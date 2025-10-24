@@ -46,15 +46,15 @@ for (dir in direcs){
       for (session in list.dirs(paste(dir,mouse,start_date,sep=separator),full.names=F,recursive=F)){
         # print(paste0("....",session))
         for (start_time in list.dirs(paste(dir,mouse,start_date,session,sep=separator),full.names=F,recursive=F)){
-          if ("A.csv" %in% list.files(paste(dir,mouse,start_date,session, start_time,sep=separator))){
+          if ("A.csv" %in% list.files(paste(dir,mouse,start_date,session, start_time, "minian",sep=separator))){
             path = paste(dir,mouse,start_date,session,start_time,sep=separator)
             print(paste0("Reading ", path))
             exp<-strsplit(strsplit(dir,separator)[[1]][1],"_")[[1]][1]
-            bad_cells<-read_cell_label(paste0(path,separator,"cell_label.csv"))
-            A<-rbind(A,read_csv_minian(paste0(path,separator,"A.csv"))%>%filter(A>0))
-            C<-rbind(C, read_csv_minian(paste0(path,separator,"C.csv")))
-            S<-rbind(S, read_csv_minian(paste0(path,separator,"S.csv")))
-            YrA<-rbind(YrA, read_csv_minian(paste0(path,separator,"YrA.csv")))
+            bad_cells<-read_cell_label(paste(path,"minian","cell_label.csv", sep=separator))
+            A<-rbind(A,read_csv_minian(paste(path,"minian","A.csv", sep=separator))%>%filter(A>0))
+            C<-rbind(C, read_csv_minian(paste(path,"minian","C.csv", sep=separator)))
+            S<-rbind(S, read_csv_minian(paste(path,"minian","S.csv", sep=separator)))
+            YrA<-rbind(YrA, read_csv_minian(paste0(path,"minian","YrA.csv")))
             motion<-rbind(motion, read_motion(path))
             ts<-rbind(ts, read_timestamps(paste(path,"My_V4_Miniscope","timeStamps.csv", sep=separator)))
           }

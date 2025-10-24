@@ -37,7 +37,7 @@ read_motion <- function(path){
     d<-tibble()
     f<-0
     for (file in files){
-      m<-read_csv(paste0(path,separator,file), show_col_types = F)%>%filter(!is.na(height) & !is.na(width))
+      m<-read_csv_minian(paste0(path,separator,file))%>%filter(!is.na(height) & !is.na(width))
       m$frame <- (0:(nrow(m)-1)) + f
       d<-rbind(d,m)
       f<-f + nrow(m)
