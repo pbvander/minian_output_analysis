@@ -4,6 +4,7 @@ library(tidyverse)
 library(ggpubr)
 library(ggprism)
 library(ggridges)
+library(patchwork)
 library(rjson)
 library(nlme)
 library(chron)
@@ -103,15 +104,28 @@ df<-rbind(df%>%filter(is.na(chron.x))%>%rename(chron=chron.y)%>%select(!chron.x)
 ##### Graph
 setwd(output_dir)
 
-#Lines
-p<-ggplot(df%>%filter(!is.na(YrA)),aes(x=frame,y=unit_id))+
-  geom_ridgeline(aes(height=scaled_YrA),fill=NA)+
-  ms
-save_png_large("line plot", plot=p,w=20,h=20)
+#Lines with motion
+ls<-list(scale_x_continuous(expand=c(0,0)),
+         theme(text=element_text(size=32)))
 
-#Motion
-p<-ggplot(motion, aes(x=frame,y=motion_distance))+
+p1<-ggplot(df%>%filter(!is.na(YrA)),aes(x=frame,y=unit_id))+
+  geom_hline(yintercept = 0:length(unique(df$unit_id)),color="grey")+
+  geom_ridgeline(aes(height=scaled_YrA),scale=0.9,linewidth=0.35,fill=NA)+
+  ms+ls
+p2<-ggplot(df, aes(x=frame,y=motion_distance))+
+  geom_line()+
+  ms+ls
+save_png_large("line plot and motion",plot=p2/p1+plot_layout(heights=c(1,10)),w=32,h=25)
+
+p1<-ggplot(df%>%filter(!is.na(YrA),start_time=="01_55_00"),aes(x=frame,y=unit_id))+
+  geom_hline(yintercept = 0:length(unique(df$unit_id)),color="grey")+
+  geom_ridgeline(aes(height=scaled_YrA),scale=0.9,fill=NA)+
+  ms+ls+scale_x_continuous(expand=c(0,0),breaks=seq(10000,20000,2500))
+p2<-ggplot(df%>%filter(start_time=="01_55_00"), aes(x=frame,y=motion_distance))+
+  geom_line()+
+  ms+ls
+save_png_large("line plot and motion subset",plot=p2/p1+plot_layout(heights=c(1,10)),w=18,h=25)
+
+ggplot(df, aes(x=frame,y=temp))+
   geom_line()+
   ms
-p
-save_png_large("motion",plot=p,w=20,h=6)
