@@ -4,8 +4,8 @@ read_csv_minian <- function(file){
   d<-d%>%mutate(experiment=exp,
                 mouse=mouse,
                 start_date=start_date,
-                session=session)%>%
-    filter(unit_id %nin% bad_cells)
+                session=session)
+  if ("unit_id" %in% colnames(d)){d<-d%>%filter(unit_id %nin% bad_cells)}
   return(d)
 }
 
