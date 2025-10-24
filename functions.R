@@ -205,6 +205,14 @@ annotate_text <- function(..., geom="text",hjust=0,x=0,y=0,label="Lorem Ipsum",s
   annotate(geom=geom,hjust=hjust,x=x,y=y,label=label,size=size,fontface=fontface,...)
 }
 
+ridgeline <- function(..., scale=0.9,linewidth=0.35,fill=NA){
+  geom_ridgeline(scale=scale,linewidth=linewidth,fill=fill, ...)
+}
+
+ridgeline_guide <- function(..., var = "unit_id",color="grey"){
+  geom_hline(aes(yintercept=!!sym(var)),color=color, ...)
+}
+
 ##Misc
 `%nin%` <- Negate(`%in%`)
 
