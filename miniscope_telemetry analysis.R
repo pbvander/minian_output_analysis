@@ -69,6 +69,7 @@ for (dir in direcs){
 df<-merge(C,S)%>%
   merge(YrA)%>%
   merge(ts)%>%
+  merge(motion)%>%
   mutate(start_chron = chron(dates.=start_date, times.=start_time, format=c(dates="y_m_d",times = "h_m_s"),out.format=c(date="m-d-y",time="h:m:s")),
                                                  chron = start_chron + (time_ms / (1000*60*60*24)),
                                                  init_unit_id = unit_id, #preserve original unit_id labels)
