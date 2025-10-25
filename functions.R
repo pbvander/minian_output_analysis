@@ -58,8 +58,8 @@ read_telemetry_data <- function(file, format = "starr-lifesci", idinfo = c("mous
       separate(ID, sep="_",idinfo)%>% ##Ignore warning about additional pieces
       select(!starts_with("misc"))%>%
       mutate(measure=case_when(measure=="Deg."~"temp",measure=="Cnts"~"act",T~"unknown"))%>%
-      mutate(chron=chron(dates.=date, times.=time))
-    if (round){d<-d%>%mutate(chron = chron%>%round(units=times(round_unit)))}
+      mutate(telem_ts = mdy_hms(paste(date,time)))
+    if (round){d<-d%>%mutate(telem_ts = telem_ts%>%round_date(telem_ts, unit = "5 mins"))}
     if (any(grepl(d$measure, pattern="unknown"))){stop("Unknown measure in telemetry data")}
     d<-d%>%spread(measure,data)
     

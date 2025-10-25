@@ -7,7 +7,6 @@ library(ggridges)
 library(patchwork)
 library(rjson)
 library(nlme)
-library(chron)
 library(gtools)
 summarize<-dplyr::summarize
 source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
@@ -71,8 +70,8 @@ df<-merge(C,S)%>%
   merge(YrA)%>%
   merge(ts)%>%
   merge(motion)%>%
-  mutate(start_chron = chron(dates.=start_date, times.=start_time, format=c(dates="y_m_d",times = "h_m_s"),out.format=c(date="m-d-y",time="h:m:s")),
-         chron = start_chron + (time_ms / (1000*60*60*24)),
+  mutate(start_ts = ymd_hms(paste(start_date, start_time)),
+         miniscope_ts = (start_ts + milliseconds(time_ms)),
          init_unit_id = unit_id, #preserve original unit_id labels)
          unit_id = factor(unit_id)%>%as.numeric()%>%factor() #renumbers unit_id starting from 1
          )%>%
@@ -84,15 +83,12 @@ df<-df%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id
 A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
               session_id = paste0(mouse,"_",start_date,"_",session))
 
-#Convert time units
-df<-df%>%mutate(time_minutes = time_ms/(1000*60))
-
 #Create new column for total time within each session
 df<-df%>%
   group_by(session_id)%>%
-  mutate(session_start_time = min(chron))%>%
+  mutate(session_start_ts = min(miniscope_ts))%>%
   ungroup()%>%
-  mutate(session_time_minutes = as.numeric(chron - session_start_time)*24*60)
+  mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60)
 
 # Clean up variables and memory
 rm(C,S,YrA,ts,motion)
@@ -111,20 +107,22 @@ for (dir in direcs){
 
 ##### Merge telemetry and miniscope data
 # Create time bin column as basis for merging
-df<-df%>%mutate(chron_bin = cut(chron, seq(min(t_df$chron)-1/(24*60*2),max(t_df$chron)+(1/(24*60*2)), (1/(24*60)))))
-t_df<-t_df%>%mutate(chron_bin = cut(chron, seq(min(t_df$chron)-(1/(24*60*2)),max(t_df$chron)+(1/(24*60*2)), (1/(24*60)))))
+ts_seq<-seq(min(t_df$telem_ts)-seconds(30),max(t_df$telem_ts)+seconds(30), seconds(60)) #assumes a 1-minute (60 second) sampling interval
+df<-df%>%mutate(ts_bin = cut(miniscope_ts, ts_seq))
+t_df<-t_df%>%mutate(ts_bin = cut(telem_ts, ts_seq))
 
 # Preserve all miniscope data, and assign one temperature/act to all frames in the given range
-df<-merge(df, t_df, by=c("mouse","chron_bin"), all=T)
-df<-rbind(df%>%filter(is.na(chron.x))%>%rename(chron=chron.y)%>%select(!chron.x), #chron.x is time measured from miniscope data, chron.y is time measured from telemetry data (this line assigns "chron" to miniscope data time, when it is present, and telemetry data time when it isn't)
-          df%>%filter(!is.na(chron.x))%>%rename(chron=chron.x)%>%select(!chron.y))
+df<-merge(df, t_df, by=c("mouse","ts_bin"), all=T)
+df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
 
 # Create 1-minute bins in miniscope data
 sumdf<-df%>%
-  group_by(chron_bin,unit_id_id)%>%
+  filter(!is.na(YrA))%>%
+  group_by(ts_bin,unit_id_id)%>%
+  arrange(ts_bin)%>%
   mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance))%>%
   ungroup()%>%
-  distinct(chron_bin,unit_id_id, .keep_all = T)
+  distinct(ts_bin,unit_id_id, .keep_all = T)
 
 ##### Graph
 gc()
