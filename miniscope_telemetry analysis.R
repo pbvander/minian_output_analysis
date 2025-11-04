@@ -65,21 +65,20 @@ for (dir in direcs){
 }
 
 ### Create dataframe with all timeseries data
-# Merge timeseries data
+# Merge timeseries data and uniquely identify each unit/session with an ID
 df<-merge(C,S)%>%
   merge(YrA)%>%
   merge(ts)%>%
   merge(motion)%>%
   mutate(start_ts = ymd_hms(paste(start_date, start_time)),
          miniscope_ts = (start_ts + milliseconds(time_ms)),
-         init_unit_id = unit_id, #preserve original unit_id labels)
+         init_unit_id = unit_id, #preserve original unit_id labels
          unit_id = factor(unit_id)%>%as.numeric()%>%factor() #renumbers unit_id starting from 1
          )%>%
+  mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
+         session_id = paste0(mouse,"_",start_date,"_",session))%>%
   scale_temporal()
 
-# Uniquely identify each "unit" and "imaging session" across various recordings
-df<-df%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
-                session_id = paste0(mouse,"_",start_date,"_",session))
 A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
               session_id = paste0(mouse,"_",start_date,"_",session))
 

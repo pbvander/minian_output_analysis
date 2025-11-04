@@ -22,7 +22,7 @@ read_timestamps <- function(file){
 }
 
 scale_temporal <- function(d){
-  d<-d%>%group_by(unit_id)%>%mutate(scaled_C = C/max(C),
+  d<-d%>%group_by(unit_id_id)%>%mutate(scaled_C = C/max(C),
                                     scaled_S = S/max(S),
                                     scaled_YrA = YrA/max(YrA))
   return(d)
