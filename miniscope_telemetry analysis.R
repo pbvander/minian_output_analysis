@@ -8,6 +8,7 @@ library(patchwork)
 library(rjson)
 library(nlme)
 library(gtools)
+library(corrr)
 summarize<-dplyr::summarize
 source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 
@@ -137,7 +138,7 @@ ls<-list(scale_x_continuous(expand=c(0,0), breaks=NULL),
 ridge_set<-list(ridgeline_guide(),
                 ridgeline(aes(height=scaled_YrA)),
                 scale_fill_viridis_c(),
-                labs(title="Normalized YrA (Demixed temporal activity)", y="Cell ID",x=element_blank()))
+                labs(title="Normalized YrA (detrended + demixed GCaMP signal)", y="Cell ID",x=element_blank()))
 motion_set<-list(geom_line(),
                  labs(y="pixels",x=element_blank(),title="Motion distance"))
 temp_set<-list(geom_line(linewidth = 1),
@@ -156,3 +157,18 @@ s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
 s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
 s2/s1/s3+plot_layout(heights=c(1,10,1))
 save_png_large("line plot and motion and temp subset",plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
+
+###YrA - body temperature relationship
+data<-sumdf%>%filter(!is.na(mean_YrA))
+data<-merge(data, data%>%group_by(unit_id)%>%summarise(cor = cor(temp, scaled_mean_YrA, method = "pearson")))%>%mutate(unit_id_cor = paste0(unit_id," (",round(cor,digits = 2),")"))
+data$unit_id<-factor(data$unit_id, levels = data%>%arrange(cor)%>%pull(unit_id)%>%unique())
+p1<-ggplot(data, aes(x=temp, y=scaled_mean_YrA))+
+  xy_point2(alpha=0.5)+
+  regression_line()+
+  ms+
+  labs(y="Normalized + binned (mean) YrA", title="Cell ID", x="Core body temperature (Deg. C)")+
+  theme(text = element_text(size=24))+
+  facet_wrap(vars(unit_id), axes="all")#+theme(strip.text.x = element_blank())
+p1
+save_png_large("Normalized and binned YrA by body temperature", w=32,h=18)
+
