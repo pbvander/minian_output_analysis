@@ -121,7 +121,8 @@ sumdf<-df%>%
   arrange(ts_bin)%>%
   mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance))%>%
   ungroup()%>%
-  distinct(ts_bin,unit_id_id, .keep_all = T)
+  distinct(ts_bin,unit_id_id, .keep_all = T)%>%
+  scale_temporal_bin()
 
 ##### Graph
 gc()

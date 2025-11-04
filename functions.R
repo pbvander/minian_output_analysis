@@ -28,6 +28,13 @@ scale_temporal <- function(d){
   return(d)
 }
 
+scale_temporal_bin <- function(d){
+  d<-d%>%group_by(unit_id_id)%>%mutate(scaled_mean_C = mean_C/max(mean_C),
+                                    scaled_mean_S = mean_S/max(mean_S),
+                                    scaled_mean_YrA = mean_YrA/max(mean_YrA))
+  return(d)
+}
+
 read_motion <- function(path){
   pattern<-"motion[0-9]*.csv"
   if (!any(grepl(pattern, list.files(path)))){stop("No motion files detected")}
