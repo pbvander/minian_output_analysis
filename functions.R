@@ -177,8 +177,8 @@ xy_point <- function(...,size=4){
   geom_point(size=size,...)
 }
 
-xy_point2 <- function(...,size=3,shape=21,color="grey20",alpha=0.7){
-  geom_point(size=size,shape=shape,color=color,alpha=alpha,...)
+xy_point2 <- function(...,size=3,shape=21,color="grey20",alpha=0.6, stroke=1.2){
+  geom_point(size=size,shape=shape,color=color,alpha=alpha, stroke=stroke,...)
 }
 
 regression_line <- function(..., size=1.5, method="lm", se=F){
