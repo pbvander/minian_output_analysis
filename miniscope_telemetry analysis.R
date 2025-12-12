@@ -99,9 +99,10 @@ read<-c()
 t_df<-tibble()
 for (dir in direcs){
   telem_file<-paste(strsplit(direcs[1],separator)[[1]][1],"telem data","telem data combined.csv", sep=separator)
+  metadata_file<-paste(strsplit(direcs[1],separator)[[1]][1],"telem data","metadata.csv", sep=separator)
   if (telem_file %in% read){next}
   print(telem_file)
-  t_df<-rbind(t_df, read_telemetry_data(telem_file)) ##Ignore warning about additional pieces
+  t_df<-rbind(t_df, read_telemetry_data(telem_file, metadata_file)) ##Ignore warning about additional pieces
   read <- c(read, telem_file)
 }
 

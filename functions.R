@@ -55,7 +55,8 @@ read_motion <- function(path){
 }
 
 ##Telemetry
-read_telemetry_data <- function(file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F, round_unit = "00:01:00"){
+read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F){
+  #Read in telemetry data
   d<-read_csv(file, show_col_types = F)
   if (format == "starr-lifesci"){ ###For STARR Life Sciences VitalView software output
     idinfo<-c("mouse", "misc", "measure", "misc2")
@@ -66,13 +67,22 @@ read_telemetry_data <- function(file, format = "starr-lifesci", idinfo = c("mous
       select(!starts_with("misc"))%>%
       mutate(measure=case_when(measure=="Deg."~"temp",measure=="Cnts"~"act",T~"unknown"))%>%
       mutate(telem_ts = mdy_hms(paste(date,time)))
-    if (round){d<-d%>%mutate(telem_ts = telem_ts%>%round_date(telem_ts, unit = "5 mins"))}
+    if (round){d<-d%>%mutate(telem_ts = telem_ts%>%round_date(telem_ts, unit = "minute"))} #round data to nearest minute (only necessary if timestamps are not aligned on the minute)
     if (any(grepl(d$measure, pattern="unknown"))){stop("Unknown measure in telemetry data")}
     d<-d%>%spread(measure,data)
     
   } else {
     stop("This function currently only supports 'starr-lifesci' as a format")
   }
+  
+  #Read in telemetry metadata and add to telemetry data
+  md<-read_csv(metadata_file, show_col_types = F)%>%mutate(fstart = mdy_hms(paste(fstart, "10:00:00"))) #read metadata and convert fstart to date-time
+  trial1_end <- md%>%filter(trial=="trial1")%>%pull(fstart)%>%unique() + days(4) #calculate end of trial1
+  d<-d%>%
+    mutate(trial=ifelse(telem_ts < trial1_end, "trial1","trial2"))%>% #add trial metadata to telem data
+    merge(md)%>% #add metadata
+    mutate(aligned_time  = difftime(telem_ts, fstart, units = "hours")%>%as.numeric()%>%round(digits=2))
+  
   return(d)
 }
 
