@@ -10,7 +10,7 @@ read_csv_minian <- function(file){
 }
 
 read_cell_label <- function(file){
-  cell_label<-read_csv(file,show_col_types = F)%>%rename(label = "1")
+  cell_label<-read_csv(file,show_col_types = F,col_names="label")
   cell_label$unit_id<-0:(nrow(cell_label)-1)
   bad_cells<-cell_label%>%filter(label==0)%>%pull(unit_id)
 }
