@@ -83,6 +83,16 @@ df<-merge(C,S)%>%
 A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
               session_id = paste0(mouse,"_",start_date,"_",session))
 
+# Add metadata on session type
+read<-c()
+session_mdf<-tibble()
+for (dir in direcs){
+  file<-paste(strsplit(direcs[1],separator)[[1]][1],"session_type_metadata.csv", sep=separator)
+  if (file %in% read){next}
+  session_md<-read_csv(file, show_col_types=F)
+}
+df<-df%>%merge(session_mdf, all.x=T)
+
 #Create new column for total time within each session
 df<-df%>%
   group_by(session_id)%>%
