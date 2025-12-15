@@ -173,48 +173,51 @@ sumdf<-read_rds("./output/sumdf.rds")
 
 ##### Graph
 gc()
-setwd(output_dir)
 
-### Lines with motion (quality check)
-ls<-list(scale_x_continuous(expand=c(0,0), breaks=NULL),
-         theme(text=element_text(size=28),plot.title = element_text(size=28)),
-         labs(x="Time (minutes)"),
-         facet_wrap(vars(start_time), nrow=1,scales="free_x"),
-         theme(strip.text.x = element_blank()))
-ridge_set<-list(ridgeline_guide(),
-                ridgeline(aes(height=scaled_YrA)),
-                scale_fill_viridis_c(),
-                labs(title="Normalized YrA (detrended + demixed GCaMP signal)", y="Cell ID",x=element_blank()))
-motion_set<-list(geom_line(),
-                 labs(y="pixels",x=element_blank(),title="Motion distance"))
-temp_set<-list(geom_line(linewidth = 1),
-               scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,4)),
-               labs(y="Deg. C",title="Core body tempeature"))
+for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
+  print(id)
 
-# All frames
-p1<-ggplot(df%>%filter(!is.na(YrA)),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
-p2<-ggplot(df%>%filter(!is.na(motion_distance)), aes(x=session_time_minutes,y=motion_distance))+ms+ls+motion_set
-p3<-ggplot(df%>%filter(!is.na(YrA)), aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
-save_png_large("line plot and motion and temp",plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)
+  ### Lines with motion (quality check)
+  ls<-list(scale_x_continuous(expand=c(0,0), breaks=NULL),
+           theme(text=element_text(size=28),plot.title = element_text(size=28)),
+           labs(x="Time (minutes)"),
+           facet_wrap(vars(start_time), nrow=1,scales="free_x"),
+           theme(strip.text.x = element_blank()))
+  ridge_set<-list(ridgeline_guide(),
+                  ridgeline(aes(height=scaled_YrA)),
+                  scale_fill_viridis_c(),
+                  labs(title="Detrended + demixed signal (F) / max F", y="Cell ID",x=element_blank()))
+  motion_set<-list(geom_line(),
+                   labs(y="pixels",x=element_blank(),title="Motion distance"))
+  temp_set<-list(geom_line(linewidth = 1),
+                 scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,4)),
+                 labs(y="Deg. C",title="Core body tempeature"))
+  
+  # All frames
+  p1<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
+  p2<-ggplot(df%>%filter(!is.na(motion_distance), session_id_type==id), aes(x=session_time_minutes,y=motion_distance))+ms+ls+motion_set
+  p3<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
+  save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)
+  
+  # Subset of frames
+  # s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+  # s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+  # s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+  # s2/s1/s3+plot_layout(heights=c(1,10,1))
+  # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
+}
 
-# Subset of frames
-s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-s2/s1/s3+plot_layout(heights=c(1,10,1))
-save_png_large("line plot and motion and temp subset",plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
-
-###YrA - body temperature relationship
-data<-sumdf%>%filter(!is.na(mean_YrA))
-data<-merge(data, data%>%group_by(unit_id)%>%summarise(cor = cor(temp, scaled_mean_YrA, method = "pearson")))%>%mutate(unit_id_cor = paste0(unit_id," (",round(cor,digits = 2),")"))
-data$unit_id<-factor(data$unit_id, levels = data%>%arrange(cor)%>%pull(unit_id)%>%unique())
-p1<-ggplot(data, aes(x=temp, y=scaled_mean_YrA))+
+###dF/F0 - body temperature relationship
+data<-sumdf%>%filter(!is.na(mean_df_f0), session_type=="torpor")
+data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(temp, mean_df_f0, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
+data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
+p1<-ggplot(data, aes(x=temp, y=df_f0))+
   xy_point2(alpha=0.5)+
   regression_line()+
   ms+
   labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
   theme(text = element_text(size=24))+
-  facet_wrap(vars(unit_id), axes="all")#+theme(strip.text.x = element_blank())
+  facet_wrap(vars(unit_id_id), axes="all", scales="free_y")#+theme(strip.text.x = element_blank())
 p1
 save_png_large("df_f0 by body temperature", w=40,h=25)
 
