@@ -16,7 +16,8 @@ source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 #Paths/directories:
 exp_direc<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Experiments"
 output_dir<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope"
-direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor")
+direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
+          "250417_circulating_E2_torpor_miniscope/post-OVX_torpor")
 dir_struct<-c("test","mouse","start_date","session","start_time","camera") #set this to the levels of metadata stored in the directory structure of the data. Set in order from the first/higher/root directory level, to the last/lowest/final branch directory level
 separator<-"/" #set depending on OS
 
@@ -115,7 +116,7 @@ for (dir in direcs){
   metadata_file<-paste(strsplit(direcs[1],separator)[[1]][1],"telem data","metadata.csv", sep=separator)
   if (telem_file %in% read){next}
   print(telem_file)
-  t_df<-rbind(t_df, read_telemetry_data(telem_file, metadata_file)) ##Ignore warning about additional pieces
+  t_df<-rbind(t_df, read_telemetry_data(telem_file, metadata_file, format="starr-lifesci")) ##Ignore warning about additional pieces
   read <- c(read, telem_file)
 }
 
