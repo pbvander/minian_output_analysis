@@ -100,7 +100,8 @@ df<-df%>%
   group_by(session_id)%>%
   mutate(session_start_ts = min(miniscope_ts))%>%
   ungroup()%>%
-  mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60)
+  mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60, #time within the entire "session" 
+         time_seconds = interval(start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric()) #time in seconds within each "start_time" 
 
 # Clean up variables and memory
 rm(C,S,YrA,ts,motion)
