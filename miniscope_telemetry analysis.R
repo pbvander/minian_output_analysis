@@ -130,12 +130,31 @@ t_df<-t_df%>%mutate(ts_bin = cut(telem_ts, ts_seq))
 df<-merge(df, t_df, by=c("mouse","ts_bin"), all=T)
 df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
 
+##### Calculate dF/F0
+df<-df%>%mutate(f0 = case_when(
+    session_type == "cage_change" & time_seconds < 300 ~ T, #5-minute baseline before cage change
+    session_type == "torpor" & aligned_time<30 & temp>35 ~ T, #day 1 torpor (euthermia timepoints)
+    session_type == "torpor" & temp>35 ~ T, #day 2 torpor (euthermia timepoints)
+    session_type == "cold" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
+    session_type == "heat" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
+    session_type == "male_interaction" & time_seconds < 300 ~ T, #5-minute baseline before adding male
+    T ~ F
+  )
+)
+
+f0_df<-df%>%filter(f0)%>%group_by(unit_id_id,session_id,session_type)%>%summarize(mean_f0 = mean(YrA), sd_f0 = sd(YrA))
+check<-f0_df%>%group_by(session_id,session_type)%>%count()%>%nrow() - df%>%filter(!is.na(session_id))%>%group_by(session_id,session_type)%>%count()%>%nrow() 
+print(check) #check that f0 is calculated for all sesssion_id values. This should equal 0
+if (check !=0){stop("f0 not matching number of session_ids")}
+df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
+                                        df_f0_z = df_f0/sd_f0)
+
 # Create 1-minute bins in miniscope data
 sumdf<-df%>%
   filter(!is.na(YrA))%>%
   group_by(ts_bin,unit_id_id)%>%
   arrange(ts_bin)%>%
-  mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance))%>%
+  mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance), mean_df_f0=mean(df_f0), mean_df_f0_z=mean(df_f0_z))%>%
   ungroup()%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
@@ -193,9 +212,9 @@ p1<-ggplot(data, aes(x=temp, y=scaled_mean_YrA))+
   xy_point2(alpha=0.5)+
   regression_line()+
   ms+
-  labs(y="Normalized + binned (mean) YrA", title="Cell ID", x="Core body temperature (Deg. C)")+
+  labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
   theme(text = element_text(size=24))+
   facet_wrap(vars(unit_id), axes="all")#+theme(strip.text.x = element_blank())
 p1
-save_png_large("Normalized and binned YrA by body temperature", w=32,h=18)
+save_png_large("df_f0 by body temperature", w=40,h=25)
 
