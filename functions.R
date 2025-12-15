@@ -17,6 +17,10 @@ read_cell_label <- function(file){
 
 read_timestamps <- function(file){
   d<-read_csv(file, show_col_types = F)
+  d<-d%>%mutate(experiment=exp,
+                mouse=mouse,
+                start_date=start_date,
+                session=session)
   if("frame" %nin% colnames(d)){d<-d%>%rename(frame = `Frame Number`, time_ms = `Time Stamp (ms)`, buffer_index = `Buffer Index`, start_time = start_time)}
   return(d)
 }
