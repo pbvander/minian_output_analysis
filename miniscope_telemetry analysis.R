@@ -89,9 +89,11 @@ session_mdf<-tibble()
 for (dir in direcs){
   file<-paste(strsplit(direcs[1],separator)[[1]][1],"session_type_metadata.csv", sep=separator)
   if (file %in% read){next}
-  session_md<-read_csv(file, show_col_types=F)
+  print(file)
+  session_mdf<-rbind(session_mdf, read_csv(file, show_col_types=F)%>%mutate(across(everything(), as.character)))
+  read<-c(read, file)
 }
-df<-df%>%merge(session_mdf, all.x=T)
+df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))
 
 #Create new column for total time within each session
 df<-df%>%
