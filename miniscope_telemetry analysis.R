@@ -136,6 +136,18 @@ sumdf<-df%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
 
+##### Write output
+setwd(output_dir)
+write_output_rds(df)
+write_output_rds(A)
+write_output_rds(sumdf)
+
+##### Checkpoint (resume here if above has run)
+setwd(output_dir)
+df<-read_rds("./output/df.rds")
+A<-read_rds("./output/A.rds")
+sumdf<-read_rds("./output/sumdf.rds")
+
 ##### Graph
 gc()
 setwd(output_dir)

@@ -173,6 +173,9 @@ write_output<-function(data, direc="./output/", name = NA){
   saveRDS(object=data, file=paste0(direc,ifelse(is.na(name),deparse(substitute(data)),name),".rds"))
   write_csv(x=data, file=paste0(direc,ifelse(is.na(name),deparse(substitute(data)),name),".csv"))}
 
+write_output_rds<-function(data, direc="./output/", name = NA){
+  saveRDS(object=data, file=paste0(direc,ifelse(is.na(name),deparse(substitute(data)),name),".rds"))}
+
 ##ggplot themes/aesthetics/settings
 point_summary <- function(...,size=8){
   geom_point(size=size,stat="summary",...)
