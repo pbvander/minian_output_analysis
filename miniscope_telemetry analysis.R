@@ -10,12 +10,12 @@ library(nlme)
 library(gtools)
 library(corrr)
 summarize<-dplyr::summarize
-source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
+source("C:/Users/General Correa Lab/Documents/GitHub/minian_output_analysis/functions.R")
 
 ##### Things to set manually:
 #Paths/directories:
-exp_direc<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Experiments"
-output_dir<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope"
+exp_direc<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vander/Experiments"
+output_dir<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope"
 direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
           "250417_circulating_E2_torpor_miniscope/post-OVX_torpor")
 dir_struct<-c("test","mouse","start_date","session","start_time","camera") #set this to the levels of metadata stored in the directory structure of the data. Set in order from the first/higher/root directory level, to the last/lowest/final branch directory level
@@ -94,6 +94,22 @@ for (dir in direcs){
   read<-c(read, file)
 }
 df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))
+
+# Add event-based metadata
+event_mdf<-tibble()
+read<-c()
+for (dir in direcs){
+  file<-paste(strsplit(dir[1],separator)[[1]][1],"event_metadata.csv", sep=separator)
+  if (file %in% read){next}
+  print(file)
+  event_mdf<-rbind(event_mdf, read_event_metadata(file))
+  read<-c(read,file)
+}
+event_mdf<-event_mdf%>%select(event, session_id, frame)%>%pivot_wider(names_from = event,values_from = frame)
+df<-df%>%
+  merge(event_mdf, all.x=T)%>%
+  mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
+                                        session_type == "male_interaction" ~ ifelse(frame%>%between(male_added,male_removed), 1, 0)))
 
 #Create new column for total time within each session
 df<-df%>%
@@ -206,6 +222,9 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
                  labs(y="Deg. C",title="Core body tempeature"))
   ambient_temp_set<-list(geom_line(linewidth = 1),
                          labs(y="Deg. C",title="Ambient tempeature",x=element_blank()))
+  male_interaction_set<-list(geom_line(linewidth = 1),
+                         labs(y="",title="Male social stimulus",x=element_blank()),
+                         scale_y_continuous(breaks=c(0,1)))
   
   # All frames
   p1<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
@@ -215,6 +234,9 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
     save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)}
   if (grepl("heat",id) | grepl("cold",id)){
     p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
+    save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+  if (grepl("male_interaction",id)){
+    p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
     save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
   
   # Subset of frames

@@ -119,6 +119,40 @@ read_ambient_data <- function(file, upsample_interval_seconds = 60){
   interp_df<-tibble("timepoint"=interp$x, "ambient_temp_interpolated"=(interp$y)%>%round(digits=2))
   d<-merge(d,interp_df)%>%
     select(!c(timepoint,time))
+  return(d)
+}
+
+## Event metadata
+read_event_metadata <- function(file){
+  ## Read in data and get path to timeStamp files required
+  d<-read_csv(file, show_col_types=F)%>%
+    filter(!is.na(webcam_frame))%>%
+    mutate(across(everything(),as.character),
+           path=paste(paste0(experiment,"_circulating_E2_torpor_miniscope"),timepoint,mouse,start_date,session,start_time,"My_WebCam","timeStamps.csv",sep=separator))
+  ts_d<-tibble()
+  for (pth in unique(d$path)){
+    d2<-d%>%filter(path==pth)
+    t<-read_csv(pth, show_col_types = F)%>%
+      rename(webcam_frame = `Frame Number`, webcam_time_ms = `Time Stamp (ms)`, buffer_index = `Buffer Index`)%>%
+      mutate(exp=unique(d2$experiment),
+             mouse=unique(d2$mouse),
+             start_date=unique(d2$start_date),
+             session=unique(d2$session),
+             start_time=unique(d2$start_time))
+    ts_d<-rbind(ts_d, t)
+  }
+  d<-merge(d,ts_d,all.x=T)%>%mutate(session_id = paste(mouse,start_date,session,sep="_"))
+  for (i in 1:nrow(d)){
+    frm<-(df%>%
+            filter(session_id==d[[i,"session_id"]], start_time==d[[i,"start_time"]])%>%
+            mutate(ts_diff = abs(time_ms-d[[i,"webcam_time_ms"]]))%>%
+            filter(ts_diff == min(ts_diff))%>%
+            pull(frame)%>%
+            unique())[1] # [1] is important in case there is a "tie" between two frames for closest to the time stamp of interest
+    d[i,"frame"] <- frm
+  }
+  d<-d%>%filter(!is.na(frame))
+  return(d)
 }
 
 ##Saving plots/data
