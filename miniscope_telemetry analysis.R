@@ -119,14 +119,27 @@ for (dir in direcs){
   read <- c(read, telem_file)
 }
 
+##### Read in ambient temperature data
+read<-c()
+at_df<-tibble()
+for (dir in direcs){
+  at_file<-paste(strsplit(dir,separator)[[1]][1],"telem data","ambient temperature.csv", sep=separator)
+  if (at_file %in% read){next}
+  print(at_file)
+  at_df<-rbind(at_df, read_ambient_data(at_file, upsample_interval_seconds = 60))
+  read <- c(read, at_file)
+}
+
 ##### Merge telemetry and miniscope data
 # Create time bin column as basis for merging
 ts_seq<-seq(min(t_df$telem_ts)-seconds(30),max(t_df$telem_ts)+seconds(30), seconds(60)) #assumes a 1-minute (60 second) sampling interval
 df<-df%>%mutate(ts_bin = cut(miniscope_ts, ts_seq))
 t_df<-t_df%>%mutate(ts_bin = cut(telem_ts, ts_seq))
+at_df<-at_df%>%mutate(ts_bin = cut(ambient_ts, ts_seq))
 
-# Preserve all miniscope data, and assign one temperature/act to all frames in the given range
-df<-merge(df, t_df, by=c("mouse","ts_bin"), all=T)
+# Preserve all miniscope data, and assign one temperature/act/ambient temperature to all frames in the given range
+df<-merge(df, t_df, all=T)
+df<-merge(df, at_df%>%select(!c(session_type,start_date)), all=T)
 df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
 
 ##### Calculate dF/F0
@@ -191,12 +204,18 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
   temp_set<-list(geom_line(linewidth = 1),
                  scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,4)),
                  labs(y="Deg. C",title="Core body tempeature"))
+  ambient_temp_set<-list(geom_line(linewidth = 1),
+                         labs(y="Deg. C",title="Ambient tempeature",x=element_blank()))
   
   # All frames
   p1<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
   p2<-ggplot(df%>%filter(!is.na(motion_distance), session_id_type==id), aes(x=session_time_minutes,y=motion_distance))+ms+ls+motion_set
   p3<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
-  save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)
+  if (grepl("torpor",id)){
+    save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)}
+  if (grepl("heat",id) | grepl("cold",id)){
+    p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
+    save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
   
   # Subset of frames
   # s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
@@ -216,7 +235,6 @@ p1<-ggplot(data, aes(x=temp, y=df_f0))+
   ms+
   labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
   theme(text = element_text(size=24))+
-  facet_wrap(vars(unit_id_id), axes="all", scales="free_y")#+theme(strip.text.x = element_blank())
+  facet_wrap(vars(unit_id_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
 p1
 save_png_large("df_f0 by body temperature", w=40,h=25)
-

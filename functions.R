@@ -94,6 +94,33 @@ read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", i
   return(d)
 }
 
+##Ambient temeprature
+read_ambient_data <- function(file, upsample_interval_seconds = 60){
+  ## Read in ambient temeprature data file
+  d<-read_csv(file, show_col_types=F)%>%
+    mutate(ambient_ts = ymd_hms(paste(start_date,time)))
+  
+  ## Upsample data 
+  # Get target times for upsampling and add to d
+  start_stop_df<-d%>%group_by(start_date,session_type,mouse)%>%summarize(start = min(ambient_ts), stop = max(ambient_ts))
+  times_df<-tibble()
+  for (i in 1:nrow(start_stop_df)){
+    times_df<-rbind(times_df,
+                    tibble("ambient_ts" = (seq(start_stop_df[[i,"start"]], start_stop_df[[i,"stop"]], seconds(60))),
+                           "mouse"=start_stop_df[[i,"mouse"]],
+                           "start_date"=start_stop_df[[i,"start_date"]],
+                           "session_type"=start_stop_df[[i,"session_type"]]))
+  }
+  d<-merge(d, times_df, all=T)%>%
+    mutate(timepoint = factor(ambient_ts)%>%as.numeric())
+  
+  # Upsample via linear interpolation
+  interp<-approx(x = d$timepoint, y=d$ambient_temp, xout=unique(d$timepoint))
+  interp_df<-tibble("timepoint"=interp$x, "ambient_temp_interpolated"=(interp$y)%>%round(digits=2))
+  d<-merge(d,interp_df)%>%
+    select(!c(timepoint,time))
+}
+
 ##Saving plots/data
 save_plot<- function(name, plot=last_plot(), direc="./output/",w=NA,h=NA,units="in", ...){
   # print("Saving pdf...")
