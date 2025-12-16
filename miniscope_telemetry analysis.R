@@ -74,8 +74,7 @@ df<-merge(C,S)%>%
   merge(motion)%>%
   mutate(start_ts = ymd_hms(paste(start_date, start_time)),
          miniscope_ts = (start_ts + milliseconds(time_ms)),
-         init_unit_id = unit_id, #preserve original unit_id labels
-         unit_id = factor(unit_id)%>%as.numeric()%>%factor() #renumbers unit_id starting from 1
+         
          )%>%
   mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
          session_id = paste0(mouse,"_",start_date,"_",session))%>%

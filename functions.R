@@ -5,7 +5,11 @@ read_csv_minian <- function(file){
                 mouse=mouse,
                 start_date=start_date,
                 session=session)
-  if ("unit_id" %in% colnames(d)){d<-d%>%filter(unit_id %nin% bad_cells)}
+  if ("unit_id" %in% colnames(d)){
+    d<-d%>%filter(unit_id %nin% bad_cells)%>% #remove cells labeled as bad in CScreener
+      mutate(init_unit_id = unit_id, #preserve original unit_id labels
+             unit_id = factor(unit_id)%>%as.numeric()%>%factor()) #renumbers unit_id starting from 1
+    }
   return(d)
 }
 
