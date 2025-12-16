@@ -25,7 +25,7 @@ read_timestamps <- function(file){
                 mouse=mouse,
                 start_date=start_date,
                 session=session)
-  if("frame" %nin% colnames(d)){d<-d%>%rename(frame = `Frame Number`, time_ms = `Time Stamp (ms)`, buffer_index = `Buffer Index`, start_time = start_time)}
+  if("frame" %nin% colnames(d)){d<-d%>%rename(frame = `Frame Number`, time_ms = `Time Stamp (ms)`, buffer_index = `Buffer Index`)%>%mutate(start_time=start_time)}
   return(d)
 }
 
