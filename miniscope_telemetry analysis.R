@@ -87,7 +87,7 @@ A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
 read<-c()
 session_mdf<-tibble()
 for (dir in direcs){
-  file<-paste(strsplit(direcs[1],separator)[[1]][1],"session_type_metadata.csv", sep=separator)
+  file<-paste(strsplit(dir[1],separator)[[1]][1],"session_type_metadata.csv", sep=separator)
   if (file %in% read){next}
   print(file)
   session_mdf<-rbind(session_mdf, read_csv(file, show_col_types=F)%>%mutate(across(everything(), as.character)))
@@ -111,8 +111,8 @@ gc()
 read<-c()
 t_df<-tibble()
 for (dir in direcs){
-  telem_file<-paste(strsplit(direcs[1],separator)[[1]][1],"telem data","telem data combined.csv", sep=separator)
-  metadata_file<-paste(strsplit(direcs[1],separator)[[1]][1],"telem data","metadata.csv", sep=separator)
+  telem_file<-paste(strsplit(dir,separator)[[1]][1],"telem data","telem data combined.csv", sep=separator)
+  metadata_file<-paste(strsplit(dir,separator)[[1]][1],"telem data","metadata.csv", sep=separator)
   if (telem_file %in% read){next}
   print(telem_file)
   t_df<-rbind(t_df, read_telemetry_data(telem_file, metadata_file, format="starr-lifesci")) ##Ignore warning about additional pieces
