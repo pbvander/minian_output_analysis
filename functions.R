@@ -91,6 +91,22 @@ read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", i
     merge(md)%>% #add metadata
     mutate(aligned_time  = difftime(telem_ts, fstart, units = "hours")%>%as.numeric()%>%round(digits=2))
   
+  #Process telemetry data
+  #Calculate lagged data
+  d<-d%>%
+    mutate(telem_ts = telem_ts + minutes(1))%>%
+    select(telem_ts,temp,mouse)%>%rename(temp_lag1 = temp)%>%
+    merge(d, all.y=T)%>%
+    mutate(temp_change1 = temp-temp_lag1)
+  
+  #Define torpor states
+  d<-d%>%mutate(torpor_status = case_when(temp<31 ~ "deep_torpor",
+                                          temp<34 & temp_change1 < -0.05 ~ "entry",
+                                          temp<34 & temp_change1 > 0.1 ~ "arousal",
+                                          temp<34 ~ "shallow_torpor",
+                                          temp>=34 ~ "non-torpor"),
+                torpor_status=factor(torpor_status, levels=c("non-torpor","shallow_torpor","entry","arousal","deep_torpor")))
+
   return(d)
 }
 
