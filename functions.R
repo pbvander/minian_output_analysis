@@ -134,7 +134,12 @@ read_ambient_data <- function(file, upsample_interval_seconds = 60){
   interp<-approx(x = d$timepoint, y=d$ambient_temp, xout=unique(d$timepoint))
   interp_df<-tibble("timepoint"=interp$x, "ambient_temp_interpolated"=(interp$y)%>%round(digits=2))
   d<-merge(d,interp_df)%>%
-    select(!c(timepoint,time))
+    select(!c(timepoint,time))%>%
+    mutate(ambient_temp_bin=case_when(ambient_temp_interpolated < 5 ~ "4C",
+                                     ambient_temp_interpolated > 37 ~ "38C",
+                                     ambient_temp_interpolated%>%between(21,23) ~ "22C",
+                                     T ~ NA),
+           ambient_temp_bin=factor(ambient_temp_bin,levels=c("4C","22C","38C")))
   return(d)
 }
 
