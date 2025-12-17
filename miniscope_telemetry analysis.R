@@ -262,3 +262,68 @@ p<-ggplot(data, aes(x=temp, y=mean_df_f0))+
   facet_wrap(vars(unit_id_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
 p
 save_png_large("df_f0 by body temperature", w=40,h=25)
+
+## Torpor vs non-torpor bins
+# Examine torpor status labeling
+p<-ggplot(t_df%>%filter(aligned_time%>%between(-6,51)),aes(x=aligned_time,y=temp))+
+  continuous_line(aes(group=mouse,color=torpor_status))+
+  facet_wrap(vars(mouse,trial),axes="all")+
+  scale_color_manual(values=colors)+
+  ms
+p
+save_plot("torpor status labels",w=18,h=12)
+
+#Non-torpor vs deep torpor
+set<-list(geom_violin(aes(fill=torpor_status)),
+              point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123)),
+              scale_fill_manual(values=colors),
+              facet_wrap(vars(unit_id_id),scales="free_y",axes="all"),
+              labs(x=element_blank(),y="dF/F0"),
+              scale_x_discrete(breaks=c()))
+
+p<-ggplot(sumdf%>%filter(!is.na(mean_df_f0), torpor_status %in% c("deep_torpor","non-torpor")), aes(x=torpor_status,y=mean_df_f0))+ms+set
+p
+save_plot("df_f0 non-torpor vs deep torpor",w=20,h=15)
+
+#All torpor status bins
+p<-ggplot(sumdf%>%filter(!is.na(mean_df_f0)), aes(x=torpor_status,y=mean_df_f0))+ms+set
+p
+save_plot("df_f0 by torpor status",w=20,h=15)
+
+### dF/F0 - ambient temperature relationship
+## By temeprature
+data<-sumdf%>%filter(!is.na(mean_df_f0), !is.na(ambient_temp_interpolated))
+data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(ambient_temp_interpolated, mean_df_f0, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
+data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
+p<-ggplot(data, aes(x=ambient_temp_interpolated, y=mean_df_f0))+
+  xy_point2(alpha=0.5)+
+  regression_line()+
+  ms+
+  labs(y="dF/F0", title="Cell ID", x="Ambient temperature (Deg. C)")+
+  theme(text = element_text(size=24))+
+  facet_wrap(vars(unit_id_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
+p
+save_png_large("df_f0 by ambient temperature", w=40,h=25)
+
+## Temperature bins
+set<-list(geom_violin(aes(fill=ambient_temp_bin)),
+          point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123)),
+          scale_fill_manual(values=c(colors[3],colors[1],colors[2])),
+          facet_wrap(vars(unit_id_id),scales="free_y",axes="all"),
+          labs(x=element_blank(),y="dF/F0"),
+          scale_x_discrete(breaks=c()))
+
+sumdf<-sumdf%>%mutate(ambient_temp_bin=factor(ambient_temp_bin,levels=c("4C","22C","38C")))
+p<-ggplot(sumdf%>%filter(!is.na(mean_df_f0),ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=mean_df_f0))+ms+set
+p
+save_plot("df_f0 by ambient temperature bin",w=20,h=15)
+
+### dF/F0 - male social stimulus relationship
+p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=factor(male_interaction)), aes(x=male_interaction,y=mean_df_f0))+
+  geom_violin(aes(fill=male_interaction))+
+  point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123))+
+  scale_fill_manual(values=c(colors[1],colors[5]))+
+  facet_wrap(vars(unit_id_id),axes="all",scales="free_y")+
+  ms
+p
+save_plot("df_f0 by male interaction",w=20,h=15)
