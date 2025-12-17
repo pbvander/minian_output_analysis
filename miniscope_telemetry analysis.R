@@ -247,16 +247,18 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
   # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
 }
 
-###dF/F0 - body temperature relationship
+### dF/F0 - body temperature relationship
+## By temperature value
 data<-sumdf%>%filter(!is.na(mean_df_f0), session_type=="torpor")
 data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(temp, mean_df_f0, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
 data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
-p1<-ggplot(data, aes(x=temp, y=df_f0))+
+
+p<-ggplot(data, aes(x=temp, y=mean_df_f0))+
   xy_point2(alpha=0.5)+
   regression_line()+
   ms+
   labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
   theme(text = element_text(size=24))+
   facet_wrap(vars(unit_id_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
-p1
+p
 save_png_large("df_f0 by body temperature", w=40,h=25)

@@ -302,6 +302,8 @@ ridgeline_guide <- function(..., var = "unit_id",color="grey"){
   geom_hline(aes(yintercept=!!sym(var)),color=color, ...)
 }
 
+colors<-c("#000000", "#E69F00", "#56B4E9", "#009E73","#F0E442", "#0072B2", "#D55E00", "#CC79A7") #http://bconnelly.net/posts/creating_colorblind-friendly_figures/
+
 ##Misc
 `%nin%` <- Negate(`%in%`)
 
