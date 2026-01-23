@@ -175,14 +175,14 @@ check<-f0_df%>%group_by(session_id,session_type)%>%count()%>%nrow() - df%>%filte
 print(check) #check that f0 is calculated for all sesssion_id values. This should equal 0
 if (check !=0){stop("f0 not matching number of session_ids")}
 df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
-                                        df_f0_z = df_f0/sd_f0)
+                                        z = (YrA - mean_f0) / sd_f0)
 
 # Create 1-minute bins in miniscope data
 sumdf<-df%>%
   filter(!is.na(YrA))%>%
   group_by(ts_bin,unit_id_id)%>%
   arrange(ts_bin)%>%
-  mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance), mean_df_f0=mean(df_f0), mean_df_f0_z=mean(df_f0_z))%>%
+  mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance), mean_df_f0=mean(df_f0), mean_z=mean(z))%>%
   ungroup()%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
