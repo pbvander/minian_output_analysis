@@ -17,7 +17,9 @@ source("C:/Users/General Correa Lab/Documents/GitHub/minian_output_analysis/func
 exp_direc<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vander/Experiments"
 output_dir<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope"
 direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
-          "250417_circulating_E2_torpor_miniscope/post-OVX_torpor")
+          "250417_circulating_E2_torpor_miniscope/post-OVX_torpor",
+          "251013_circulating_E2_torpor_miniscope/pre-ovx_torpor",
+          "251013_circulating_E2_torpor_miniscope/post-ovx_torpor")
 dir_struct<-c("test","mouse","start_date","session","start_time","camera") #set this to the levels of metadata stored in the directory structure of the data. Set in order from the first/higher/root directory level, to the last/lowest/final branch directory level
 separator<-"/" #set depending on OS
 
