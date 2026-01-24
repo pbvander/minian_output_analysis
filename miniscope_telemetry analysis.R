@@ -9,6 +9,7 @@ library(rjson)
 library(nlme)
 library(gtools)
 library(corrr)
+library(pROC)
 summarize<-dplyr::summarize
 source("C:/Users/General Correa Lab/Documents/GitHub/minian_output_analysis/functions.R")
 
@@ -192,6 +193,9 @@ sumdf<-df%>%
   ungroup()%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
+
+##### ROC analysis
+roc_df<-roc_analysis(sumdf,session_type=c("torpor","heat","cold"))
 
 ##### Write output
 setwd(output_dir)

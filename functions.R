@@ -62,6 +62,46 @@ read_motion <- function(path){
   return(d)
 }
 
+roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=200){
+  ##This function performs ROC analysis as in https://github.com/hongw-lab/Code_for_2024_ZhangM/blob/main/ROC.m (from https://www.nature.com/articles/s41586-023-06973-x#Sec9 paper)
+  ii=1
+  for (type in session_type){
+    #Set up data
+    auc_col<-paste0(type,"_auc")
+    sig_col<-paste0(type,"_auc_sig")
+    roc_df<-tibble(unit_id_id=character(0),"{auc_col}":=numeric(0), "{sig_col}":=character(0))
+    if (type=="torpor"){roc_data<-data%>%filter(torpor_status=="non-torpor" | torpor_status=="deep_torpor")%>%mutate(label=ifelse(torpor_status=="non-torpor",0,1))}
+    if (type=="heat"){roc_data<-data%>%filter(session_type=="heat")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="37C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
+    if (type=="cold"){roc_data<-data%>%filter(session_type=="cold")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="5C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
+    if (type=="male_interaction"){roc_data<-data%>%filter(session_type=="male_interaction")%>%mutate(label=ifelse(male=="22C",0,1))}
+    
+    #Run analysis and return results
+    for (id in unique(roc_data$unit_id_id)){
+      #Real data
+      d<-roc_data%>%filter(unit_id_id==id)
+      if (length(unique(d$label)) != 2){next} #excludes sessions without both labels (will cause error in roc function)
+      roc<-d%>%roc_("label",predictor, direction="<",levels=c(0,1))
+      
+      #Shuffled data
+      shuf_auc<-c()
+      for (i in 1:shuf_iters){
+        d$shuf_label<-sample(d$label,length(d$label),replace=F)
+        shuf_auc<-c(shuf_auc, d%>%roc_("shuf_label",predictor, direction="<",levels=c(0,1))%>%auc())
+      }
+      #Determine rank and add to roc_df
+      rank<-(c(auc(roc),shuf_auc)%>%rank())[1]
+      auc_sig<-case_when(rank<shuf_iters*0.025 ~ "suppressed",
+                         rank>shuf_iters*0.975 ~ "activated",
+                         T ~ "neutral")
+      roc_df<-rbind(roc_df, tibble(unit_id_id=id, "{auc_col}":=auc(roc), "{sig_col}":=auc_sig))
+    }
+    if (ii==1){compiled_df<-roc_df}
+    if(ii>1){compiled_df<-merge(compiled_df,roc_df,all=T)}
+    ii=ii+1
+  }
+  return(compiled_df)
+}
+
 ##Telemetry
 read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F){
   #Read in telemetry data
