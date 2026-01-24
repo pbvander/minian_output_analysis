@@ -189,7 +189,7 @@ sumdf<-df%>%
   filter(!is.na(YrA))%>%
   group_by(ts_bin,unit_id_id)%>%
   arrange(ts_bin)%>%
-  mutate(mean_C=mean(C), mean_S=mean(S), mean_YrA=mean(YrA), mean_motion_distance=mean(motion_distance), mean_df_f0=mean(df_f0), mean_z=mean(z))%>%
+  mutate(C_bin=mean(C), S_bin=mean(S), YrA_bin=mean(YrA), mean_motion_distance=mean(motion_distance), df_fo_bin=mean(df_f0), z_bin=mean(z))%>%
   ungroup()%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
@@ -259,11 +259,11 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
 
 ### dF/F0 - body temperature relationship
 ## By temperature value
-data<-sumdf%>%filter(!is.na(mean_df_f0), session_type=="torpor")
-data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(temp, mean_df_f0, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
+data<-sumdf%>%filter(!is.na(df_fo_bin), session_type=="torpor")
+data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(temp, df_fo_bin, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
 data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
 
-p<-ggplot(data, aes(x=temp, y=mean_df_f0))+
+p<-ggplot(data, aes(x=temp, y=df_fo_bin))+
   xy_point2(alpha=0.5)+
   regression_line()+
   ms+
@@ -291,21 +291,21 @@ set<-list(geom_violin(aes(fill=torpor_status)),
               labs(x=element_blank(),y="dF/F0"),
               scale_x_discrete(breaks=c()))
 
-p<-ggplot(sumdf%>%filter(!is.na(mean_df_f0), torpor_status %in% c("deep_torpor","non-torpor")), aes(x=torpor_status,y=mean_df_f0))+ms+set
+p<-ggplot(sumdf%>%filter(!is.na(df_fo_bin), torpor_status %in% c("deep_torpor","non-torpor")), aes(x=torpor_status,y=df_fo_bin))+ms+set
 p
 save_plot("df_f0 non-torpor vs deep torpor",w=20,h=15)
 
 #All torpor status bins
-p<-ggplot(sumdf%>%filter(!is.na(mean_df_f0)), aes(x=torpor_status,y=mean_df_f0))+ms+set
+p<-ggplot(sumdf%>%filter(!is.na(df_fo_bin)), aes(x=torpor_status,y=df_fo_bin))+ms+set
 p
 save_plot("df_f0 by torpor status",w=20,h=15)
 
 ### dF/F0 - ambient temperature relationship
 ## By temeprature
-data<-sumdf%>%filter(!is.na(mean_df_f0), !is.na(ambient_temp_interpolated))
-data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(ambient_temp_interpolated, mean_df_f0, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
+data<-sumdf%>%filter(!is.na(df_fo_bin), !is.na(ambient_temp_interpolated))
+data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(ambient_temp_interpolated, df_fo_bin, method = "pearson")))%>%mutate(unit_id_id_cor = paste0(unit_id_id," (",round(cor,digits = 2),")"))
 data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
-p<-ggplot(data, aes(x=ambient_temp_interpolated, y=mean_df_f0))+
+p<-ggplot(data, aes(x=ambient_temp_interpolated, y=df_fo_bin))+
   xy_point2(alpha=0.5)+
   regression_line()+
   ms+
@@ -324,12 +324,12 @@ set<-list(geom_violin(aes(fill=ambient_temp_bin)),
           scale_x_discrete(breaks=c()))
 
 sumdf<-sumdf%>%mutate(ambient_temp_bin=factor(ambient_temp_bin,levels=c("4C","22C","38C")))
-p<-ggplot(sumdf%>%filter(!is.na(mean_df_f0),ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=mean_df_f0))+ms+set
+p<-ggplot(sumdf%>%filter(!is.na(df_fo_bin),ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=df_fo_bin))+ms+set
 p
 save_plot("df_f0 by ambient temperature bin",w=20,h=15)
 
 ### dF/F0 - male social stimulus relationship
-p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=factor(male_interaction)), aes(x=male_interaction,y=mean_df_f0))+
+p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=factor(male_interaction)), aes(x=male_interaction,y=df_fo_bin))+
   geom_violin(aes(fill=male_interaction))+
   point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123))+
   scale_fill_manual(values=c(colors[1],colors[5]))+
