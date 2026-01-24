@@ -21,6 +21,10 @@ direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
 dir_struct<-c("test","mouse","start_date","session","start_time","camera") #set this to the levels of metadata stored in the directory structure of the data. Set in order from the first/higher/root directory level, to the last/lowest/final branch directory level
 separator<-"/" #set depending on OS
 
+#Exclusions:
+session_id_type_to_exclude<-c("MT29_2025_06_11_session1_heat" #All frames from F0 baseline were excluded due to excess motion
+                              )
+
 #Global graph settings:
 ms<-list(theme_prism())
 
@@ -93,7 +97,7 @@ for (dir in direcs){
   session_mdf<-rbind(session_mdf, read_csv(file, show_col_types=F)%>%mutate(across(everything(), as.character)))
   read<-c(read, file)
 }
-df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))
+df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
 
 # Add event-based metadata
 event_mdf<-tibble()
