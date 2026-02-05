@@ -198,9 +198,6 @@ sumdf<-df%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
 
-##### ROC analysis
-roc_df<-roc_analysis(sumdf,session_type=c("torpor","heat","cold"))
-
 ##### Write output
 setwd(output_dir)
 write_output_rds(df)
@@ -212,6 +209,9 @@ setwd(output_dir)
 df<-read_rds("./output/df.rds")
 A<-read_rds("./output/A.rds")
 sumdf<-read_rds("./output/sumdf.rds")
+
+##### ROC analysis
+roc_df<-roc_analysis(sumdf,session_type=c("torpor","heat","cold","male_interaction"))%>%merge(sumdf%>%distinct(unit_id_id,.keep_all = T),all.x=T)
 
 ##### Graph
 gc()
@@ -374,3 +374,26 @@ p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=fac
   ms
 p
 save_plot("df_f0 by male interaction",w=20,h=15)
+
+### ROC analysis-defined cell type frequencies by gonadal/E2 state
+pie_df<-roc_df%>%filter(!is.na(torpor_auc_sig))%>%group_by(pellet,torpor_auc_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
+
+chi_test_matrix<-roc_df%>%
+  filter(!is.na(male_interaction_auc_sig))%>%
+  group_by(pellet,male_interaction_auc_sig)%>%
+  count()%>%
+  pivot_wider(names_from = male_interaction_auc_sig,values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_auc_sig)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  facet_wrap(vars(pellet))
+pie
