@@ -265,6 +265,7 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
   # s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
   # s2/s1/s3+plot_layout(heights=c(1,10,1))
   # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
+  gc()
 }
 
 ### dF/F0 - body temperature relationship
@@ -273,7 +274,8 @@ data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor")
 data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(temp, df_f0_bin, method = "pearson")))
 data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
 
-p<-ggplot(data, aes(x=temp, y=df_fo_bin))+
+# All units
+p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
   xy_point2(alpha=0.5)+
   regression_line()+
   ms+
