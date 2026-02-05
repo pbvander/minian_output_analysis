@@ -73,7 +73,7 @@ roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=200
     if (type=="torpor"){roc_data<-data%>%filter(torpor_status=="non-torpor" | torpor_status=="deep_torpor")%>%mutate(label=ifelse(torpor_status=="non-torpor",0,1))}
     if (type=="heat"){roc_data<-data%>%filter(session_type=="heat")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="37C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
     if (type=="cold"){roc_data<-data%>%filter(session_type=="cold")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="5C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
-    if (type=="male_interaction"){roc_data<-data%>%filter(session_type=="male_interaction")%>%mutate(label=ifelse(male=="22C",0,1))}
+    if (type=="male_interaction"){roc_data<-data%>%filter(session_type=="male_interaction", !is.na(male_interaction))%>%mutate(label=male_interaction)}
     
     #Run analysis and return results
     for (id in unique(roc_data$unit_id_id)){
