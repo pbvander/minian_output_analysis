@@ -176,6 +176,7 @@ df<-df%>%mutate(f0 = case_when(
     session_type == "cold" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
     session_type == "heat" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
     session_type == "male_interaction" & time_seconds < 300 ~ T, #5-minute baseline before adding male
+    session_type == "E2_injection" & time_seconds < 300 ~ T, #5-minute baseline before starting injections
     T ~ F
   )
 )
