@@ -31,8 +31,8 @@ read_timestamps <- function(file){
 
 scale_temporal <- function(d){
   d<-d%>%group_by(unit_id_id)%>%mutate(scaled_C = C/max(C),
-                                    scaled_S = S/max(S),
-                                    scaled_YrA = YrA/max(YrA))
+                                       scaled_S = S/max(S),
+                                       scaled_YrA = YrA/max(YrA))
   return(d)
 }
 
@@ -62,7 +62,7 @@ read_motion <- function(path){
   return(d)
 }
 
-roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=200){
+roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=1000){
   ##This function performs ROC analysis as in https://github.com/hongw-lab/Code_for_2024_ZhangM/blob/main/ROC.m (from https://www.nature.com/articles/s41586-023-06973-x#Sec9 paper)
   ii=1
   for (type in session_type){

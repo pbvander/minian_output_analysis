@@ -30,6 +30,9 @@ session_id_type_to_exclude<-c("MT29_2025_06_11_session1_heat" #All frames from F
 
 #Global graph settings:
 ms<-list(theme_prism())
+theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis.title.y = element_blank(),axis.ticks = element_blank(),axis.text.x = element_blank(), legend.title = element_blank())
+group_gonad_scale<-c("black","#56B4E9","black","#D55E00")
+cell_type_scale<-c("black","#F0E442","#0072B2")
 
 ##### Read in miniscope data:
 ### Initalize variables
@@ -201,7 +204,7 @@ roc_df<-roc_analysis(sumdf,session_type=c("torpor","heat","cold"))
 setwd(output_dir)
 write_output_rds(df)
 write_output_rds(A)
-write_output_rds(sumdf)
+write_output(sumdf)
 
 ##### Checkpoint (resume here if above has run)
 setwd(output_dir)
