@@ -102,6 +102,43 @@ roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=100
   return(compiled_df)
 }
 
+correlation_analysis <- function(data, response, predictor="df_f0_bin", shuf_iters=1000, method="pearson"){
+  ii=1
+  for (resp in response){
+    #Set up data
+    cor_col<-paste0(resp,"_cor")
+    sig_col<-paste0(resp,"_cor_sig")
+    slope_col<-paste0(resp,"_slope")
+    cor_df<-tibble(unit_id_id=character(0),"{cor_col}":=numeric(0), "{sig_col}":=character(0), "{slope_col}":=numeric(0))
+    data<-data%>%mutate(r = .data[[resp]], pred =  .data[[predictor]])
+    
+    #Calculate
+    for (id in unique(data$unit_id_id)){
+      #Calculate real correlation
+      d<-data%>%filter(unit_id_id==id)
+      cor<-cor(d$pred, d$r, method=method)
+      slope<-coef(lm(d$r ~ d$pred))[[2]]
+      
+      #Calculate shuffled correlations
+      shuf_cor<-c()
+      for (i in 1:shuf_iters){
+        d$r_shuf<-sample(d$r, length(d$r), replace=F)
+        shuf_cor<-c(shuf_cor, cor(d$r_shuf, d$pred, method=method))
+      }
+      #Determine rank and add to cor_df
+      rank<-(c(cor,shuf_cor)%>%rank())[1]
+      cor_sig<-case_when(rank<shuf_iters*0.025 ~ "negative",
+                         rank>shuf_iters*0.975 ~ "positive",
+                         T ~ "neutral")
+      cor_df<-rbind(cor_df, tibble(unit_id_id=id, "{cor_col}":=cor, "{sig_col}":=cor_sig, "{slope_col}":=slope))
+    }
+    if (ii==1){compiled_df<-cor_df}
+    if (ii>1){compiled_df<-merge(compiled_df,cor_df,all=T)}
+    ii=ii+1
+  }
+  return(compiled_df)
+}
+
 ##Telemetry
 read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F){
   #Read in telemetry data

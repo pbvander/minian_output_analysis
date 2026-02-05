@@ -276,6 +276,39 @@ p<-ggplot(data, aes(x=temp, y=df_fo_bin))+
 p
 save_png_large("df_f0 by body temperature", w=40,h=25)
 
+# Correlation coefficient by gonad/E2 state
+p<-ggplot(cor_df, aes(x=group_gonad, y=torpor_temp_cor))+
+  geom_violin(aes(fill=group_gonad))+
+  point_indiv()+
+  scale_fill_manual(values=group_gonad_scale)+
+  facet_wrap(vars(torpor_temp_cor_sig),axes="all")+
+  ms
+p
+save_plot("torpor temperature correlation coefficient by cell type and group_gonad", w=12,h=8)
+
+# Correlation type frequencies
+pie_df<-cor_df%>%filter(!is.na(torpor_temp_cor_sig))%>%group_by(pellet,torpor_temp_cor_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_temp_cor_sig=factor(torpor_temp_cor_sig,levels=c("neutral","negative","positive")))
+
+pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  facet_wrap(vars(pellet))
+pie
+save_plot("torpor temperature correlation types by gonadal and E2 state",w=8,h=5)
+
+#Slope by gonad/E2 state
+p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=group_gonad, y=torpor_temp_slope))+
+  geom_violin(aes(fill=group_gonad))+
+  point_indiv()+
+  scale_fill_manual(values=group_gonad_scale)+
+  facet_wrap(vars(torpor_temp_cor_sig),axes="all",scales="free")+
+  ms
+p
+save_plot("torpor temperature slope by cell type and group_gonad", w=12,h=8)
+
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
 p<-ggplot(t_df%>%filter(aligned_time%>%between(-6,51)),aes(x=aligned_time,y=temp))+
