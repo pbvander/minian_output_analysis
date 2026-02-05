@@ -213,6 +213,12 @@ sumdf<-read_rds("./output/sumdf.rds")
 ##### ROC analysis
 roc_df<-roc_analysis(sumdf,session_type=c("torpor","heat","cold","male_interaction"))%>%merge(sumdf%>%distinct(unit_id_id,.keep_all = T),all.x=T)
 
+##### Body temperature correlation analysis
+cor_df<-merge(correlation_analysis(sumdf%>%filter(!is.na(YrA_bin), session_type=="torpor"), response="temp")%>%rename(torpor_temp_cor=temp_cor, torpor_temp_cor_sig=temp_cor_sig, torpor_temp_slope=temp_slope),
+              correlation_analysis(sumdf%>%filter(!is.na(YrA_bin), session_type %in% c("cold","heat")), response=c("ambient_temp_interpolated","temp"))%>%rename(temp_cor_during_ambient = temp_cor,temp_cor_sig_during_ambient = temp_cor_sig, temp_slope_during_ambient = temp_slope),
+              all=T)
+cor_df<-cor_df%>%merge(sumdf%>%distinct(unit_id_id,.keep_all = T),all.x=T)
+
 ##### Graph
 gc()
 
