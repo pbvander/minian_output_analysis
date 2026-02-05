@@ -37,9 +37,9 @@ scale_temporal <- function(d){
 }
 
 scale_temporal_bin <- function(d){
-  d<-d%>%group_by(unit_id_id)%>%mutate(scaled_mean_C = mean_C/max(mean_C),
-                                    scaled_mean_S = mean_S/max(mean_S),
-                                    scaled_mean_YrA = mean_YrA/max(mean_YrA))
+  d<-d%>%group_by(unit_id_id)%>%mutate(scaled_C_bin = C_bin/max(C_bin),
+                                       scaled_S_bin = S_bin/max(S_bin),
+                                       scaled_YrA_bin = YrA_bin/max(YrA_bin))
   return(d)
 }
 
