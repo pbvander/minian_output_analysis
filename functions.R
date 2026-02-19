@@ -162,6 +162,8 @@ read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", i
   
   #Read in telemetry metadata and add to telemetry data
   md<-read_csv(metadata_file, show_col_types = F)%>%mutate(fstart = mdy_hms(paste(fstart, "10:00:00"))) #read metadata and convert fstart to date-time
+  md<-md%>%mutate(group_gonad = factor(paste0(group,"_",gonad),levels=c("veh_intact","veh_ovx","e2_intact","e2_ovx")), #useful combination column
+                  pellet = factor(pellet, levels=c("pre-OVX","OVX+Veh","OVX+E2"))) 
   trial1_end <- md%>%filter(trial=="trial1")%>%pull(fstart)%>%unique() + days(4) #calculate end of trial1
   d<-d%>%
     mutate(trial=ifelse(telem_ts < trial1_end, "trial1","trial2"))%>% #add trial metadata to telem data

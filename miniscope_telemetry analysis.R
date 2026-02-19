@@ -83,8 +83,7 @@ df<-merge(C,S)%>%
   merge(ts)%>%
   merge(motion)%>%
   mutate(start_ts = ymd_hms(paste(start_date, start_time)),
-         miniscope_ts = (start_ts + milliseconds(time_ms)),
-         group_gonad = factor(paste0(group,"_",gonad),levels=c("veh_intact","veh_ovx","e2_intact","e2_ovx"))
+         miniscope_ts = (start_ts + milliseconds(time_ms))
          )%>%
   mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
          session_id = paste0(mouse,"_",start_date,"_",session))%>%
