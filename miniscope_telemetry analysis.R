@@ -222,6 +222,7 @@ cor_df<-cor_df%>%merge(sumdf%>%distinct(unit_id_id,.keep_all = T),all.x=T)
 gc()
 
 for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
+  if (paste0("line plot and motion and temp ",id,".png") %in% list.files("./output")){next}
   print(id)
 
   ### Lines with motion (quality check)
