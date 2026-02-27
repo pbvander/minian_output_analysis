@@ -331,8 +331,25 @@ p<-ggplot(cor_df, aes(x=group_gonad, y=torpor_temp_cor))+
 p
 save_plot("torpor temperature correlation coefficient by cell type and group_gonad", w=12,h=8)
 
+t_test(cor_df%>%filter(torpor_temp_cor_sig!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,torpor_temp_cor_sig)%>%summarize(mean_coef=mean(torpor_temp_cor))%>%group_by(torpor_temp_cor_sig), mean_coef ~ pellet)
+for (cell_type in unique(cor_df$torpor_temp_cor_sig)){
+  if (cell_type=="neutral"){next}
+  print(cell_type)
+  anov<-anova(lme(data=cor_df%>%filter(gonad=="ovx",torpor_temp_cor_sig==cell_type), fixed=torpor_temp_cor ~ pellet, random=~1|mouse))
+  print(anov)
+}
 # Correlation type frequencies
 pie_df<-cor_df%>%filter(!is.na(torpor_temp_cor_sig))%>%group_by(pellet,torpor_temp_cor_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_temp_cor_sig=factor(torpor_temp_cor_sig,levels=c("neutral","negative","positive")))
+
+torpor_temp_cor_chisq<-pie_df%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = torpor_temp_cor_sig, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
 
 pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
   theme_prism()+
@@ -363,8 +380,14 @@ pie
 save_png_large("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
 #Slope by gonad/E2 state
-p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=group_gonad, y=torpor_temp_slope))+
-  geom_violin(aes(fill=group_gonad))+
+t_test(cor_df%>%filter(torpor_temp_cor_sig!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,torpor_temp_cor_sig)%>%summarize(mean_slope=mean(torpor_temp_slope))%>%group_by(torpor_temp_cor_sig), mean_slope ~ pellet)
+for (cell_type in unique(cor_df$torpor_temp_cor_sig)){
+  if (cell_type=="neutral"){next}
+  print(cell_type)
+  anov<-anova(lme(data=cor_df%>%filter(gonad=="ovx",torpor_temp_cor_sig==cell_type), fixed=torpor_temp_slope ~ pellet, random=~1|mouse))
+  print(anov)
+}
+
 p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=pellet, y=torpor_temp_slope))+
   geom_violin(aes(fill=pellet))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
@@ -443,17 +466,6 @@ save_plot("df_f0 by male interaction",w=20,h=15)
 
 ### ROC analysis-defined cell type frequencies by gonadal/E2 state
 pie_df<-roc_df%>%filter(!is.na(torpor_auc_sig))%>%group_by(pellet,torpor_auc_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
-
-chi_test_matrix<-roc_df%>%
-  filter(!is.na(male_interaction_auc_sig))%>%
-  group_by(pellet,male_interaction_auc_sig)%>%
-  count()%>%
-  pivot_wider(names_from = male_interaction_auc_sig,values_from = n)%>%
-  ungroup()%>%
-  select(-pellet)%>%
-  mutate(across(everything(), ~replace_na(.x,0)))%>%
-  as.matrix()%>%
-  chisq.test()
 
 pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_auc_sig)) +
   theme_prism()+
