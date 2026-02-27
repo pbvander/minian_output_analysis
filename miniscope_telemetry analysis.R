@@ -338,6 +338,19 @@ for (cell_type in unique(cor_df$torpor_temp_cor_sig)){
   anov<-anova(lme(data=cor_df%>%filter(gonad=="ovx",torpor_temp_cor_sig==cell_type), fixed=torpor_temp_cor ~ pellet, random=~1|mouse))
   print(anov)
 }
+
+p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=pellet, y=torpor_temp_cor))+
+  geom_violin(aes(fill=pellet))+
+  labs(y="Pearson correlation coefficient")+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  point_indiv()+
+  scale_fill_manual(values=pellet_scale)+
+  facet_wrap(vars(torpor_temp_cor_sig),axes="all")+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("torpor temperature correlation coefficient by cell type and pellet", w=12,h=8)
+
 # Correlation type frequencies
 pie_df<-cor_df%>%filter(!is.na(torpor_temp_cor_sig))%>%group_by(pellet,torpor_temp_cor_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_temp_cor_sig=factor(torpor_temp_cor_sig,levels=c("neutral","negative","positive")))
 
