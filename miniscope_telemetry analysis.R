@@ -200,6 +200,14 @@ sumdf<-df%>%
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=1000)
 
+##### Population-level analysis
+torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=1000)
+ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), .session_type = c("heat","cold"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=1000)
+
+lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>% #combine data
+  merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
+unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(unit_df,all=T) #add coefficients from population model to unit_df
+
 ##### Write output
 setwd(output_dir)
 write_output_rds(df)

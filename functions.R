@@ -160,6 +160,90 @@ correlation_analysis <- function(data, response, .session_type, predictor="df_f0
   return(compiled_df)
 }
 
+##Popoulation-level analysis
+lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, cv_folds=5, shuf_iters=1000){
+  lm_df<-tibble()
+  lm_coef_df<-tibble()
+  data<-data%>%filter(session_type %in% .session_type)
+  for (sid in unique(data$session_id)){
+    ##Set up column names based on session type
+    type<-case_when(.session_type=="torpor" ~ "torpor",
+                    "heat" %in% .session_type & "cold" %in% .session_type ~ "ambient")[1]
+    cor_col=paste0(response,"_mean_cor_",type)
+    sig_col=paste0(response,"_cor_sig_",type)
+    coef_col<-paste0(response,"_MeanLmCoef_",type)
+    print(paste(sid, type))
+    
+    ##Format and pivot data
+    d<-data%>%filter(session_id==sid)%>%
+      select(unit_id_id, telem_ts, {{response}}, {{predictor}})%>%
+      pivot_wider(values_from = {{predictor}}, names_from = unit_id_id)%>%
+      select(!telem_ts)
+    if (sum(is.na(d))>0)(warning(paste("NAs present in dataset",sid)))
+    
+    ##Partition data for cross-validation
+    #Find number of bins to use for stratification of response variable (there must be more observations than cv_folds in each bin)
+    for (f in 2:cv_folds){
+      min<-d%>%pull({{response}})%>%cut(f)%>%table()%>%min()
+      if(min<cv_folds){break} #if bin size has gotten too small, stop here (and don't update bins variable)
+      bins<-f
+    }
+    pcs<-partition_cv_strat(d, coords=colnames(d),strat = d%>%pull({{response}})%>%cut(bins)%>%as.numeric()%>%as.factor(),nfold=cv_folds)
+    
+    ##Make models with observed data for each cv fold
+    cor_ls<-c()
+    coef_df<-tibble()
+    for (fold in 1:cv_folds){
+      #Set up data
+      idx = pcs[["1"]][[fold]]
+      train = d[idx$train,]
+      test = d[idx$test,]
+      
+      #Train and test model
+      formula<-as.formula(paste0(response,"~ ."))
+      model<-lm(formula, train)
+      predict<-predict(model, newdata=test)
+      cor<-cor(test%>%pull({{response}}), predict, method="pearson")
+      cor_ls<-c(cor_ls,cor)
+      coef_d<-tibble("unit_id_id"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold)%>%filter(unit_id_id!="(Intercept)")
+      coef_df<-rbind(coef_df,coef_d)
+    }
+    
+    ##Make models with shuffled data using same partitions for each cv fold
+    shuf_cor_ls<-c()
+    for (i in 1:shuf_iters){
+      shuf_cor<-c()
+      for (fold in 1:cv_folds){
+        #Set up data
+        idx = pcs[["1"]][[fold]]
+        train = (d[idx$train,])
+        shuf_train = train%>%mutate("{response}":=sample(train%>%pull({{response}}),length(train%>%pull({{response}}))))
+        test = d[idx$test,]
+        
+        #Train and test model
+        model<-lm(formula, shuf_train)
+        predict<-predict(model, newdata=test)
+        cor<-cor(test%>%pull({{response}}), predict, method="pearson")
+        shuf_cor<-c(shuf_cor,cor)
+      }
+      shuf_cor_ls<-c(shuf_cor_ls, mean(shuf_cor))
+    }
+    
+    ##Get rank of observed data within shuffled data
+    mean_cor_ls<-mean(cor_ls)
+    rank<-(c(mean_cor_ls,shuf_cor_ls)%>%rank())[1]
+    cor_sig<-ifelse(rank>shuf_iters*0.95, "significant","non-significant")
+    
+    ##Compile data
+    lm_d<-tibble("{cor_col}":= mean(cor_ls), "{sig_col}":=cor_sig, "session_id"=sid)
+    lm_df<-rbind(lm_df,lm_d)
+    lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
+    lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
+  }
+  ls<-list("lm_df" = lm_df, "lm_coef_df"=lm_coef_df)
+  return(ls)
+}
+
 ##Telemetry
 read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F){
   #Read in telemetry data
