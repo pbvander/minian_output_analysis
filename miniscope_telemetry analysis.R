@@ -197,6 +197,9 @@ sumdf<-df%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
 
+##### Single-cell analysis
+unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=1000)
+
 ##### Write output
 setwd(output_dir)
 write_output_rds(df)

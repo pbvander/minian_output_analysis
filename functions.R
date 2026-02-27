@@ -62,7 +62,24 @@ read_motion <- function(path){
   return(d)
 }
 
-roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=1000){
+##Single cell analysis
+unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", shuf_iters=1000){
+  ##ROC analysis with binned Y variables
+  print("Performing ROC analysis with binned response variables")
+  roc_df<-roc_analysis(data, session_type=roc_session_type, predictor=.predictor, shuf_iters=shuf_iters)
+  
+  ##Correlation analysis with continuous Y variables
+  print("Performing correlation analysis with continuous response variables")
+  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response="temp", shuf_iters = shuf_iters)
+  cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), shuf_iters = shuf_iters)
+  
+  ##Combine data and add metadata
+  d<-merge(roc_df,cor_df_torpor,all=T)%>%merge(cor_df_ambient,all=T)
+  d<-merge(d,data%>%distinct(unit_id_id, .keep_all = T),all.x=T)
+  return(d)
+}
+
+roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1000){
   ##This function performs ROC analysis as in https://github.com/hongw-lab/Code_for_2024_ZhangM/blob/main/ROC.m (from https://www.nature.com/articles/s41586-023-06973-x#Sec9 paper)
   ii=1
   for (type in session_type){
@@ -102,13 +119,17 @@ roc_analysis <- function(data, session_type, predictor="YrA_bin", shuf_iters=100
   return(compiled_df)
 }
 
-correlation_analysis <- function(data, response, predictor="df_f0_bin", shuf_iters=1000, method="pearson"){
+correlation_analysis <- function(data, response, .session_type, predictor="df_f0_bin", shuf_iters=1000, method="pearson"){
+  type<-case_when(.session_type == "torpor" ~ "torpor",
+                  "cold" %in% .session_type & "heat" %in% .session_type ~ "ambient")[1]
+  print(paste0("Session type = ",type, ", Response = ",paste(response,collapse = ", ")))
+  data<-data%>%filter(session_type %in% .session_type)
   ii=1
   for (resp in response){
     #Set up data
-    cor_col<-paste0(resp,"_cor")
-    sig_col<-paste0(resp,"_cor_sig")
-    slope_col<-paste0(resp,"_slope")
+    cor_col<-paste0(resp,"_cor_",type)
+    sig_col<-paste0(resp,"_cor_sig_",type)
+    slope_col<-paste0(resp,"_slope_",type)
     cor_df<-tibble(unit_id_id=character(0),"{cor_col}":=numeric(0), "{sig_col}":=character(0), "{slope_col}":=numeric(0))
     data<-data%>%mutate(r = .data[[resp]], pred =  .data[[predictor]])
     
