@@ -217,14 +217,18 @@ unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(
 ##### Write output
 setwd(output_dir)
 write_output_rds(df)
-write_output_rds(A)
+write_output(A)
 write_output(sumdf)
+write_output(unit_df)
+write_output(lm_df)
 
 ##### Checkpoint (resume here if above has run)
 setwd(output_dir)
 df<-read_rds("./output/df.rds")
 A<-read_rds("./output/A.rds")
 sumdf<-read_rds("./output/sumdf.rds")
+unit_df<-read_rds("./output/unit_df.rds")
+lm_df<-read_rds("./output/lm_df.rds")
 
 ##### Graph
 gc()
