@@ -10,8 +10,11 @@ library(nlme)
 library(gtools)
 library(corrr)
 library(pROC)
+library(rstatix)
+library(sperrorest)
 summarize<-dplyr::summarize
 source("C:/Users/General Correa Lab/Documents/GitHub/minian_output_analysis/functions.R")
+filter<-dplyr::filter
 
 ##### Things to set manually:
 #Paths/directories:
