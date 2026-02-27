@@ -1,4 +1,4 @@
-##Miniscope data
+##Reading and processing Miniscope data
 read_csv_minian <- function(file){
   d<-read_csv(file, show_col_types = F)
   d<-d%>%mutate(experiment=exp,
