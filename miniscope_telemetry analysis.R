@@ -297,7 +297,31 @@ p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
 p
 save_png_large("df_f0 by body temperature", w=40,h=25)
 
-# Correlation coefficient by gonad/E2 state
+data<-data%>%filter(session_id_type=="MT29_2025_05_22_session1_torpor")
+data<-data%>%mutate(unit_id=factor(unit_id, levels=data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id,cor)%>%pull(unit_id)))
+
+p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
+  xy_point2(alpha=0.5)+
+  regression_line()+
+  ms+
+  labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
+  theme(text = element_text(size=24))+
+  facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
+p
+save_png_large("df_f0 by body temperature MT29_2025_05_22_session1_torpor",w=25,h=15)
+
+# Observations by temperature histogram
+p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),binwidth = 1)+
+  scale_x_continuous(expand=c(0,0))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Observations")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("torpor observations by temp and pellet", w=7,h=5)
+
+# Correlation coefficient by gonad/E2 state or pellet
 p<-ggplot(cor_df, aes(x=group_gonad, y=torpor_temp_cor))+
   geom_violin(aes(fill=group_gonad))+
   point_indiv()+
@@ -321,7 +345,22 @@ pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
   guides(color="none")+
   facet_wrap(vars(pellet))
 pie
-save_plot("torpor temperature correlation types by gonadal and E2 state",w=8,h=5)
+save_png_large("torpor temperature correlation types by pellet",w=8,h=5)
+
+mouse_pie_df<-cor_df%>%filter(!is.na(torpor_temp_cor_sig))%>%group_by(mouse,pellet,torpor_temp_cor_sig)%>%count()%>%ungroup()%>%group_by(mouse,pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_temp_cor_sig=factor(torpor_temp_cor_sig,levels=c("neutral","negative","positive")))
+
+pie<-ggplot(mouse_pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(percent,"%"),color=torpor_temp_cor_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("grey90","black","black"))+
+  guides(color="none")+
+  facet_grid(vars(mouse),vars(pellet))
+pie
+save_png_large("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
 #Slope by gonad/E2 state
 p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=group_gonad, y=torpor_temp_slope))+
