@@ -35,7 +35,10 @@ session_id_type_to_exclude<-c("MT29_2025_06_11_session1_heat" #All frames from F
 ms<-list(theme_prism())
 theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis.title.y = element_blank(),axis.ticks = element_blank(),axis.text.x = element_blank(), legend.title = element_blank())
 group_gonad_scale<-c("black","#56B4E9","black","#D55E00")
+pellet_scale<-c("black","#56B4E9","#D55E00")
 cell_type_scale<-c("black","#F0E442","#0072B2")
+ambient_temp_bin_scale<-c("#0072B2","black","#E69F00")
+male_interaction_scale<-c("black","#F0E442")
 
 ##### Read in miniscope data:
 ### Initalize variables
@@ -309,6 +312,9 @@ pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=cell_type_scale)+
   coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(percent,"%"),color=torpor_temp_cor_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("grey90","black","black"))+
+  guides(color="none")+
   facet_wrap(vars(pellet))
 pie
 save_plot("torpor temperature correlation types by gonadal and E2 state",w=8,h=5)
@@ -316,12 +322,17 @@ save_plot("torpor temperature correlation types by gonadal and E2 state",w=8,h=5
 #Slope by gonad/E2 state
 p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=group_gonad, y=torpor_temp_slope))+
   geom_violin(aes(fill=group_gonad))+
+p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=pellet, y=torpor_temp_slope))+
+  geom_violin(aes(fill=pellet))+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
   point_indiv()+
-  scale_fill_manual(values=group_gonad_scale)+
+  labs(x=element_blank(),y="Slope")+
+  scale_fill_manual(values=pellet_scale)+
   facet_wrap(vars(torpor_temp_cor_sig),axes="all",scales="free")+
-  ms
+  ms+
+  theme(legend.position = "none")
 p
-save_plot("torpor temperature slope by cell type and group_gonad", w=12,h=8)
+save_plot("torpor temperature slope by cell type and pellet", w=12,h=8)
 
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
@@ -368,13 +379,12 @@ save_png_large("df_f0 by ambient temperature", w=40,h=25)
 ## Temperature bins
 set<-list(geom_violin(aes(fill=ambient_temp_bin)),
           point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123)),
-          scale_fill_manual(values=c(colors[3],colors[1],colors[2])),
+          scale_fill_manual(values=c(ambient_temp_bin_scale)),
           facet_wrap(vars(unit_id_id),scales="free_y",axes="all"),
           labs(x=element_blank(),y="dF/F0"),
           scale_x_discrete(breaks=c()))
 
-sumdf<-sumdf%>%mutate(ambient_temp_bin=factor(ambient_temp_bin,levels=c("4C","22C","38C")))
-p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin),ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=df_f0_bin))+ms+set
+p<-ggplot(data%>%filter(ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=df_f0_bin))+ms+set
 p
 save_plot("df_f0 by ambient temperature bin",w=20,h=15)
 
@@ -382,7 +392,7 @@ save_plot("df_f0 by ambient temperature bin",w=20,h=15)
 p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=factor(male_interaction)), aes(x=male_interaction,y=df_f0_bin))+
   geom_violin(aes(fill=male_interaction))+
   point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123))+
-  scale_fill_manual(values=c(colors[1],colors[5]))+
+  scale_fill_manual(values=male_interaction_scale)+
   facet_wrap(vars(unit_id_id),axes="all",scales="free_y")+
   ms
 p
