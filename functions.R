@@ -176,6 +176,7 @@ transform_data_piegraph <- function(data, animal_var, cell_var){
 lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, cv_folds=5, shuf_iters=1000){
   lm_df<-tibble()
   lm_coef_df<-tibble()
+  predict_df<-tibble()
   data<-data%>%filter(session_type %in% .session_type)
   for (sid in unique(data$session_id)){
     ##Set up column names based on session type
@@ -219,7 +220,9 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
       cor_ls<-c(cor_ls,cor)
       coef_d<-tibble("unit_id_id"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold)%>%filter(unit_id_id!="(Intercept)")
       coef_df<-rbind(coef_df,coef_d)
+      predict_df<-rbind(predict_df,tibble("predicted"=predict,"true"=test%>%pull({{response}}),"session_id"=sid))
     }
+    
     
     ##Make models with shuffled data using same partitions for each cv fold
     shuf_cor_ls<-c()
@@ -252,7 +255,7 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
     lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
     lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
   }
-  ls<-list("lm_df" = lm_df, "lm_coef_df"=lm_coef_df)
+  ls<-list("lm_df" = lm_df, "lm_coef_df"=lm_coef_df, "predict_df"=predict_df)
   return(ls)
 }
 

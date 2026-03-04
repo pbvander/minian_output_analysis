@@ -508,6 +508,51 @@ p
 save_plot("torpor status bins fc by pellet",w=10,h=7)
 p+coord_cartesian(ylim=c(0,20))
 save_plot("torpor status bins fc by pellet zoomed y",w=10,h=7)
+
+### dF-F0 - body temperature (population level analysis)
+##LM significance by pellet
+data<-transform_data_piegraph(lm_df,"pellet","temp_cor_sig_torpor")
+
+pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("grey90","black","black"))+
+  guides(color="none")+
+  facet_grid(vars(pellet))
+pie
+save_plot("lm correlation significance by pellet",w=4,h=5)
+
+##LM accuracy
+p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor=="significant"), aes(x=pellet,y=temp_mean_cor_torpor))+
+  geom_violin(aes(fill=pellet))+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  point_indiv()+
+  labs(x=element_blank(),y="Correlation coefficient")+
+  scale_fill_manual(values=pellet_scale)+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("lm correlation coefficient by pellet",w=6,h=6)
+
+##LM predictions
+for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
+  data<-torpor_lm_ls$predict_df
+  data<-data%>%filter(session_id==sess)
+  
+  p<-ggplot(data, aes(x=predicted,y=true))+
+    labs(x="Predicted temperature", y="Observed temperature")+
+    geom_abline(slope=1,linetype="dashed",size=2)+
+    xy_point2(alpha=0.5)+
+    regression_line()+
+    ms
+  p
+  save_plot(paste("predicted temp",sess,"torpor"),w=6,h=6)
+}
+
 ### dF/F0 - ambient temperature relationship
 ## By temeprature
 data<-sumdf%>%filter(!is.na(df_f0_bin), !is.na(ambient_temp_interpolated))
