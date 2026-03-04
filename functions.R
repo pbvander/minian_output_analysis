@@ -160,6 +160,16 @@ correlation_analysis <- function(data, response, .session_type, predictor="df_f0
   return(compiled_df)
 }
 
+transform_data_piegraph <- function(data, animal_var, cell_var){
+  d<-data%>%filter(!is.na(.data[[cell_var]]))%>%
+    group_by(across(all_of(c(animal_var,cell_var))))%>%
+    count()%>%
+    ungroup()%>%
+    group_by(across(all_of(animal_var)))%>%
+    mutate(percent=round((n/sum(n))*100, digits=1))
+  return(d)
+}
+
 ##Popoulation-level analysis
 lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, cv_folds=5, shuf_iters=1000){
   lm_df<-tibble()

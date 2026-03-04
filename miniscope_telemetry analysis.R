@@ -26,6 +26,7 @@ direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
           "251013_circulating_E2_torpor_miniscope/post-ovx_torpor")
 dir_struct<-c("test","mouse","start_date","session","start_time","camera") #set this to the levels of metadata stored in the directory structure of the data. Set in order from the first/higher/root directory level, to the last/lowest/final branch directory level
 separator<-"/" #set depending on OS
+sess<-"MT29_2025_05_22_session1_torpor" #best session for creating figures
 
 #Exclusions:
 session_id_type_to_exclude<-c("MT29_2025_06_11_session1_heat" #All frames from F0 baseline were excluded due to excess motion
@@ -280,11 +281,11 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
   gc()
 }
 
-### dF/F0 - body temperature relationship
+### dF/F0 - body temperature relationship (single unit analysis)
 ## By temperature value
-data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor")
-data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(temp, df_f0_bin, method = "pearson")))
-data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
+# Graph all units
+data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor")%>%
+  mutate(unit_id_id = factor(unit_id_id, levels = unit_df%>%arrange(temp_cor_torpor)%>%pull(unit_id_id)))
 
 # All units
 p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
@@ -297,8 +298,9 @@ p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
 p
 save_png_large("df_f0 by body temperature", w=40,h=25)
 
-data<-data%>%filter(session_id_type=="MT29_2025_05_22_session1_torpor")
-data<-data%>%mutate(unit_id=factor(unit_id, levels=data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id,cor)%>%pull(unit_id)))
+# Graph a single session
+data<-data%>%filter(session_id_type==sess)%>%
+  mutate(unit_id=factor(unit_id, levels=unit_df%>%filter(session_id_type==sess)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
 
 p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
   xy_point2(alpha=0.5)+
@@ -308,7 +310,7 @@ p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
   theme(text = element_text(size=24))+
   facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
 p
-save_png_large("df_f0 by body temperature MT29_2025_05_22_session1_torpor",w=25,h=15)
+save_png_large(paste("df_f0 by body temperature",sess),w=25,h=15)
 
 # Observations by temperature histogram
 p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
@@ -352,40 +354,44 @@ p
 save_plot("torpor temperature correlation coefficient by cell type and pellet", w=12,h=8)
 
 # Correlation type frequencies
-pie_df<-cor_df%>%filter(!is.na(torpor_temp_cor_sig))%>%group_by(pellet,torpor_temp_cor_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_temp_cor_sig=factor(torpor_temp_cor_sig,levels=c("neutral","negative","positive")))
+#Grouped by pellet
+data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
-torpor_temp_cor_chisq<-pie_df%>%
+chisq<-data%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
-  pivot_wider(names_from = torpor_temp_cor_sig, values_from = n)%>%
+  pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
   ungroup()%>%
   select(-pellet)%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
   as.matrix()%>%
   chisq.test()
 
-pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
+pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
   theme_prism()+
   theme_pie+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=cell_type_scale)+
   coord_polar("y", start=0)+
-  geom_text(aes(label = paste0(percent,"%"),color=torpor_temp_cor_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("grey90","black","black"))+
   guides(color="none")+
   facet_wrap(vars(pellet))
 pie
 save_png_large("torpor temperature correlation types by pellet",w=8,h=5)
 
-mouse_pie_df<-cor_df%>%filter(!is.na(torpor_temp_cor_sig))%>%group_by(mouse,pellet,torpor_temp_cor_sig)%>%count()%>%ungroup()%>%group_by(mouse,pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_temp_cor_sig=factor(torpor_temp_cor_sig,levels=c("neutral","negative","positive")))
+#Grouped by mouse and pellet
+mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "temp_cor_sig_torpor")%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
-pie<-ggplot(mouse_pie_df, aes(x="", y=percent, fill=torpor_temp_cor_sig)) +
+pie<-ggplot(mouse_data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
   theme_prism()+
   theme_pie+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=cell_type_scale)+
   coord_polar("y", start=0)+
-  geom_text(aes(label = paste0(percent,"%"),color=torpor_temp_cor_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("grey90","black","black"))+
   guides(color="none")+
   facet_grid(vars(mouse),vars(pellet))
@@ -401,13 +407,13 @@ for (cell_type in unique(cor_df$torpor_temp_cor_sig)){
   print(anov)
 }
 
-p<-ggplot(cor_df%>%filter(torpor_temp_cor_sig!="neutral"), aes(x=pellet, y=torpor_temp_slope))+
+p<-ggplot(cor_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=torpor_temp_slope))+
   geom_violin(aes(fill=pellet))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
   point_indiv()+
   labs(x=element_blank(),y="Slope")+
   scale_fill_manual(values=pellet_scale)+
-  facet_wrap(vars(torpor_temp_cor_sig),axes="all",scales="free")+
+  facet_wrap(vars(temp_cor_sig_torpor),axes="all",scales="free")+
   ms+
   theme(legend.position = "none")
 p
@@ -423,7 +429,7 @@ p<-ggplot(t_df%>%filter(aligned_time%>%between(-6,51)),aes(x=aligned_time,y=temp
 p
 save_plot("torpor status labels",w=18,h=12)
 
-#Non-torpor vs deep torpor
+# Non-torpor vs deep torpor
 set<-list(geom_violin(aes(fill=torpor_status)),
               point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123)),
               scale_fill_manual(values=colors),
@@ -435,7 +441,7 @@ p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), torpor_status %in% c("deep_torpor","
 p
 save_plot("df_f0 non-torpor vs deep torpor",w=20,h=15)
 
-#All torpor status bins
+# All torpor status bins
 p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin)), aes(x=torpor_status,y=df_f0_bin))+ms+set
 p
 save_plot("df_f0 by torpor status",w=20,h=15)
@@ -443,8 +449,7 @@ save_plot("df_f0 by torpor status",w=20,h=15)
 ### dF/F0 - ambient temperature relationship
 ## By temeprature
 data<-sumdf%>%filter(!is.na(df_f0_bin), !is.na(ambient_temp_interpolated))
-data<-merge(data, data%>%group_by(unit_id_id)%>%summarise(cor = cor(ambient_temp_interpolated, df_f0_bin, method = "pearson")))
-data$unit_id_id<-factor(data$unit_id_id, levels = data%>%ungroup()%>%arrange(cor)%>%distinct(unit_id_id,cor)%>%pull(unit_id_id))
+data<-data%>%mutate(unit_id_id = factor(unit_id_id, levels = unit_df%>%arrange(ambient_temp_interpolated_cor_ambient)%>%pull(unit_id_id)))
 p<-ggplot(data, aes(x=ambient_temp_interpolated, y=df_f0_bin))+
   xy_point2(alpha=0.5)+
   regression_line()+
