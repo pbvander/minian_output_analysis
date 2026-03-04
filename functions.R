@@ -259,6 +259,58 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
   return(ls)
 }
 
+format_data_pca <- function(data, predictor, dim_to_reduce, id_dim){
+  d<-data%>%
+    select({{predictor}}, {{dim_to_reduce}}, {{id_dim}})%>%
+    pivot_wider(values_from = {{predictor}}, names_from = {{dim_to_reduce}})%>%
+    as.data.frame()
+  rownames(d)<-as.character(d%>%pull({{id_dim}}))
+  d<-d%>%select(!{{id_dim}})
+  return(d)
+}
+
+plot_pca_var <- function(pca, .name){
+  #Get pca_var
+  pca.var <- pca$sdev^2
+  pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+  pcvardf<-tibble(PC = 1:length(pca.var.per),var=pca.var.per)
+  
+  #Plot
+  p<-ggplot(pcvardf,aes(x=PC,y=var))+
+    scale_x_continuous(breaks=seq(1,20,1),expand=c(0.01,0.01))+
+    labs(y="% variance explained")+
+    scale_y_continuous(expand=c(0,0))+
+    geom_col()+
+    ms
+  save_plot(name = .name, plot=p, w=5,h=5)
+}
+
+pca <- function(data, predictor = "df_f0_bin", dims){
+  if (length(dims)>2){stop("Length of dims exceeds 2")}
+  pca_ls<-list()
+  for (i in 1:length(dims)){
+    pca_df<-tibble()
+    reduce<-dims[i]
+    id<-dims[-i]
+    print(paste0("Reducing over ",reduce,", ID = ",id))
+    for (sid in unique(data$session_id)){
+      sid_data<-data%>%filter(session_id==sid)
+      input_d<-format_data_pca(sid_data, predictor = predictor, dim_to_reduce = reduce, id_dim=id)
+      pca<-prcomp(input_d, center=F, scale=F)
+      plot_pca_var(pca, paste("PCA variance",id,sid))
+      pca_data<-as.data.frame(pca$x)
+      pca_data<-pca_data%>%mutate("{id}":= rownames(pca_data),session_id=sid)
+      pca_data<-merge(pca_data, sid_data%>%ungroup()%>%mutate("{id}":=as.character(.data[[id]]))%>%distinct(!!sym(id), .keep_all = T),
+                      all.x=T)
+      pca_df<-bind_rows(pca_df,pca_data)
+    }
+    pca_ls[[id]]<-pca_df
+  }
+  return(pca_ls)
+}
+
+
+
 ##Telemetry
 read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F){
   #Read in telemetry data

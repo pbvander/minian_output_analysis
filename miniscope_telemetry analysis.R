@@ -553,6 +553,35 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
   save_plot(paste("predicted temp",sess,"torpor"),w=6,h=6)
 }
 
+##PCA
+for (sid in unique(pca_ls$telem_ts$session_id)){ #Each dot is a timepoint, collapsed across all cells
+  data<-(pca_ls$telem_ts)%>%filter(session_id==sid)
+  set<-list()
+  p<-ggplot(data, aes(x=PC1,y=PC2))+
+    scale_color_viridis_c()+
+    xy_point(aes(color=temp))+
+    ms
+  p
+  save_plot(paste("PCA by temp",sid),w=6,h=5)
+  
+  p<-ggplot(data, aes(x=PC1,y=PC2))+
+    scale_color_manual(values=colors)+
+    xy_point(aes(color=torpor_status))+
+    ms
+  p
+  save_plot(paste("PCA by torpor status",sid),w=6,h=5)
+}
+
+for (sid in unique(pca_ls$unit_id_id$session_id)){ #Each dot is a cell, collapsed across timepoints
+  data<-(pca_ls$unit_id_id)%>%filter(session_id==sid)%>%merge(unit_df,all.x=T)
+  p<-ggplot(data, aes(x=PC1,y=PC2))+
+    xy_point(aes(color=temp_cor_torpor))+
+    scale_color_viridis_c()+
+    ms
+  p
+  save_plot(paste("PCA by temp_cor_torpor",sid),w=6,h=5)
+}
+
 ### dF/F0 - ambient temperature relationship
 ## By temeprature
 data<-sumdf%>%filter(!is.na(df_f0_bin), !is.na(ambient_temp_interpolated))
