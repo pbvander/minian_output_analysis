@@ -448,6 +448,66 @@ p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin)), aes(x=torpor_status,y=df_f0_bin))+m
 p
 save_plot("df_f0 by torpor status",w=20,h=15)
 
+# ROC analysis
+#Cell type frequencies
+#By pellet
+data<-transform_data_piegraph(unit_df, animal_var="pellet", cell_var = "torpor_auc_sig")%>%
+  mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
+
+chisq<-data%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = torpor_auc_sig, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+pie<-ggplot(data, aes(x="", y=percent, fill=torpor_auc_sig)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=torpor_auc_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("grey90","black","black"))+
+  guides(color="none")+
+  facet_wrap(vars(pellet))
+pie
+save_png_large("torpor roc types by pellet",w=8,h=5)
+
+#Grouped by mouse and pellet
+mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "torpor_auc_sig")%>%
+  mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
+
+pie<-ggplot(mouse_data, aes(x="", y=percent, fill=torpor_auc_sig)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=torpor_auc_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("grey90","black","black"))+
+  guides(color="none")+
+  facet_grid(vars(mouse),vars(pellet))
+pie
+save_png_large("torpor roc types by pellet and mouse",w=8,h=5)
+
+#Fold-change between status bins
+p<-ggplot(unit_df%>%filter(!is.na(torpor_auc_sig)),aes(x=pellet,y=torpor_fc))+
+  geom_violin(aes(fill=pellet))+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  point_indiv()+
+  labs(x=element_blank(),y="Fold Change")+
+  scale_fill_manual(values=pellet_scale)+
+  facet_wrap(vars(torpor_auc_sig),axes="all",scales="free")+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("torpor status bins fc by pellet",w=10,h=7)
+p+coord_cartesian(ylim=c(0,20))
+save_plot("torpor status bins fc by pellet zoomed y",w=10,h=7)
 ### dF/F0 - ambient temperature relationship
 ## By temeprature
 data<-sumdf%>%filter(!is.na(df_f0_bin), !is.na(ambient_temp_interpolated))
@@ -483,15 +543,3 @@ p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=fac
   ms
 p
 save_plot("df_f0 by male interaction",w=20,h=15)
-
-### ROC analysis-defined cell type frequencies by gonadal/E2 state
-pie_df<-roc_df%>%filter(!is.na(torpor_auc_sig))%>%group_by(pellet,torpor_auc_sig)%>%count()%>%ungroup()%>%group_by(pellet)%>%mutate(percent=round((n/sum(n))*100, digits=0))%>%mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
-
-pie<-ggplot(pie_df, aes(x="", y=percent, fill=torpor_auc_sig)) +
-  theme_prism()+
-  theme_pie+
-  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
-  scale_fill_manual(values=cell_type_scale)+
-  coord_polar("y", start=0)+
-  facet_wrap(vars(pellet))
-pie

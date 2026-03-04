@@ -86,6 +86,7 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
     #Set up data
     auc_col<-paste0(type,"_auc")
     sig_col<-paste0(type,"_auc_sig")
+    fc_col<-paste0(type,"_fc")
     roc_df<-tibble(unit_id_id=character(0),"{auc_col}":=numeric(0), "{sig_col}":=character(0))
     if (type=="torpor"){roc_data<-data%>%filter(torpor_status=="non-torpor" | torpor_status=="deep_torpor")%>%mutate(label=ifelse(torpor_status=="non-torpor",0,1))}
     if (type=="heat"){roc_data<-data%>%filter(session_type=="heat")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="37C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
@@ -98,6 +99,7 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
       d<-roc_data%>%filter(unit_id_id==id)
       if (length(unique(d$label)) != 2){next} #excludes sessions without both labels (will cause error in roc function)
       roc<-d%>%roc_("label",predictor, direction="<",levels=c(0,1))
+      fc<-d%>%group_by(label)%>%summarize(mean=mean(.data[[predictor]]))%>%filter(label==1)%>%pull(mean)
       
       #Shuffled data
       shuf_auc<-c()
@@ -110,7 +112,7 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
       auc_sig<-case_when(rank<shuf_iters*0.025 ~ "suppressed",
                          rank>shuf_iters*0.975 ~ "activated",
                          T ~ "neutral")
-      roc_df<-rbind(roc_df, tibble(unit_id_id=id, "{auc_col}":=auc(roc), "{sig_col}":=auc_sig))
+      roc_df<-rbind(roc_df, tibble(unit_id_id=id, "{auc_col}":=auc(roc), "{sig_col}":=auc_sig, "{fc_col}":=fc))
     }
     if (ii==1){compiled_df<-roc_df}
     if(ii>1){compiled_df<-merge(compiled_df,roc_df,all=T)}
