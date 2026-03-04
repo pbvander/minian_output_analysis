@@ -236,6 +236,7 @@ pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("
 ##### Graph
 gc()
 
+## Graph full data for all sessions
 for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
   if (paste0("line plot and motion and temp ",id,".png") %in% list.files("./output")){next}
   print(id)
@@ -289,7 +290,6 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
 data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor")%>%
   mutate(unit_id_id = factor(unit_id_id, levels = unit_df%>%arrange(temp_cor_torpor)%>%pull(unit_id_id)))
 
-# All units
 p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
   xy_point2(alpha=0.5)+
   regression_line()+
