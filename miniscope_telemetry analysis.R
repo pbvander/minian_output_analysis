@@ -23,7 +23,9 @@ output_dir<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vande
 direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
           "250417_circulating_E2_torpor_miniscope/post-OVX_torpor",
           "251013_circulating_E2_torpor_miniscope/pre-ovx_torpor",
-          "251013_circulating_E2_torpor_miniscope/post-ovx_torpor")
+          "251013_circulating_E2_torpor_miniscope/post-ovx_torpor",
+          "260108_circulating_E2_torpor_miniscope/pre-ovx_torpor",
+          "260108_circulating_E2_torpor_miniscope/post-ovx_torpor")
 dir_struct<-c("test","mouse","start_date","session","start_time","camera") #set this to the levels of metadata stored in the directory structure of the data. Set in order from the first/higher/root directory level, to the last/lowest/final branch directory level
 separator<-"/" #set depending on OS
 sess<-"MT29_2025_05_22_session1_torpor" #best session for creating figures
