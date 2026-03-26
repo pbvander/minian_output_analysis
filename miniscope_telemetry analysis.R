@@ -101,6 +101,20 @@ df<-merge(C,S)%>%
 A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
               session_id = paste0(mouse,"_",start_date,"_",session))
 
+# Checkpoint
+#Write 
+setwd(output_dir)
+write_output_rds(df, name = "df_checkpoint1")
+write_output_rds(A, name = "A_checkpoint1")
+
+#Read 
+# setwd(output_dir)
+# df<-read_rds("./output/df_checkpoint1.rds")
+# A<-read_rds("./output/A_checkpoint1.rds")
+
+#Setwd
+setwd(exp_direc)
+
 # Add metadata on session type
 read<-c()
 session_mdf<-tibble()
@@ -206,13 +220,12 @@ sumdf<-df%>%
   distinct(ts_bin,unit_id_id, .keep_all = T)%>%
   scale_temporal_bin()
 
-##### Write output
+##### Checkpoint 2
 setwd(output_dir)
 write_output_rds(df)
 write_output(A)
 write_output(sumdf)
 
-##### Checkpoint (resume here if above has run)
 setwd(output_dir)
 df<-read_rds("./output/df.rds")
 A<-read_rds("./output/A.rds")
@@ -234,6 +247,23 @@ unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(
 
 ### PCA
 pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("unit_id_id","telem_ts"))
+
+##### Checkpoint 3
+#Write new
+write_output(lm_df)
+write_output(lm_predict_df)
+write_output(unit_df)
+write_output_rds(pca_ls)
+
+#Read all
+setwd(output_dir)
+df<-read_rds("./output/df.rds")
+A<-read_rds("./output/A.rds")
+sumdf<-read_rds("./output/sumdf.rds")
+lm_df<-read_rds("./output/lm_df.rds")
+lm_predict_df<-read_rds("./output/lm_predict_df.rds")
+unit_df<-read_rds("./output/unit_df.rds")
+pca_ls<-read_rds("./output/pca_ls.rds")
 
 ##### Graph
 gc()
