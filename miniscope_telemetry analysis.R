@@ -613,6 +613,7 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
 }
 
 ##PCA
+pca_df<-tibble()
 for (sid in unique(pca_ls$telem_ts$session_id)){ #Each dot is a timepoint, collapsed across all cells
   data<-(pca_ls$telem_ts)%>%filter(session_id==sid)
   set<-list()
@@ -637,7 +638,30 @@ for (sid in unique(pca_ls$telem_ts$session_id)){ #Each dot is a timepoint, colla
     ms
   p
   save_plot(paste("PCA by torpor status",sid),w=6,h=5)
+  
+  cor<-cor(data$temp, data$PC1, method = "pearson")
+  shuf<-c()
+  for (i in 1:shuffle_iterations){
+    d<-data%>%mutate(temp = sample(temp, length(data$temp)))
+    shuf<-c(shuf, cor(d$temp,d$PC1, method="pearson"))
+  }
+  rank<-(c(cor, shuf)%>%rank())[1]
+  cor_sig<-case_when(rank<shuffle_iterations*0.025 ~ "sig",
+                     rank>shuffle_iterations*0.975 ~ "sig",
+                     T ~ "non-sig")
+  pca_d<-tibble("session_id" = sid, "temp_PC1_cor" = cor, "temp_PC1_cor_sig"=cor_sig)
+  pca_df<-rbind(pca_df,pca_d)
 }
+pca_df<-pca_df%>%merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T)
+
+p<-ggplot(pca_df%>%filter(!is.na(temp_PC1_cor),temp_PC1_cor_sig=="sig"), aes(x=pellet,y=abs(temp_PC1_cor)))+
+  point_summary(aes(color=pellet))+
+  point_errorbar(aes(group=pellet))+
+  point_indiv()+
+  scale_color_manual(values=pellet_scale)+
+  ms+theme(legend.position = "none")
+p
+save_plot("PC1 - temp correlation by pellet", w=6,h=6)
 
 for (sid in unique(pca_ls$unit_id_id$session_id)){ #Each dot is a cell, collapsed across timepoints
   data<-(pca_ls$unit_id_id)%>%filter(session_id==sid)%>%merge(unit_df,all.x=T)
