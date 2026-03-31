@@ -52,6 +52,7 @@ male_interaction_scale<-c("black","#F0E442")
 ### Initalize variables
 bad_frames<-list()
 sumdf<-tibble()
+A_all<-tibble()
 
 ### Read and prepare metadata
 setwd(exp_direc)
@@ -153,7 +154,6 @@ for (dir in direcs){
             setwd(output_dir)
             if ("./output/int" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
             write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint1+",gsub(separator,"+",path)))
-            write_output_rds(A, direc="./output/intermediate/", name=paste0("A_checkpoint1+",gsub(separator,"+",path)))
             setwd(exp_direc)
 
             # Add metadata on session type
@@ -220,7 +220,6 @@ for (dir in direcs){
             ##### Checkpoint 2
             setwd(output_dir)
             write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint2+",gsub(separator,"+",path)))
-            write_output_rds(A, direc="./output/intermediate/", name=paste0("A_checkpoint2+",gsub(separator,"+",path)))
             setwd(exp_direc)
 
             # Create 1-minute bins in miniscope data
@@ -233,6 +232,9 @@ for (dir in direcs){
               distinct(ts_bin,unit_id_id, .keep_all = T)%>%
               scale_temporal_bin()
             sumdf<-rbind(sumdf,sumd)
+            
+            # Compile A
+            A_all<-rbind(A_all,A)
 
             ## Graph full data for all sessions
             setwd(output_dir)
@@ -292,6 +294,7 @@ for (dir in direcs){
 ###Checkpoint 3
 setwd(output_dir)
 write_output(sumdf)
+sumdf<-read_rds("./output/sumdf.rds")
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
@@ -320,13 +323,12 @@ write_output(unit_df)
 write_output_rds(pca_ls)
 
 #Read all
-# setwd(output_dir)
-# A<-read_rds("./output/A.rds")
-# sumdf<-read_rds("./output/sumdf.rds")
-# lm_df<-read_rds("./output/lm_df.rds")
-# lm_predict_df<-read_rds("./output/lm_predict_df.rds")
-# unit_df<-read_rds("./output/unit_df.rds")
-# pca_ls<-read_rds("./output/pca_ls.rds")
+setwd(output_dir)
+sumdf<-read_rds("./output/sumdf.rds")
+lm_df<-read_rds("./output/lm_df.rds")
+lm_predict_df<-read_rds("./output/lm_predict_df.rds")
+unit_df<-read_rds("./output/unit_df.rds")
+pca_ls<-read_rds("./output/pca_ls.rds")
 
 ##### Graph
 gc()
