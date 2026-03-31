@@ -339,7 +339,7 @@ pca <- function(data, predictor = "df_f0_bin", dims){
 
 
 ##Telemetry
-read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = F){
+read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = T, round_units = "minute", fstart_time="10:00:00", trial_length_days = 4){
   #Read in telemetry data
   d<-read_csv(file, show_col_types = F)
   if (format == "starr-lifesci"){ ###For STARR Life Sciences VitalView software output
@@ -351,7 +351,11 @@ read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", i
       select(!starts_with("misc"))%>%
       mutate(measure=case_when(measure=="Deg."~"temp",measure=="Cnts"~"act",T~"unknown"))%>%
       mutate(telem_ts = mdy_hms(paste(date,time)))
-    if (round){d<-d%>%mutate(telem_ts = telem_ts%>%round_date(telem_ts, unit = "minute"))} #round data to nearest minute (only necessary if timestamps are not aligned on the minute)
+    if (round){ #round data to nearest minute (only necessary if timestamps are not aligned on the minute)
+      print(paste("Rounding telem_ts to nearest",round_units))
+      d<-d%>%mutate(telem_ts_og = telem_ts,
+                    telem_ts = round_date(telem_ts, round_units))
+      } 
     if (any(grepl(d$measure, pattern="unknown"))){stop("Unknown measure in telemetry data")}
     d<-d%>%spread(measure,data)
     
@@ -360,10 +364,10 @@ read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", i
   }
   
   #Read in telemetry metadata and add to telemetry data
-  md<-read_csv(metadata_file, show_col_types = F)%>%mutate(fstart = mdy_hms(paste(fstart, "10:00:00"))) #read metadata and convert fstart to date-time
+  md<-read_csv(metadata_file, show_col_types = F)%>%mutate(fstart = mdy_hms(paste(fstart, fstart_time))) #read metadata and convert fstart to date-time
   md<-md%>%mutate(group_gonad = factor(paste0(group,"_",gonad),levels=c("veh_intact","veh_ovx","e2_intact","e2_ovx")), #useful combination column
                   pellet = factor(pellet, levels=c("pre-OVX","OVX+Veh","OVX+E2"))) 
-  trial1_end <- md%>%filter(trial=="trial1")%>%pull(fstart)%>%unique() + days(4) #calculate end of trial1
+  trial1_end <- md%>%filter(trial=="trial1")%>%pull(fstart)%>%unique() + days(trial_length_days) #calculate end of trial1
   d<-d%>%
     mutate(trial=ifelse(telem_ts < trial1_end, "trial1","trial2"))%>% #add trial metadata to telem data
     merge(md)%>% #add metadata
