@@ -317,6 +317,7 @@ pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("
 
 ##### Checkpoint 3
 #Write new
+setwd(output_dir)
 write_output(lm_df)
 write_output(lm_predict_df)
 write_output(unit_df)
@@ -725,8 +726,12 @@ p<-ggplot(unit_df%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_
 p
 
 ##Comparison of tuning across stimuli
-target_cols<-c("temp_cor_torpor","temp_change1_cor_torpor", "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
-target_cols_binary<-c("temp_cor_sig_torpor","temp_change1_cor_sig_torpor","ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
+target_cols<-c("temp_cor_torpor",#"temp_change1_cor_torpor", 
+               "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
+target_cols_binary<-c("temp_cor_sig_torpor",#"temp_change1_cor_sig_torpor",
+                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
+labs<-c("TCore", #"TCore_change",
+        "TAmb", "Male")
 
 # Heat map
 #Values
@@ -736,15 +741,15 @@ for (target in target_cols){
     filter(!is.na(ambient_temp_interpolated_cor_ambient))%>%
     pivot_longer(cols=target_cols,names_to = "var",values_to = "val")%>%
     mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(!!sym(target_cols[t]))%>%pull(unit_id_id)%>%unique()),
-           var=factor(var,levels=target_cols))
+           var=factor(var,levels=target_cols,labels=labs))
 
   p<-ggplot(heatmap_df, aes(x=var,y=unit_id_id,fill=val))+
-    geom_tile(data=heatmap_df%>%filter(var!="male_interaction_auc"))+
+    geom_tile(data=heatmap_df%>%filter(var!="Male"))+
     scale_y_discrete(breaks=NULL)+
     # scale_x_discrete(labels = c("TCore during torpor","Ambient temp during heat/cold","Male interaction"))+
     scale_fill_gradient2(high="red",low="blue",mid = "white",midpoint=0)+
     new_scale_fill()+
-    geom_tile(data=heatmap_df%>%filter(var=="male_interaction_auc"),aes(fill=val))+
+    geom_tile(data=heatmap_df%>%filter(var=="Male"),aes(fill=val))+
     scale_fill_gradient2(high="red",low="blue",mid="white",midpoint=0.5)+
     scale_color_manual(values=pellet_scale)+
     ms
@@ -754,12 +759,25 @@ for (target in target_cols){
   t=t+1
 }
 
+#scatter plots
+combos<-combinations(length(target_cols),2,target_cols)
+for (i in 1:length(combos[,1])){
+  data<-unit_df%>%filter(!is.na(!!sym(combos[i,1])))%>%filter(!is.na(!!sym(combos[i,2])))%>%mutate(r = .data[[combos[i,1]]], pred =  .data[[combos[i,2]]])
+  print(combos[i,])
+  print(cor(data$r, data$pred, method="pearson"))
+  p<-ggplot(unit_df,aes(x=!!sym(combos[i,1]),y=!!sym(combos[i,2])))+
+    regression_line()+
+    xy_point2()+ms
+  p
+  save_plot(paste(combos[i,1],"-",combos[i,2]),w=5,h=4)
+}
+
 #Binary significance
 heatmap_df<-unit_df%>%
   filter(!is.na(ambient_temp_interpolated_cor_ambient))%>%
   pivot_longer(cols=target_cols_binary,names_to = "var",values_to = "val")%>%
   mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(temp_cor_torpor)%>%pull(unit_id_id)%>%unique()),
-         var=factor(var,levels=target_cols_binary),
+         var=factor(var,levels=target_cols_binary,labels=labs),
          val=case_when(val=="positive"|val=="negative"|val=="neutral" ~ val,
                        val=="activated" ~ "positive",
                        val=="suppressed" ~ "negative"),
@@ -775,22 +793,45 @@ p<-ggplot(heatmap_df, aes(x=var,y=unit_id_id,fill=val))+
 p
 save_plot("Tuning heatmap binary",w=8,h=5)
 
-#scatter plots
-combos<-combinations(length(target_cols),2,target_cols)
-for (i in 1:length(combos[,1])){
-  print(combos[i,])
-  p<-ggplot(unit_df,aes(x=!!sym(combos[i,1]),y=!!sym(combos[i,2])))+
-    regression_line()+
-    xy_point2()+ms
-  p
-  save_plot(paste(combos[i,1],"-",combos[i,2]),w=5,h=4)
+
+
+#Frequencies (binary)
+tune_col<-paste(labs,collapse = "_")
+pie_data<-transform_data_piegraph(unit_df%>%drop_na(all_of(target_cols_binary))%>%unite(col=!!tune_col,target_cols_binary), "pellet", tune_col)
+p<-ggplot(pie_data,aes(x=pellet,y=percent))+
+  geom_col(aes(fill=!!sym(tune_col)))+
+  ms
+p
+
+i=1
+for (target in target_cols_binary){
+  data<-transform_data_piegraph(unit_df%>%drop_na(all_of(target)), "pellet",target)%>%mutate(target_ = .data[[target]], target_=case_when(target_=="positive"|target_=="negative"|target_=="neutral" ~ target_,
+                                                                                                                                          target_=="activated" ~ "positive",
+                                                                                                                                          target_=="suppressed" ~ "negative"),
+                                                                                             target_=factor(target_,levels=c("neutral","positive","negative")))
+  
+  pie<-ggplot(data, aes(x="", y=percent, fill=target_)) +
+    theme_prism()+
+    theme_pie+
+    geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+    scale_fill_manual(values=cell_type_scale)+
+    coord_polar("y", start=0)+
+    geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=target_,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+    scale_color_manual(values=c("grey90","black","black"))+
+    guides(color="none")+
+    labs(title=labs[i])+
+    facet_wrap(vars(pellet))
+  pie
+  save_plot(paste("lm correlation significance by pellet",target),w=7,h=5)
+  
+  i=i+1
 }
 
 ## Compare lm results by variable
 #Tcore only vs Tcore + change
 data<-lm_df%>%select(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1,session_id)%>%
   pivot_longer(cols=c(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1), names_to = "var",values_to = "cor")%>%
-  mutate(var = factor(var,levels=c("temp_mean_cor_torpor_", "temp_mean_cor_torpor_temp_change1"),labels=c("TCore only","TCore + Change")))
+  mutate(var = factor(var,levels=c("temp_mean_cor_torpor_", "temp_mean_cor_torpor_temp_change1"),labels=c("TCore","TCore + change")))
 
 wilcox.test(cor~var, data)
 
@@ -801,7 +842,24 @@ p<-ggplot(data, aes(x=var, y=cor))+
   labs(x=element_blank(),y="Pearson correlation coefficient")+
   ms
 p
-save_plot("Tcore vs Tcore with change correlation analysis", w=4,h=4)
+save_plot("Tcore vs Tcore with change correlation analysis", w=4.5,h=4.5)
+
+##Stdev of F0 signal across stimuli and pellets
+data<-sumdf%>%filter(!is.na(sd_f0_bin))%>%group_by(unit_id_id, session_id_type)%>%summarize(sd_f0=mean(sd_f0_bin))%>%
+  merge(sumdf%>%ungroup()%>%distinct(unit_id_id,  session_id_type, .keep_all = T),all.x=T)%>% #add metadata
+  filter(!is.na(sd_f0_bin))
+
+for (st in unique(data$session_type)){
+  p<-ggplot(data%>%filter(session_type==st), aes(x=pellet, y=sd_f0))+
+    geom_violin(aes(fill=pellet))+
+    scale_fill_manual(values=pellet_scale)+
+    point_indiv()+
+    point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123),alpha=0.7)+
+    labs(title=st)+
+    ms+theme(legend.position = "none")
+  p
+  save_plot(paste("F0 stdev",st),w=6,h=5)
+}
 
 ####Write final outputs
 write_sessioninfo()
