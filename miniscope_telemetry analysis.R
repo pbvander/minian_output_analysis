@@ -31,8 +31,10 @@ separator<-"/" #set depending on OS
 sess<-"MT29_2025_05_22_session1_torpor" #best session for creating figures
 
 #Exclusions:
-session_id_type_to_exclude<-c("MT29_2025_06_11_session1_heat" #All frames from F0 baseline were excluded due to excess motion
-                              )
+session_id_type_to_exclude<-c()
+
+#Parameters
+shuffle_iterations<-100
 
 #Global graph settings:
 ms<-list(theme_prism())
@@ -40,6 +42,7 @@ theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis
 group_gonad_scale<-c("black","#56B4E9","black","#D55E00")
 pellet_scale<-c("black","#56B4E9","#D55E00")
 cell_type_scale<-c("black","#F0E442","#0072B2")
+cell_type_scale2<-c("grey60","#F0E442","#0072B2")
 ambient_temp_bin_scale<-c("#0072B2","black","#E69F00")
 male_interaction_scale<-c("black","#F0E442")
 
@@ -232,7 +235,7 @@ A<-read_rds("./output/A.rds")
 sumdf<-read_rds("./output/sumdf.rds")
 
 ##### Single-cell analysis
-unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=100)
+unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
 
 ##### Population-level analysis
 ### Linear model
