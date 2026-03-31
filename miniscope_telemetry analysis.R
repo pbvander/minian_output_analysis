@@ -236,14 +236,16 @@ unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("
 
 ##### Population-level analysis
 ### Linear model
-torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=100)
-ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), .session_type = c("heat","cold"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=100)
+torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
+torpor_w_tempchange1_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", additional_x_var = "temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
+ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="ambient_ts", .session_type = c("heat","cold"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
 
-lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>% #combine data
+lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>% #combine data
   merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
-lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>% #combine data
+lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$predict_df,all=T)%>% #combine data
   merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
-unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(unit_df,all=T) #add coefficients from population model to unit_df
+unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>% #combine data
+  merge(unit_df,all=T) #add coefficients from population model to unit_df
 
 ### PCA
 pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("unit_id_id","telem_ts"))
@@ -646,6 +648,14 @@ p<-ggplot(sumdf%>%filter(!is.na(male_interaction))%>%mutate(male_interaction=fac
   point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123))+
   scale_fill_manual(values=male_interaction_scale)+
   facet_wrap(vars(unit_id_id),axes="all",scales="free_y")+
+## Compare lm results by variable
+data<-lm_df%>%select(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1,session_id)%>%pivot_longer(cols=c(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1), names_to = "var",values_to = "cor")
+
+wilcox.test(cor~var, data)
+
+p<-ggplot(data, aes(x=var, y=cor))+
+  point_indiv()+
+  line_pair(aes(group=session_id))+
   ms
 p
 save_plot("df_f0 by male interaction",w=20,h=15)

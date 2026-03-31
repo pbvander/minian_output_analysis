@@ -70,7 +70,7 @@ unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", shuf_i
   
   ##Correlation analysis with continuous Y variables
   print("Performing correlation analysis with continuous response variables")
-  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response="temp", shuf_iters = shuf_iters)
+  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters)
   cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), shuf_iters = shuf_iters)
   
   ##Combine data and add metadata
@@ -173,25 +173,26 @@ transform_data_piegraph <- function(data, animal_var, cell_var){
 }
 
 ##Popoulation-level analysis
-lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, cv_folds=5, shuf_iters=1000){
+lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000){
   lm_df<-tibble()
   lm_coef_df<-tibble()
+  lm_add_x_var_coef_df<-tibble()
   predict_df<-tibble()
   data<-data%>%filter(session_type %in% .session_type)
   for (sid in unique(data$session_id)){
     ##Set up column names based on session type
     type<-case_when(.session_type=="torpor" ~ "torpor",
                     "heat" %in% .session_type & "cold" %in% .session_type ~ "ambient")[1]
-    cor_col=paste0(response,"_mean_cor_",type)
-    sig_col=paste0(response,"_cor_sig_",type)
-    coef_col<-paste0(response,"_MeanLmCoef_",type)
-    print(paste(sid, type))
+    cor_col=paste0(response,"_mean_cor_",type,"_",additional_x_var)
+    sig_col=paste0(response,"_cor_sig_",type,"_",additional_x_var)
+    coef_col<-paste0(response,"_MeanLmCoef_",type,additional_x_var)
+    print(paste(sid, type, additional_x_var))
     
     ##Format and pivot data
     d<-data%>%filter(session_id==sid)%>%
-      select(unit_id_id, telem_ts, {{response}}, {{predictor}})%>%
+      select(unit_id_id, {{id_col}}, {{response}}, {{predictor}},{{additional_x_var}})%>%
       pivot_wider(values_from = {{predictor}}, names_from = unit_id_id)%>%
-      select(!telem_ts)
+      select(!{{id_col}})
     if (sum(is.na(d))>0)(warning(paste("NAs present in dataset",sid)))
     
     ##Partition data for cross-validation
@@ -206,6 +207,7 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
     ##Make models with observed data for each cv fold
     cor_ls<-c()
     coef_df<-tibble()
+    add_x_var_coef_df<-tibble()
     for (fold in 1:cv_folds){
       #Set up data
       idx = pcs[["1"]][[fold]]
@@ -218,14 +220,17 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
       predict<-predict(model, newdata=test)
       cor<-cor(test%>%pull({{response}}), predict, method="pearson")
       cor_ls<-c(cor_ls,cor)
-      coef_d<-tibble("unit_id_id"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold)%>%filter(unit_id_id!="(Intercept)")
+      coef_d<-tibble("unit_id_id"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold)%>%filter(unit_id_id %nin% c("(Intercept)",additional_x_var))
       coef_df<-rbind(coef_df,coef_d)
+      add_x_var_coef_d<-tibble("add_x_var"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold,"session_id"=sid)%>%filter(add_x_var %in% additional_x_var)
+      add_x_var_coef_df<-rbind(add_x_var_coef_df,add_x_var_coef_d)
       predict_df<-rbind(predict_df,tibble("predicted"=predict,"true"=test%>%pull({{response}}),"session_id"=sid))
     }
     
     
     ##Make models with shuffled data using same partitions for each cv fold
     shuf_cor_ls<-c()
+    shuf_add_x_var_coef_df<-tibble()
     for (i in 1:shuf_iters){
       shuf_cor<-c()
       for (fold in 1:cv_folds){
@@ -240,6 +245,8 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
         predict<-predict(model, newdata=test)
         cor<-cor(test%>%pull({{response}}), predict, method="pearson")
         shuf_cor<-c(shuf_cor,cor)
+        shuf_add_x_var_coef_d<-tibble("add_x_var"=names(model$coefficients),"shuf_coefficient"=unlist(model$coefficients),"fold"=fold,"session_id"=sid,iter=i)%>%filter(add_x_var %in% additional_x_var)
+        shuf_add_x_var_coef_df<-rbind(shuf_add_x_var_coef_df, shuf_add_x_var_coef_d)
       }
       shuf_cor_ls<-c(shuf_cor_ls, mean(shuf_cor))
     }
@@ -254,8 +261,25 @@ lm_analysis <- function(data, .session_type, predictor = "df_f0_bin", response, 
     lm_df<-rbind(lm_df,lm_d)
     lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
     lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
+    
+    
+    for (xvar in additional_x_var){
+      #Get rank
+      mean_obs_coef<-add_x_var_coef_df%>%filter(add_x_var==xvar)%>%group_by(add_x_var)%>%summarize(mean=mean(coefficient))%>%pull(mean)
+      shuf_coef<-shuf_add_x_var_coef_df%>%group_by(iter)%>%summarize(shuf_mean=mean(shuf_coefficient))%>%pull(shuf_mean)
+      coef_rank<-(c(mean_obs_coef,shuf_coef)%>%rank())[1]
+      coef_sig<-case_when(coef_rank>shuf_iters*0.975 ~ "positive",
+                          coef_rank<shuf_iters*0.025 ~ "negative",
+                          T ~ "netural")
+      #Compile
+      xvar_coef_col<-paste0(xvar,"_MeanLmCoef_",type)
+      xvar_sig_col<-paste0(xvar,"_sig_",type)    
+      lm_add_x_var_coef_d<-add_x_var_coef_df%>%group_by(add_x_var,session_id)%>%summarize("{xvar_coef_col}":=mean(coefficient))%>%mutate("{xvar_sig_col}":=coef_sig)
+      lm_add_x_var_coef_df<-rbind(lm_add_x_var_coef_df,lm_add_x_var_coef_d)
+    }
   }
-  ls<-list("lm_df" = lm_df, "lm_coef_df"=lm_coef_df, "predict_df"=predict_df)
+  
+  ls<-list("lm_df" = lm_df, "lm_coef_df"=lm_coef_df, "predict_df"=predict_df, "lm_add_x_var_coef_df"=lm_add_x_var_coef_df)
   return(ls)
 }
 
