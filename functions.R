@@ -99,7 +99,10 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
       d<-roc_data%>%filter(unit_id_id==id)
       if (length(unique(d$label)) != 2){next} #excludes sessions without both labels (will cause error in roc function)
       roc<-d%>%roc_("label",predictor, direction="<",levels=c(0,1))
-      fc<-d%>%group_by(label)%>%summarize(mean=mean(.data[[predictor]]))%>%filter(label==1)%>%pull(mean)
+      sum_roc<-d%>%group_by(label)%>%summarize(mean=mean(.data[[predictor]]))
+      fc<-1+
+          (sum_roc%>%filter(label==1)%>%pull(mean) - 
+           sum_roc%>%filter(label==0)%>%pull(mean))
       
       #Shuffled data
       shuf_auc<-c()
