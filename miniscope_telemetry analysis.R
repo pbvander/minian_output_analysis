@@ -762,32 +762,22 @@ for (i in 1:length(combos[,1])){
   save_plot(paste(combos[i,1],"-",combos[i,2]),w=5,h=4)
 }
 
-# #Generate all combination columns of length 2 and 3
-# combos <- map(2:length(target_cols), ~combn(target_cols, .x, simplify = FALSE))%>%flatten()
-# 
-# #Loop through and create the columns
-# for (cols in combos) {
-#   new_name <- paste(cols, collapse = "-")
-#   unit_df <- unit_df %>% 
-#     unite(!!new_name, all_of(cols), sep = "-", remove = FALSE)
-# }
-# 
-# #Graph
-# ggplot(unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient)), aes(x=temp_cor_sig_torpor,fill=.data[["ambient_temp_interpolated_cor_sig_ambient"]]))+
-#   geom_bar(position = "fill")+ms+
-#   facet_wrap(vars(pellet))
-
 ## Compare lm results by variable
-data<-lm_df%>%select(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1,session_id)%>%pivot_longer(cols=c(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1), names_to = "var",values_to = "cor")
+#Tcore only vs Tcore + change
+data<-lm_df%>%select(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1,session_id)%>%
+  pivot_longer(cols=c(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1), names_to = "var",values_to = "cor")%>%
+  mutate(var = factor(var,levels=c("temp_mean_cor_torpor_", "temp_mean_cor_torpor_temp_change1"),labels=c("TCore only","TCore + Change")))
 
 wilcox.test(cor~var, data)
 
 p<-ggplot(data, aes(x=var, y=cor))+
+  geom_violin()+
+  line_pair(aes(group=session_id),size=0.5,alpha=0.6)+
   point_indiv()+
-  line_pair(aes(group=session_id))+
+  labs(x=element_blank(),y="Pearson correlation coefficient")+
   ms
 p
-
+save_plot("Tcore vs Tcore with change correlation analysis", w=4,h=4)
 
 ####Write final outputs
 write_sessioninfo()
