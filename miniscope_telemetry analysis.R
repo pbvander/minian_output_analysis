@@ -785,3 +785,8 @@ p<-ggplot(data, aes(x=var, y=cor))+
   line_pair(aes(group=session_id))+
   ms
 p
+
+
+####Write final outputs
+write_sessioninfo()
+
