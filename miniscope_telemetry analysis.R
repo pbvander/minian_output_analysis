@@ -48,77 +48,13 @@ male_interaction_scale<-c("black","#F0E442")
 
 ##### Read in miniscope data:
 ### Initalize variables
-A<-tibble()
-C<-tibble()
-S<-tibble()
-YrA<-tibble()
-motion<-tibble()
-ts<-tibble()
 bad_frames<-list()
+sumdf<-tibble()
 
-### Read in csv files
-setwd(exp_direc)
-for (dir in direcs){
-  # print(paste0(".",dir))
-  for (mouse in list.dirs(dir, full.names=F,recursive=F)){
-    # print(paste0("..",mouse))
-    for (start_date in list.dirs(paste(dir,mouse,sep=separator),full.names=F,recursive=F)){
-      # print(paste0("...",start_date))
-      for (session in list.dirs(paste(dir,mouse,start_date,sep=separator),full.names=F,recursive=F)){
-        # print(paste0("....",session))
-        for (start_time in list.dirs(paste(dir,mouse,start_date,session,sep=separator),full.names=F,recursive=F)){
-          if ("A.csv" %in% list.files(paste(dir,mouse,start_date,session, start_time, "minian",sep=separator))){
-            path <- paste(dir,mouse,start_date,session,start_time,sep=separator)
-            msrun_dir <- grep("msRun",list.files(path),value = T)
-            print(paste0("Reading ", path))
-            exp<-strsplit(strsplit(dir,separator)[[1]][1],"_")[[1]][1]
-            bad_cells<-read_cell_label(paste(path,"minian","cell_label.csv", sep=separator))
-            A<-rbind(A,read_csv_minian(paste(path,"minian","A.csv", sep=separator))%>%filter(A>0))
-            C<-rbind(C, read_csv_minian(paste(path,"minian","C.csv", sep=separator)))
-            S<-rbind(S, read_csv_minian(paste(path,"minian","S.csv", sep=separator)))
-            YrA<-rbind(YrA, read_csv_minian(paste(path,"minian","YrA.csv", sep=separator)))
-            motion<-rbind(motion, read_motion(paste(path,msrun_dir,sep=separator)))
-            ts<-rbind(ts, read_timestamps(paste(path,"My_V4_Miniscope","timeStamps.csv", sep=separator)))
-            bad_frames[[path]]<-setdiff(unique(motion$frame), unique(C$frame)) ##Detects frame in motion, but not C. This should be equal to bad_frames set in minian
-            motion<-motion%>%filter(frame %nin% bad_frames[[path]])
-          }
-        }
-      }
-    }
-  }
-}
-
-### Create dataframe with all timeseries data
-# Merge timeseries data and uniquely identify each unit/session with an ID
-df<-merge(C,S)%>%
-  merge(YrA)%>%
-  merge(ts)%>%
-  merge(motion)%>%
-  mutate(start_ts = ymd_hms(paste(start_date, start_time)),
-         miniscope_ts = (start_ts + milliseconds(time_ms))
-         )%>%
-  mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
-         session_id = paste0(mouse,"_",start_date,"_",session))%>%
-  scale_temporal()
-
-A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
-              session_id = paste0(mouse,"_",start_date,"_",session))
-
-# Checkpoint
-#Write 
-setwd(output_dir)
-write_output_rds(df, name = "df_checkpoint1")
-write_output_rds(A, name = "A_checkpoint1")
-
-#Read 
-# setwd(output_dir)
-# df<-read_rds("./output/df_checkpoint1.rds")
-# A<-read_rds("./output/A_checkpoint1.rds")
-
-#Setwd
+### Read and prepare metadata
 setwd(exp_direc)
 
-# Add metadata on session type
+#Session type metadata
 read<-c()
 session_mdf<-tibble()
 for (dir in direcs){
@@ -128,11 +64,10 @@ for (dir in direcs){
   session_mdf<-rbind(session_mdf, read_csv(file, show_col_types=F)%>%mutate(across(everything(), as.character)))
   read<-c(read, file)
 }
-df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
 
-# Add event-based metadata
-event_mdf<-tibble()
+#Event-based metadata
 read<-c()
+event_mdf<-tibble()
 for (dir in direcs){
   file<-paste(strsplit(dir[1],separator)[[1]][1],"event_metadata.csv", sep=separator)
   if (file %in% read){next}
@@ -140,25 +75,9 @@ for (dir in direcs){
   event_mdf<-rbind(event_mdf, read_event_metadata(file))
   read<-c(read,file)
 }
-event_mdf<-event_mdf%>%select(event, session_id, frame)%>%pivot_wider(names_from = event,values_from = frame)
-df<-df%>%
-  merge(event_mdf, all.x=T)%>%
-  mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
-                                        session_type == "male_interaction" ~ ifelse(frame%>%between(male_added,male_removed), 1, 0)))
+event_mdf<-event_mdf%>%select(event, session_id,start_time, miniscope_frame)%>%pivot_wider(names_from = event,values_from = miniscope_frame)
 
-#Create new column for total time within each session
-df<-df%>%
-  group_by(session_id)%>%
-  mutate(session_start_ts = min(miniscope_ts))%>%
-  ungroup()%>%
-  mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60, #time within the entire "session" 
-         time_seconds = interval(start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric()) #time in seconds within each "start_time" 
-
-# Clean up variables and memory
-rm(C,S,YrA,ts,motion)
-gc()
-
-##### Read in telemetry data
+#Telemetry data
 read<-c()
 t_df<-tibble()
 for (dir in direcs){
@@ -169,8 +88,10 @@ for (dir in direcs){
   t_df<-rbind(t_df, read_telemetry_data(telem_file, metadata_file, format="starr-lifesci")) ##Ignore warning about additional pieces
   read <- c(read, telem_file)
 }
+ts_seq<-seq(min(t_df$telem_ts)-seconds(30),max(t_df$telem_ts)+seconds(30), seconds(60)) #assumes a 1-minute (60 second) sampling interval
+t_df<-t_df%>%mutate(ts_bin = cut(telem_ts, ts_seq))
 
-##### Read in ambient temperature data
+#Ambient temperature data
 read<-c()
 at_df<-tibble()
 for (dir in direcs){
@@ -180,59 +101,195 @@ for (dir in direcs){
   at_df<-rbind(at_df, read_ambient_data(at_file, upsample_interval_seconds = 60))
   read <- c(read, at_file)
 }
-
-##### Merge telemetry and miniscope data
-# Create time bin column as basis for merging
-ts_seq<-seq(min(t_df$telem_ts)-seconds(30),max(t_df$telem_ts)+seconds(30), seconds(60)) #assumes a 1-minute (60 second) sampling interval
-df<-df%>%mutate(ts_bin = cut(miniscope_ts, ts_seq))
-t_df<-t_df%>%mutate(ts_bin = cut(telem_ts, ts_seq))
 at_df<-at_df%>%mutate(ts_bin = cut(ambient_ts, ts_seq))
 
-# Preserve all miniscope data, and assign one temperature/act/ambient temperature to all frames in the given range
-df<-merge(df, t_df, all=T)
-df<-merge(df, at_df%>%select(!c(session_type,start_date)), all=T)
-df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
+### Read in Miniscope data from each session and process individually
+for (dir in direcs){
+  # print(paste0(".",dir))
+  for (mouse in list.dirs(dir, full.names=F,recursive=F)){
+    # print(paste0("..",mouse))
+    for (start_date in list.dirs(paste(dir,mouse,sep=separator),full.names=F,recursive=F)){
+      # print(paste0("...",start_date))
+      for (session in list.dirs(paste(dir,mouse,start_date,sep=separator),full.names=F,recursive=F)){
+        # print(paste0("....",session))
+        for (start_time in list.dirs(paste(dir,mouse,start_date,session,sep=separator),full.names=F,recursive=F)){
+          if ("A.csv" %in% list.files(paste(dir,mouse,start_date,session, start_time, "minian",sep=separator))){
+            # #Read data
+            path <- paste(dir,mouse,start_date,session,start_time,sep=separator)
+            msrun_dir <- grep("msRun",list.files(path),value = T)
+            print(paste0("Reading ", path))
+            exp<-strsplit(strsplit(dir,separator)[[1]][1],"_")[[1]][1]
+            bad_cells<-read_cell_label(paste(path,"minian","cell_label.csv", sep=separator))
+            A<-read_csv_minian(paste(path,"minian","A.csv", sep=separator))%>%filter(A>0)
+            C<-read_csv_minian(paste(path,"minian","C.csv", sep=separator))
+            S<-read_csv_minian(paste(path,"minian","S.csv", sep=separator))
+            YrA<-read_csv_minian(paste(path,"minian","YrA.csv", sep=separator))
+            motion<-read_motion(paste(path,msrun_dir,sep=separator))
+            ts<-read_timestamps(paste(path,"My_V4_Miniscope","timeStamps.csv", sep=separator))
+            bad_frames[[path]]<-setdiff(unique(motion$frame), unique(C$frame)) ##Detects frame in motion, but not C. This should be equal to bad_frames set in minian
+            motion<-motion%>%filter(frame %nin% bad_frames[[path]])
 
-##### Calculate dF/F0
-df<-df%>%mutate(f0 = case_when(
-    session_type == "cage_change" & time_seconds < 300 ~ T, #5-minute baseline before cage change
-    session_type == "torpor" & aligned_time<30 & temp>35 ~ T, #day 1 torpor (euthermia timepoints)
-    session_type == "torpor" & temp>35 ~ T, #day 2 torpor (euthermia timepoints)
-    session_type == "cold" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
-    session_type == "heat" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
-    session_type == "male_interaction" & time_seconds < 300 ~ T, #5-minute baseline before adding male
-    session_type == "E2_injection" & time_seconds < 300 ~ T, #5-minute baseline before starting injections
-    T ~ F
-  )
-)
+            #Convert to one dataframe
+            df<-merge(C,S)%>%
+              merge(YrA)%>%
+              merge(ts)%>%
+              merge(motion)%>%
+              mutate(start_ts = ymd_hms(paste(start_date, start_time)),
+                     miniscope_ts = (start_ts + milliseconds(time_ms)))%>%
+              mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
+                     session_id = paste0(mouse,"_",start_date,"_",session))%>%
+              scale_temporal()
 
-f0_df<-df%>%filter(f0)%>%group_by(unit_id_id,session_id,session_type)%>%summarize(mean_f0 = mean(YrA), sd_f0 = sd(YrA))
-check<-f0_df%>%group_by(session_id,session_type)%>%count()%>%nrow() - df%>%filter(!is.na(session_id))%>%group_by(session_id,session_type)%>%count()%>%nrow() 
-print(check) #check that f0 is calculated for all sesssion_id values. This should equal 0
-if (check !=0){stop("f0 not matching number of session_ids")}
-df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
-                                        z = (YrA - mean_f0) / sd_f0)
+            A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
+                          session_id = paste0(mouse,"_",start_date,"_",session))
 
-# Create 1-minute bins in miniscope data
-sumdf<-df%>%
-  filter(!is.na(YrA))%>%
-  group_by(ts_bin,unit_id_id)%>%
-  arrange(ts_bin)%>%
-  mutate(C_bin=mean(C), S_bin=mean(S), YrA_bin=mean(YrA), mean_motion_distance=mean(motion_distance), df_f0_bin=mean(df_f0), z_bin=mean(z))%>%
-  ungroup()%>%
-  distinct(ts_bin,unit_id_id, .keep_all = T)%>%
-  scale_temporal_bin()
+            # Clean up variables and memory
+            rm(C,S,YrA,ts,motion)
+            gc()
 
-##### Checkpoint 2
+            #Write intermediate output (Checkpoint 1)
+            setwd(output_dir)
+            if ("./output/int" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
+            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint1+",gsub(separator,"+",path)))
+            write_output_rds(A, direc="./output/intermediate/", name=paste0("A_checkpoint1+",gsub(separator,"+",path)))
+            setwd(exp_direc)
+
+            # Add metadata on session type
+            df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
+
+            # Add event-based metadata
+            df<-df%>%
+              merge(event_mdf, all.x=T)
+            if (start_time=="concatenated"){
+              print("Using frame_og to register events")
+              df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
+                                                        session_type == "male_interaction" ~ ifelse(frame_og%>%between(male_added,male_removed), 1, 0))) #use frame_og with concatenated timeStamps
+            } else{
+              print("Using frame to register events")
+              df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
+                                                        session_type == "male_interaction" ~ ifelse(frame%>%between(male_added,male_removed), 1, 0)))
+            }
+
+
+            #Create new column for total time within each session
+            df<-df%>%
+              group_by(session_id)%>%
+              mutate(session_start_ts = min(miniscope_ts))%>%
+              ungroup()%>%
+              mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60, #time within the entire "session"
+                     time_seconds = interval(start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric()) #time in seconds within each "start_time"
+
+            ##### Merge telemetry and miniscope data
+            # Create time bin column as basis for merging
+            df<-df%>%mutate(ts_bin = cut(miniscope_ts, ts_seq))
+
+            # Preserve all miniscope data, and assign one temperature/act/ambient temperature to all frames in the given range
+            #Filter data to match mouse and date (avoid duplicates for later)
+            mous<-mouse
+            start_d<-start_date
+            t_d<-t_df%>%filter(mouse==mous, mdy(date)==ymd(start_d))
+            at_d<-at_df%>%filter(mouse==mous, start_date==start_d)
+
+            #Merge
+            df<-merge(df, t_d, all=T)
+            df<-merge(df, at_d%>%select(!c(session_type,start_date)), all=T)
+            if (df%>%filter(session_type %in% c("cold","heat"), is.na(ambient_temp_interpolated))%>%nrow() > 0){warning("NAs present in ambient_temp_interpolated column")}
+            df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
+
+            ##### Calculate dF/F0
+            df<-df%>%mutate(f0 = case_when(
+              session_type == "cage_change" & time_seconds < 300 ~ T, #5-minute baseline before cage change
+              session_type == "torpor" & aligned_time<30 & temp>35 ~ T, #day 1 torpor (euthermia timepoints)
+              session_type == "torpor" & temp>35 ~ T, #day 2 torpor (euthermia timepoints)
+              session_type == "cold" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
+              session_type == "heat" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
+              session_type == "male_interaction" & time_seconds < 300 ~ T, #5-minute baseline before adding male
+              session_type == "E2_injection" & time_seconds < 300 ~ T, #5-minute baseline before starting injections
+              T ~ F)
+              )
+
+            f0_df<-df%>%filter(f0)%>%group_by(unit_id_id,session_id,session_type)%>%summarize(mean_f0 = mean(YrA), sd_f0 = sd(YrA))
+            check<-f0_df%>%group_by(session_id,session_type)%>%count()%>%nrow() - df%>%filter(!is.na(session_id))%>%group_by(session_id,session_type)%>%count()%>%nrow()
+            print(check) #check that f0 is calculated for all sesssion_id values. This should equal 0
+            if (check !=0){stop("f0 not matching number of session_ids")}
+            df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
+                                                    z = (YrA - mean_f0) / sd_f0)
+
+            ##### Checkpoint 2
+            setwd(output_dir)
+            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint2+",gsub(separator,"+",path)))
+            write_output_rds(A, direc="./output/intermediate/", name=paste0("A_checkpoint2+",gsub(separator,"+",path)))
+            setwd(exp_direc)
+
+            # Create 1-minute bins in miniscope data
+            sumd<-df%>%
+              filter(!is.na(YrA))%>%
+              group_by(ts_bin,unit_id_id)%>%
+              arrange(ts_bin)%>%
+              mutate(C_bin=mean(C), S_bin=mean(S), YrA_bin=mean(YrA), mean_motion_distance=mean(motion_distance), df_f0_bin=mean(df_f0), z_bin=mean(z), sd_f0_bin=mean(sd_f0))%>%
+              ungroup()%>%
+              distinct(ts_bin,unit_id_id, .keep_all = T)%>%
+              scale_temporal_bin()
+            sumdf<-rbind(sumdf,sumd)
+
+            ## Graph full data for all sessions
+            setwd(output_dir)
+            for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
+              # if (paste0("line plot and motion and temp ",id,".png") %in% list.files("./output")){next}
+              print(id)
+
+              ### Lines with motion (quality check)
+              ls<-list(scale_x_continuous(expand=c(0,0), breaks=NULL),
+                       theme(text=element_text(size=28),plot.title = element_text(size=28)),
+                       labs(x="Time (minutes)"),
+                       facet_wrap(vars(start_time), nrow=1,scales="free_x"),
+                       theme(strip.text.x = element_blank()))
+              ridge_set<-list(ridgeline_guide(),
+                              ridgeline(aes(height=scaled_YrA)),
+                              scale_fill_viridis_c(),
+                              labs(title="Detrended + demixed signal (F) / max F", y="Cell ID",x=element_blank()))
+              motion_set<-list(geom_line(),
+                               labs(y="pixels",x=element_blank(),title="Motion distance"))
+              temp_set<-list(geom_line(linewidth = 1),
+                             scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,4)),
+                             labs(y="Deg. C",title="Core body tempeature"))
+              ambient_temp_set<-list(geom_line(linewidth = 1),
+                                     labs(y="Deg. C",title="Ambient tempeature",x=element_blank()))
+              male_interaction_set<-list(geom_line(linewidth = 1),
+                                         labs(y="",title="Male social stimulus",x=element_blank()),
+                                         scale_y_continuous(breaks=c(0,1)))
+
+              # All frames
+              p1<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
+              p2<-ggplot(df%>%filter(!is.na(motion_distance), session_id_type==id), aes(x=session_time_minutes,y=motion_distance))+ms+ls+motion_set
+              p3<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
+              if (grepl("torpor",id)){
+                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)}
+              if (grepl("heat",id) | grepl("cold",id)){
+                p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
+                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+              if (grepl("male_interaction",id)){
+                p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
+                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+
+              # Subset of frames
+              # s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+              # s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+              # s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+              # s2/s1/s3+plot_layout(heights=c(1,10,1))
+              # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
+              gc()
+            }
+            setwd(exp_direc)
+          }
+        }
+      }
+    }
+  }
+}
+###Checkpoint 3
 setwd(output_dir)
-write_output_rds(df)
-write_output(A)
 write_output(sumdf)
-
-setwd(output_dir)
-df<-read_rds("./output/df.rds")
-A<-read_rds("./output/A.rds")
-sumdf<-read_rds("./output/sumdf.rds")
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
@@ -261,14 +318,13 @@ write_output(unit_df)
 write_output_rds(pca_ls)
 
 #Read all
-setwd(output_dir)
-df<-read_rds("./output/df.rds")
-A<-read_rds("./output/A.rds")
-sumdf<-read_rds("./output/sumdf.rds")
-lm_df<-read_rds("./output/lm_df.rds")
-lm_predict_df<-read_rds("./output/lm_predict_df.rds")
-unit_df<-read_rds("./output/unit_df.rds")
-pca_ls<-read_rds("./output/pca_ls.rds")
+# setwd(output_dir)
+# A<-read_rds("./output/A.rds")
+# sumdf<-read_rds("./output/sumdf.rds")
+# lm_df<-read_rds("./output/lm_df.rds")
+# lm_predict_df<-read_rds("./output/lm_predict_df.rds")
+# unit_df<-read_rds("./output/unit_df.rds")
+# pca_ls<-read_rds("./output/pca_ls.rds")
 
 ##### Graph
 gc()
@@ -299,26 +355,6 @@ for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
                          labs(y="",title="Male social stimulus",x=element_blank()),
                          scale_y_continuous(breaks=c(0,1)))
   
-  # All frames
-  p1<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
-  p2<-ggplot(df%>%filter(!is.na(motion_distance), session_id_type==id), aes(x=session_time_minutes,y=motion_distance))+ms+ls+motion_set
-  p3<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
-  if (grepl("torpor",id)){
-    save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)}
-  if (grepl("heat",id) | grepl("cold",id)){
-    p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
-    save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
-  if (grepl("male_interaction",id)){
-    p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
-    save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
-  
-  # Subset of frames
-  # s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-  # s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-  # s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-  # s2/s1/s3+plot_layout(heights=c(1,10,1))
-  # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
-  gc()
 }
 
 ### dF/F0 - body temperature relationship (single unit analysis)
