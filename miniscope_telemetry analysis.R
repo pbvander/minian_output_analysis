@@ -243,12 +243,13 @@ for (dir in direcs){
             for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
               # if (paste0("line plot and motion and temp ",id,".png") %in% list.files("./output")){next}
               print(id)
+              data<-df%>%filter(!is.na(YrA), session_id_type==id)
 
               ### Lines with motion (quality check)
               ls<-list(scale_x_continuous(expand=c(0,0), breaks=NULL),
                        theme(text=element_text(size=28),plot.title = element_text(size=28)),
                        labs(x="Time (minutes)"),
-                       facet_wrap(vars(start_time), nrow=1,scales="free_x"),
+                       facet_grid(vars(start_time), scales="free_x", space="free_x"),
                        theme(strip.text.x = element_blank()))
               ridge_set<-list(ridgeline_guide(),
                               ridgeline(aes(height=scaled_YrA)),
@@ -264,18 +265,32 @@ for (dir in direcs){
               male_interaction_set<-list(geom_line(linewidth = 1),
                                          labs(y="",title="Male social stimulus",x=element_blank()),
                                          scale_y_continuous(breaks=c(0,1)))
+              fed_set<-list(geom_line(linewidth=1),
+                            labs(y="",title="Fed/fasted status"))
+              injection_set<-list(geom_line(linewidth=1),
+                                  labs(y="",title="Injection"))
 
               # All frames
-              p1<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id),aes(x=session_time_minutes,y=unit_id))+ms+ls+ridge_set
-              p2<-ggplot(df%>%filter(!is.na(motion_distance), session_id_type==id), aes(x=session_time_minutes,y=motion_distance))+ms+ls+motion_set
-              p3<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
+              p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set
+              p2<-ggplot(data, aes(x=session_time_minutes, y=motion_distance))+ms+ls+motion_set
+              p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
+            
               if (grepl("torpor",id)){
-                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p3+plot_layout(heights=c(1,10,1)),w=32,h=25)}
+                aligned_tim<-interval(df$fstart[1], ymd_hms(paste0(start_date,"_00_00_01")))%>%time_length("hours")
+                if (aligned_tim < 30){ #day 1 torpor (no re-feed)
+                  p<-p2/p1/p3+plot_layout(heights=c(1,10,1))}
+                if (aligned_tim > 30){  #day 2 torpor with re-feed
+                  p4<-ggplot(data, aes(x=session_time_minutes, y=fed))+ms+ls+fed_set
+                  p<-p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1))}
+                save_png_large(paste("line plot and motion and temp",id),plot=p,w=32,h=25)}
               if (grepl("heat",id) | grepl("cold",id)){
-                p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
+                p4<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
                 save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
               if (grepl("male_interaction",id)){
-                p4<-ggplot(df%>%filter(!is.na(YrA), session_id_type==id), aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
+                p4<-ggplot(data, aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
+                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+              if (grepl("E2_injection", id)){
+                p4<-ggplot(data, aes(x=session_time_minutes, y=injection))+ms+ls+injection_set
                 save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
 
               # Subset of frames
@@ -333,7 +348,7 @@ lm_predict_df<-read_rds("./output/lm_predict_df.rds")
 unit_df<-read_rds("./output/unit_df.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 
-##### Graph
+########### Graph ###########
 gc()
 
 ### dF/F0 - body temperature relationship (single unit analysis)
