@@ -463,20 +463,20 @@ read_event_metadata <- function(file){
   }
   
   ## Add webcam timestamp info back to d and add session_id as metadata to d and miniscope data
-  d<-merge(d,webcam_ts_d,all.x=T)%>%mutate(session_id = paste(mouse,start_date,session,sep="_"))
+  d<-merge(d,webcam_ts_d,all.x=T)%>%mutate(session_id = paste(mouse,start_date,session,sep="_"), event_ts = ymd_hms(paste0(start_date,"_",start_time)) + milliseconds(webcam_time_ms))
   miniscope_ts_d<-miniscope_ts_d%>%mutate(session_id = paste(mouse,start_date,session,sep="_"))
   
-  ## Find frame in miniscope data that is closest in timestamp to each event
-  for (i in 1:nrow(d)){
-    frm<-(miniscope_ts_d%>%
-            filter(session_id==d[[i,"session_id"]], start_time==d[[i,"start_time"]])%>%
-            mutate(ts_diff = abs(time_ms-d[[i,"webcam_time_ms"]]))%>%
-            filter(ts_diff == min(ts_diff))%>%
-            pull(frame)%>%
-            unique())[1] # [1] is important in case there is a "tie" between two frames for closest to the time stamp of interest
-    d[i,"miniscope_frame"] <- frm
-  }
-  if (NA %in% d$miniscope_frame){warning("Not all event registered to a miniscope frame")}
+  ## Find frame in miniscope data that is closest in timestamp to each event (deprecated, since it led to ambiguity with concatenated session timeStamps.csv)
+  # for (i in 1:nrow(d)){
+  #   frm<-(miniscope_ts_d%>%
+  #           filter(session_id==d[[i,"session_id"]], start_time==d[[i,"start_time"]])%>%
+  #           mutate(ts_diff = abs(time_ms-d[[i,"webcam_time_ms"]]))%>%
+  #           filter(ts_diff == min(ts_diff))%>%
+  #           pull(frame)%>%
+  #           unique())[1] # [1] is important in case there is a "tie" between two frames for closest to the time stamp of interest
+  #   d[i,"miniscope_frame"] <- frm
+  # }
+  if (NA %in% d$event_ts){warning("Not all event registered to a miniscope frame")}
   return(d)
 }
 

@@ -78,7 +78,7 @@ for (dir in direcs){
   event_mdf<-rbind(event_mdf, read_event_metadata(file))
   read<-c(read,file)
 }
-event_mdf<-event_mdf%>%select(event, session_id,start_time, miniscope_frame)%>%pivot_wider(names_from = event,values_from = miniscope_frame)
+event_mdf<-event_mdf%>%select(event, session_id,start_time, event_ts)%>%pivot_wider(names_from = event,values_from = event_ts)
 
 #Telemetry data
 read<-c()
@@ -160,18 +160,20 @@ for (dir in direcs){
             df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
 
             # Add event-based metadata
-            df<-df%>%
-              merge(event_mdf, all.x=T)
-            if (start_time=="concatenated"){
-              print("Using frame_og to register events")
-              df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
-                                                        session_type == "male_interaction" ~ ifelse(frame_og%>%between(male_added,male_removed), 1, 0))) #use frame_og with concatenated timeStamps
-            } else{
-              print("Using frame to register events")
-              df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
-                                                        session_type == "male_interaction" ~ ifelse(frame%>%between(male_added,male_removed), 1, 0)))
-            }
-
+            df<-df%>%merge(event_mdf, all.x=T)
+            df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
+                                                           session_type == "male_interaction" ~ ifelse(miniscope_ts > male_added & miniscope_ts < male_removed, 1, 0)),
+                            "injection" = case_when(session_type != "E2_injection" ~ NA,
+                                                    session_type == "E2_injection" & miniscope_ts >= E2_injection ~ "E2",
+                                                    session_type == "E2_injection" & miniscope_ts >= veh_injection ~ "Veh",
+                                                    session_type == "E2_injection" & miniscope_ts >= sham_injection ~ "Sham",
+                                                    session_type == "E2_injection" & miniscope_ts < sham_injection ~ "Baseline"),
+                            "fed" = case_when(session_type != "torpor" ~ NA,
+                                              session_type == "torpor" & miniscope_ts < fed ~ "Fasting"
+                                              session_type == "torpor" & miniscope_ts > first_bite ~ "Eating",
+                                              session_type == "torpor" & miniscope_ts >= fed & miniscope_ts <= first_bite ~ "Fed"),
+                            "cage_change" = case_when(session_type != "cage_change" ~ NA,
+                                                      session_type == "cage_change" ~ ifelse(miniscope_ts < cage_change, "Home","New")))
 
             #Create new column for total time within each session
             df<-df%>%
