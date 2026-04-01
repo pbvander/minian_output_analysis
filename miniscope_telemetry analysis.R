@@ -167,12 +167,13 @@ for (dir in direcs){
                                                     session_type == "E2_injection" & miniscope_ts >= E2_injection ~ "E2",
                                                     session_type == "E2_injection" & miniscope_ts >= veh_injection ~ "Veh",
                                                     session_type == "E2_injection" & miniscope_ts >= sham_injection ~ "Sham",
-                                                    session_type == "E2_injection" & miniscope_ts < sham_injection ~ "Baseline"),
-                            "fed" = case_when(session_type != "torpor" ~ NA,
-                                              session_type == "torpor" & miniscope_ts < fed ~ "Fasting"
-                                              session_type == "torpor" & miniscope_ts > first_bite ~ "Eating",
-                                              session_type == "torpor" & miniscope_ts >= fed & miniscope_ts <= first_bite ~ "Fed"),
-                            "cage_change" = case_when(session_type != "cage_change" ~ NA,
+                                                    session_type == "E2_injection" & miniscope_ts < sham_injection ~ "Baseline")%>%factor(levels=c("Baseline","Sham","Veh","E2")),
+                            "fed_status" = case_when(session_type != "torpor" ~ NA,
+                                                     session_type == "torpor" & miniscope_ts < fed ~ "Fasting",
+                                                     session_type == "torpor" & miniscope_ts > first_bite ~ "Eating",
+                                                     session_type == "torpor" & miniscope_ts >= fed & miniscope_ts <= first_bite ~ "Fed",
+                                                     T ~ "Fasting")%>%factor(levels=c("Fasting","Fed","Eating"),),
+                            "cage_change_status" = case_when(session_type != "cage_change" ~ NA,
                                                       session_type == "cage_change" ~ ifelse(miniscope_ts < cage_change, "Home","New")))
 
             #Create new column for total time within each session
