@@ -397,6 +397,18 @@ p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
 p
 save_png_large("torpor observations by temp and pellet", w=7,h=5)
 
+# Temp-temp_change1 correlation during torpor
+p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
+  xy_point2(alpha=0.2)+
+  regression_line()+
+  ms
+p
+save_plot("temp-temp_change1 relationship during torpor",w=5,h=5)
+p+facet_wrap(vars(session_id))
+save_plot("temp-temp_change1 relationship during torpor by session_id",w=7,h=6)
+
+temp_tempchange_lm<-lm_analysis(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
+
 # Correlation coefficient by gonad/E2 state or pellet
 p<-ggplot(unit_df, aes(x=group_gonad, y=temp_cor_torpor))+
   geom_violin(aes(fill=group_gonad))+
@@ -693,6 +705,14 @@ for (sid in unique(pca_ls$unit_id_id$session_id)){ #Each dot is a cell, collapse
 }
 
 ### dF/F0 - ambient temperature relationship
+## Plot ambient temperature challenge schematic
+ggplot(sumdf%>%filter(session_id=="MT30_2025_05_23_session1", session_type %in% c("cold","heat"))%>%mutate(session_type=factor(session_type,levels=c("heat","cold"))),aes(x=session_time_minutes,y=ambient_temp_interpolated))+
+  labs(x="Time (minutes)",y="Ambient temperature (Deg. C)")+
+  continuous_line()+
+  ms+theme(panel.spacing=unit(1,"in"))+
+  facet_wrap(vars(session_type),scales="free_x")
+save_plot("ambient temperature schematic",w=7,h=5)
+
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
   print(id)
@@ -721,6 +741,25 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
   save_plot(paste("df_f0 by ambient temperature bin",id),w=20,h=15)
 }
 
+t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
+for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
+  if (cell_type=="neutral"){next}
+  print(cell_type)
+  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  print(anov)
+}
+
+p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=pellet, y=ambient_temp_interpolated_cor_ambient))+
+  geom_violin(aes(fill=pellet))+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  point_indiv()+
+  labs(x=element_blank(),y="Slope")+
+  scale_fill_manual(values=pellet_scale)+
+  facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",scales="free")+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("ambient temperature slope by cell type and pellet", w=12,h=8)
 
 ### dF/F0 - male social stimulus relationship
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
@@ -743,12 +782,36 @@ p<-ggplot(unit_df%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_
   ms
 p
 
+p<-ggplot(unit_df%>%filter(male_interaction_auc_sig!="neutral"), aes(x=pellet, y=male_interaction_auc))+
+  geom_violin(aes(fill=pellet))+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  point_indiv()+
+  labs(x=element_blank(),y="Slope")+
+  scale_fill_manual(values=pellet_scale)+
+  facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free")+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("male auc by cell type and pellet", w=12,h=8)
+
+p<-ggplot(unit_df%>%filter(male_interaction_auc_sig!="neutral"), aes(x=pellet, y=log2(male_interaction_fc)))+
+  geom_violin(aes(fill=pellet))+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  point_indiv()+
+  labs(x=element_blank(),y=expression(bold(log[bold(2)](fold~change))))+
+  scale_fill_manual(values=pellet_scale)+
+  facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free")+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("male log2fc auc by cell type and pellet", w=12,h=8)
+
 ##Comparison of tuning across stimuli
-target_cols<-c("temp_cor_torpor",#"temp_change1_cor_torpor", 
+target_cols<-c("temp_cor_torpor","temp_change1_cor_torpor", 
                "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
-target_cols_binary<-c("temp_cor_sig_torpor",#"temp_change1_cor_sig_torpor",
+target_cols_binary<-c("temp_cor_sig_torpor","temp_change1_cor_sig_torpor",
                       "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
-labs<-c("TCore", #"TCore_change",
+labs<-c("TCore", "TCore_change",
         "TAmb", "Male")
 
 # Heat map
@@ -779,11 +842,17 @@ for (target in target_cols){
 
 #scatter plots
 combos<-combinations(length(target_cols),2,target_cols)
+combos_binary<-combinations(length(target_cols_binary),2,target_cols_binary)
 for (i in 1:length(combos[,1])){
-  data<-unit_df%>%filter(!is.na(!!sym(combos[i,1])))%>%filter(!is.na(!!sym(combos[i,2])))%>%mutate(r = .data[[combos[i,1]]], pred =  .data[[combos[i,2]]])
+  data<-unit_df%>%
+    filter(!is.na(!!sym(combos[i,1])))%>%
+    filter(!is.na(!!sym(combos[i,2])))%>%
+    filter(!!sym(combos_binary[i,1]) != "neutral" & !!sym(combos_binary[i,2]) != "neutral")%>%
+    mutate(r = .data[[combos[i,1]]], pred =  .data[[combos[i,2]]])
   print(combos[i,])
+  print(dim(data))
   print(cor(data$r, data$pred, method="pearson"))
-  p<-ggplot(unit_df,aes(x=!!sym(combos[i,1]),y=!!sym(combos[i,2])))+
+  p<-ggplot(unit_df%>%filter(!!sym(combos_binary[i,1]) != "neutral" & !!sym(combos_binary[i,2]) != "neutral"),aes(x=!!sym(combos[i,1]),y=!!sym(combos[i,2])))+
     regression_line()+
     xy_point2()+ms
   p
