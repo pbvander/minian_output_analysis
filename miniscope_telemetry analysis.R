@@ -388,8 +388,8 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
 
 # Observations by temperature histogram
 p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),binwidth = 1)+
-  scale_x_continuous(expand=c(0,0))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
   scale_y_continuous(expand=c(0,0))+
   labs(x="Core body temperature",y="Observations")+
   scale_fill_manual(values=pellet_scale)+

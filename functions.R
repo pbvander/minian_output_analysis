@@ -62,6 +62,23 @@ read_motion <- function(path){
   return(d)
 }
 
+downsample_data <- function(data, response="temp", grouping_variable="pellet", bin_width=1){
+  bin_col<-paste0(response,"_bin",bin_width)
+  total_groups<-data%>%pull({{grouping_variable}})%>%unique()%>%length()
+  print(paste("Total groups:", total_groups))
+  
+  d<-data%>%
+    slice_sample(prop = 1)%>%
+    mutate({{bin_col}}:=cut(.data[[response]], seq(min(data%>%pull({{response}}))%>%round(digits=0)-2, max(data%>%pull({{response}}))%>%round(digits=0)+2, bin_width)))%>%
+    group_by(across(all_of(c(bin_col, grouping_variable))))%>%
+    mutate(current_count = n())%>%
+    group_by(across(all_of(bin_col)))%>%
+    filter(n_distinct(.data[[grouping_variable]]) == total_groups)%>%
+    mutate(min_for_this_bin = min(current_count))%>%
+    group_by(across(all_of(c(bin_col, grouping_variable))))%>%
+    filter(row_number() <= min_for_this_bin)
+}
+
 ##Single cell analysis
 unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", shuf_iters=1000){
   ##ROC analysis with binned Y variables
