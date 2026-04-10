@@ -163,6 +163,10 @@ for (dir in direcs){
             df<-df%>%merge(event_mdf, all.x=T)
             df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
                                                            session_type == "male_interaction" ~ ifelse(miniscope_ts > male_added & miniscope_ts < male_removed, 1, 0)),
+                            "first_interaction_aligned_time_seconds" = case_when (session_type != "male_interaction" ~ NA,
+                                                                                  session_type == "male_interaction" ~ as.duration(miniscope_ts - first_interaction)%>%as.numeric()),
+                            "first_interact" = case_when(session_type != "male_interaction" ~ NA,
+                                                         session_type == "male_interaction" ~ ifelse(first_interaction_aligned_time_seconds < 1, T, F)),
                             "injection" = case_when(session_type != "E2_injection" ~ NA,
                                                     session_type == "E2_injection" & miniscope_ts >= E2_injection ~ "E2",
                                                     session_type == "E2_injection" & miniscope_ts >= veh_injection ~ "Veh",
@@ -265,6 +269,7 @@ for (dir in direcs){
                                      labs(y="Deg. C",title="Ambient tempeature",x=element_blank()))
               male_interaction_set<-list(geom_line(linewidth = 1),
                                          labs(y="",title="Male social stimulus",x=element_blank()),
+                                         geom_vline(xintercept = (data%>%filter(first_interact)%>%pull(session_time_minutes))[1], size=1,color="red"),
                                          scale_y_continuous(breaks=c(0,1)))
               fed_set<-list(geom_line(linewidth=1),
                             labs(y="",x=element_blank(),title="Fed/fasted status"))
