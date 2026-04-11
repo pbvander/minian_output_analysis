@@ -33,7 +33,8 @@ separator<-"/" #set depending on OS
 single_session<-"MT29_2025_05_22_session1_torpor" #best session for creating figures
 
 #Exclusions:
-session_id_type_to_exclude<-c()
+session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20_session1_cold", "MT35_2026_03_07_session1_cold" # These animals do not have data from the full ambient temperature challenge (some issue arose during heat and/or cold exposure that led to exclusion of one "arm" of the ambient temperature challenge). They have been excluded so that all mice represented in the analysis have the same stimuli exposure
+                              )
 
 #Parameters
 shuffle_iterations<-100
