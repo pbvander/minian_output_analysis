@@ -355,7 +355,16 @@ unit_df<-read_rds("./output/unit_df.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 
 ########### Graph ###########
-gc()
+### Number of cells per group/session
+counts<-sumdf%>%filter(!is.na(df_f0_bin))%>%ungroup()%>%distinct(unit_id_id,.keep_all = T)%>%group_by(session_id,pellet)%>%count()
+t_test(counts%>%ungroup()%>%mutate(pellet=as.character(pellet))%>%filter(pellet!="pre-OVX"), n~pellet)
+
+p<-ggplot(counts, aes(x=pellet,y=n))+
+  point_indiv()+
+  point_errorbar()+
+  point_summary()+ms
+p
+
 
 ### dF/F0 - body temperature relationship (single unit analysis)
 ## By temperature value
@@ -391,7 +400,9 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
 # p
 # save_png_large(paste("df_f0 by body temperature",single_session),w=25,h=15)
 
-# Observations by temperature histogram
+### Number of observations
+##All data
+#Numbers of rows in data (# of cells x # of timepoints)
 p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
   geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
   scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
@@ -401,6 +412,45 @@ p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
   ms
 p
 save_png_large("torpor observations by temp and pellet", w=7,h=5)
+
+#Number of timepoints
+data<-sumdf%>%filter(session_type == "torpor")%>%ungroup()%>%distinct(telem_ts, mouse, session_id,.keep_all = T)
+
+p<-ggplot(data, aes(x=temp))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Timepoints")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("torpor timepoints by temp and pellet", w=7,h=5)
+
+##Downsampled
+data<-sumdf%>%filter(session_type == "torpor")%>%downsample_data_temporal()
+
+p<-ggplot(data, aes(x=temp))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Observations")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("torpor observations by temp and pellet downsampled", w=7,h=5)
+
+#Number of timepoints
+data<-data%>%ungroup()%>%distinct(telem_ts, mouse, session_id,.keep_all = T)
+
+p<-ggplot(data, aes(x=temp))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Timepoints")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("torpor timepoints by temp and pellet downsampled", w=7,h=5)
 
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+

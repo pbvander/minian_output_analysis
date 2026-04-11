@@ -62,21 +62,36 @@ read_motion <- function(path){
   return(d)
 }
 
-downsample_data <- function(data, response="temp", grouping_variable="pellet", bin_width=1){
+#####Finish fixing this!!
+downsample_data_temporal <- function(data, response="temp", grouping_variable="pellet", temporal_variable = "telem_ts", subject_variable="mouse", bin_width=1){
+  #Set up column names and group size
   bin_col<-paste0(response,"_bin",bin_width)
   total_groups<-data%>%pull({{grouping_variable}})%>%unique()%>%length()
-  print(paste("Total groups:", total_groups))
+
+  #Create bin_col by using cut on response
+  d<-data%>%mutate({{bin_col}}:=cut(.data[[response]], seq(min(data%>%pull({{response}}))%>%round(digits=0)-2, max(data%>%pull({{response}}))%>%round(digits=0)+2, bin_width)))
   
-  d<-data%>%
-    slice_sample(prop = 1)%>%
-    mutate({{bin_col}}:=cut(.data[[response]], seq(min(data%>%pull({{response}}))%>%round(digits=0)-2, max(data%>%pull({{response}}))%>%round(digits=0)+2, bin_width)))%>%
-    group_by(across(all_of(c(bin_col, grouping_variable))))%>%
-    mutate(current_count = n())%>%
+  #Get the number of timepoints in each group/bin combination
+  timepoint_counts<-d%>%ungroup()%>%distinct(.data[[temporal_variable]], .data[[subject_variable]], .keep_all = T)%>%group_by(across(all_of(c(bin_col,grouping_variable))))%>%count()
+  
+  #Calculate minimum number of timepoints present in each bin across all groups (set to 0 if not all groups are represented)
+  target_counts<-timepoint_counts%>%
     group_by(across(all_of(bin_col)))%>%
-    filter(n_distinct(.data[[grouping_variable]]) == total_groups)%>%
-    mutate(min_for_this_bin = min(current_count))%>%
-    group_by(across(all_of(c(bin_col, grouping_variable))))%>%
-    filter(row_number() <= min_for_this_bin)
+    mutate(n_distinct=n_distinct(.data[[grouping_variable]]),
+           target=ifelse(n_distinct==total_groups, min(n), 0))%>%
+    distinct(.data[[bin_col]],.data[["target"]])
+  
+  #Filter ONLY temporally (collapse across other variables (cells), then filter timepoints)
+  d2<-d%>%
+    merge(target_counts,all=T)%>%
+    distinct(.data[[temporal_variable]], .data[[subject_variable]],.keep_all = T)%>%
+    group_by(across(all_of(c(bin_col,grouping_variable))))%>%
+    group_modify(~ slice_sample(.x, n=first(.x$target)))
+  # d2%>%group_by(temp_bin1,pellet)%>%count()  #Check that number of timepoints in each bin are the same across groups
+  
+  #Apply filtering of timepoints to original dataset
+  timepoint_subjects_to_keep<-d2%>%ungroup()%>%select(all_of(c(temporal_variable,subject_variable, bin_col)))
+  ds_data<-merge(timepoint_subjects_to_keep,data)
 }
 
 ##Single cell analysis
