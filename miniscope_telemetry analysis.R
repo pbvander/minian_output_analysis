@@ -769,6 +769,31 @@ ggplot(sumdf%>%filter(session_id=="MT30_2025_05_23_session1", session_type %in% 
   facet_wrap(vars(session_type),scales="free_x")
 save_plot("ambient temperature schematic",w=7,h=5)
 
+##Observations by pellet group
+#Numbers of rows in data (# of cells x # of timepoints)
+p<-ggplot(sumdf%>%filter(session_type %in% c("cold","heat")), aes(x=ambient_temp_interpolated))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(3, 39, 2))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(3,39,2))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Ambient temperature",y="Observations")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("ambient temp observations by ambient_temp and pellet", w=7,h=5)
+
+#Number of timepoints
+data<-sumdf%>%filter(session_type %in% c("cold","heat"))%>%ungroup()%>%distinct(telem_ts, mouse, session_id,.keep_all = T)
+
+p<-ggplot(data, aes(x=ambient_temp_interpolated))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(3, 39, 2))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(3,39,2))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Ambient temperature",y="Timepoints")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("ambient temp timepoints by ambient_temp and pellet", w=7,h=5)
+
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
   print(id)
