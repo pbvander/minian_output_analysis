@@ -368,39 +368,6 @@ p
 
 
 ### dF/F0 - body temperature relationship (single unit analysis)
-## By temperature value
-# Graph all sessions
-for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
-  print(id)
-  data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor", session_id==id)%>%
-    mutate(unit_id = factor(unit_id, levels = unit_df%>%filter(session_id==id)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
-  
-  p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
-    xy_point2(alpha=0.5)+
-    regression_line()+
-    ms+
-    labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
-    theme(text = element_text(size=24))+
-    facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
-  p
-  save_png_large(paste("df_f0 by body temperature",id), w=40,h=25)
-}
-
-
-# # Graph a single session
-# data<-data%>%filter(session_id_type==single_session)%>%
-#   mutate(unit_id=factor(unit_id, levels=unit_df%>%filter(session_id_type==single_session)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
-# 
-# p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
-#   xy_point2(alpha=0.5)+
-#   regression_line()+
-#   ms+
-#   labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
-#   theme(text = element_text(size=24))+
-#   facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
-# p
-# save_png_large(paste("df_f0 by body temperature",single_session),w=25,h=15)
-
 ### Number of observations
 ##All data
 #Numbers of rows in data (# of cells x # of timepoints)
@@ -463,6 +430,40 @@ p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mou
   ms
 p
 save_png_large("torpor timepoints per mouse by temp and pellet downsampled", w=7,h=5)
+
+## dF/F0 By temperature value
+# Graph all sessions
+for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
+  print(id)
+  data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor", session_id==id)%>%
+    mutate(unit_id = factor(unit_id, levels = unit_df%>%filter(session_id==id)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
+  
+  p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
+    xy_point2(alpha=0.5)+
+    regression_line()+
+    ms+
+    labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
+    theme(text = element_text(size=24))+
+    facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
+  p
+  save_png_large(paste("df_f0 by body temperature",id), w=40,h=25)
+}
+
+
+# # Graph a single session
+# data<-data%>%filter(session_id_type==single_session)%>%
+#   mutate(unit_id=factor(unit_id, levels=unit_df%>%filter(session_id_type==single_session)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
+# 
+# p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
+#   xy_point2(alpha=0.5)+
+#   regression_line()+
+#   ms+
+#   labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
+#   theme(text = element_text(size=24))+
+#   facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
+# p
+# save_png_large(paste("df_f0 by body temperature",single_session),w=25,h=15)
+
 
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
