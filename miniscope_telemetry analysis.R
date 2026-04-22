@@ -428,7 +428,7 @@ p
 save_png_large("torpor timepoints by temp and pellet", w=7,h=5)
 
 ##Downsampled
-data<-sumdf%>%filter(session_type == "torpor")%>%downsample_data_temporal()
+data<-sumdf%>%filter(session_type == "torpor")%>%equalize_data_temporal()
 
 p<-ggplot(data, aes(x=temp))+
   geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
@@ -441,17 +441,28 @@ p
 save_png_large("torpor observations by temp and pellet downsampled", w=7,h=5)
 
 #Number of timepoints
-data<-data%>%ungroup()%>%distinct(telem_ts, mouse, session_id,.keep_all = T)
+timepoints_per_pellet<-data%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%group_by(pellet,temp_bin1)%>%summarize(timepoints_per_pellet=n())
+mice_per_pellet<-data%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
+timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
 
-p<-ggplot(data, aes(x=temp))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
-  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
+p<-ggplot(timepoints_per_pellet, aes(x=temp_bin1, y=timepoints_per_pellet))+
+  geom_col(aes(fill=pellet),position = position_dodge())+
   scale_y_continuous(expand=c(0,0))+
   labs(x="Core body temperature",y="Timepoints")+
   scale_fill_manual(values=pellet_scale)+
   ms
 p
 save_png_large("torpor timepoints by temp and pellet downsampled", w=7,h=5)
+
+#Number of timepoints per mouse
+p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
+  geom_col(aes(fill=pellet),position = position_dodge())+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Timepoints per mouse")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_png_large("torpor timepoints per mouse by temp and pellet downsampled", w=7,h=5)
 
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
