@@ -218,7 +218,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
   lm_coef_df<-tibble()
   lm_add_x_var_coef_df<-tibble()
   predict_df<-tibble()
-  data<-data%>%filter(session_type %in% .session_type)
+  data<-data%>%filter(session_type %in% .session_type)%>%ungroup()
   for (sid in unique(data$session_id)){
     ##Set up column names based on session type
     type<-case_when(.session_type=="torpor" ~ "torpor",
