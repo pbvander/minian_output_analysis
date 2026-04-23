@@ -41,7 +41,8 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
 shuffle_iterations<-100
 
 #Global graph settings:
-ms<-list(theme_prism())
+ms<-list(theme_prism(),
+         text=element_text(size=12))
 theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis.title.y = element_blank(),axis.ticks = element_blank(),axis.text.x = element_blank(), legend.title = element_blank())
 group_gonad_scale<-c("black","#56B4E9","black","#D55E00")
 pellet_scale<-c("black","#56B4E9","#D55E00")
@@ -378,11 +379,13 @@ counts<-sumdf%>%filter(!is.na(df_f0_bin))%>%ungroup()%>%distinct(unit_id_id,.kee
 t_test(counts%>%ungroup()%>%mutate(pellet=as.character(pellet))%>%filter(pellet!="pre-OVX"), n~pellet)
 
 p<-ggplot(counts, aes(x=pellet,y=n))+
-  point_indiv()+
   point_errorbar()+
-  point_summary()+ms
+  point_summary(aes(color=pellet,shape=pellet))+
+  point_indiv()+
+  scale_color_manual(values=pellet_scale)+
+  labs(x=element_blank(),y="Number of cells per session")+
+  ms
 p
-
 
 ### dF/F0 - body temperature relationship (single unit analysis)
 ### Number of observations
