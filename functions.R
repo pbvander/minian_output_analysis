@@ -62,8 +62,8 @@ read_motion <- function(path){
   return(d)
 }
 
-equalize_data_temporal <- function(data, response="temp", grouping_variable="pellet", temporal_variable = "telem_ts", subject_variable="mouse", bin_width=1){
-  print("Warning! This function could undersample data to equalize if the unique number of subjects across groups exceeds 2")
+equalize_data_temporal <- function(data, response="temp", grouping_variable="pellet", temporal_variable = "telem_ts", subject_variable="mouse", bin_width=1,verbose=T){
+  if(verbose){print("Warning! This function could undersample data to equalize if the unique number of subjects across groups exceeds 2")}
   #Set up column names and group size
   bin_col<-paste0(response,"_bin",bin_width)
   total_groups<-data%>%pull({{grouping_variable}})%>%unique()%>%length()
@@ -100,15 +100,15 @@ equalize_data_temporal <- function(data, response="temp", grouping_variable="pel
 }
 
 ##Single cell analysis
-unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", shuf_iters=1000){
+unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", shuf_iters=1000, verbose=T){
   ##ROC analysis with binned Y variables
-  print("Performing ROC analysis with binned response variables")
+  if (verbose){print("Performing ROC analysis with binned response variables")}
   roc_df<-roc_analysis(data, session_type=roc_session_type, predictor=.predictor, shuf_iters=shuf_iters)
   
   ##Correlation analysis with continuous Y variables
-  print("Performing correlation analysis with continuous response variables")
-  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters)
-  cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), shuf_iters = shuf_iters)
+  if (verbose){print("Performing correlation analysis with continuous response variables")}
+  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters, verbose=verbose)
+  cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), shuf_iters = shuf_iters, verbose=verbose)
   
   ##Combine data and add metadata
   d<-merge(roc_df,cor_df_torpor,all=T)%>%merge(cor_df_ambient,all=T)
@@ -161,10 +161,10 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
   return(compiled_df)
 }
 
-correlation_analysis <- function(data, response, .session_type, predictor="df_f0_bin", shuf_iters=1000, method="pearson"){
+correlation_analysis <- function(data, response, .session_type, predictor="df_f0_bin", shuf_iters=1000, method="pearson",verbose=T){
   type<-case_when(.session_type == "torpor" ~ "torpor",
                   "cold" %in% .session_type & "heat" %in% .session_type ~ "ambient")[1]
-  print(paste0("Session type = ",type, ", Response = ",paste(response,collapse = ", ")))
+  if(verbose){print(paste0("Session type = ",type, ", Response = ",paste(response,collapse = ", ")))}
   data<-data%>%filter(session_type %in% .session_type)
   ii=1
   for (resp in response){
