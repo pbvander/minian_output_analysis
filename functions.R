@@ -683,3 +683,8 @@ pca_matrix<- function(df, row_names_from = 1){
 write_sessioninfo<- function(){
   writeLines(capture.output(sessionInfo()), "./output/sessionInfo.txt")
 }
+
+get_mode <- function(x) {
+  ux <- unique(na.omit(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}

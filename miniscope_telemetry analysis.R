@@ -17,6 +17,7 @@ library(GGally)
 # summarize<-dplyr::summarize
 source("C:/Users/General Correa Lab/Documents/GitHub/minian_output_analysis/functions.R")
 # filter<-dplyr::filter
+options(dplyr.summarise.inform = FALSE)
 
 ##### Things to set manually:
 #Paths/directories:
@@ -323,6 +324,22 @@ sumdf<-read_rds("./output/sumdf.rds")
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
 
+# Taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations
+unit_df_torpor_ds<-tibble()
+pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
+for (i in 1:shuffle_iterations){
+  d<-sumdf%>%
+    filter(!is.na(df_f0_bin),session_type=="torpor")%>%
+    equalize_data_temporal(verbose=F)%>%
+    unit_analysis(roc_session_type = c("torpor"), shuf_iters = shuffle_iterations, verbose=F)%>%
+    mutate(iteration=i)
+  unit_df_torpor_ds<-rbind(unit_df_torpor_ds,d)
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+unit_df_torpor_ds_sum<-unit_df_torpor_ds%>%group_by(unit_id_id)%>%mutate(across(c(torpor_auc, torpor_fc, temp_cor_torpor, temp_slope_torpor, temp_change1_cor_torpor, temp_change1_slope_torpor), ~mean(.x)),
+                                                                         across(c(torpor_auc_sig,temp_cor_sig_torpor,temp_change1_cor_sig_torpor), ~get_mode(.x)))
+
 ##### Population-level analysis
 ### Linear model
 torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
@@ -506,10 +523,14 @@ p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp
   theme(legend.position = "none")
 p
 save_plot("torpor temperature correlation coefficient by cell type and pellet", w=12,h=8)
+p+(unit_df_torpor_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))
+save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=12,h=8)
 
 # Correlation type frequencies
 #Grouped by pellet
 data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
+data_downsampled<-transform_data_piegraph(unit_df_torpor_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
 chisq<-data%>%
@@ -534,6 +555,7 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
   facet_wrap(vars(pellet))
 pie
 save_png_large("torpor temperature correlation types by pellet",w=8,h=5)
+pie+data_downsampled
 
 #Grouped by mouse and pellet
 mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "temp_cor_sig_torpor")%>%
