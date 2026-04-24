@@ -325,20 +325,21 @@ sumdf<-read_rds("./output/sumdf.rds")
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
 
-# Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)
-unit_df_torpor_ds<-tibble()
+# Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations).
+#torpor and post-ovx data only
+unit_df_torpor_ovx_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
 for (i in 1:shuffle_iterations){
   d<-sumdf%>%
-    filter(!is.na(df_f0_bin),session_type=="torpor")%>%
+    filter(!is.na(df_f0_bin),session_type=="torpor",gonad=="ovx")%>%
     equalize_data_temporal(verbose=F)%>%
     unit_analysis(roc_session_type = c("torpor"), shuf_iters = shuffle_iterations, verbose=F)%>%
     mutate(iteration=i)
-  unit_df_torpor_ds<-rbind(unit_df_torpor_ds,d)
+  unit_df_torpor_ovx_ds<-rbind(unit_df_torpor_ovx_ds,d)
   setTxtProgressBar(pb, i)
 }
 close(pb)
-unit_df_torpor_ds_sum<-unit_df_torpor_ds%>%
+unit_df_torpor_ovx_ds_sum<-unit_df_torpor_ovx_ds%>%
   group_by(unit_id_id)%>%
   mutate(across(c(torpor_auc, torpor_fc, temp_cor_torpor, temp_slope_torpor, temp_change1_cor_torpor, temp_change1_slope_torpor), ~mean(.x)),
          across(c(torpor_auc_sig,temp_cor_sig_torpor,temp_change1_cor_sig_torpor), ~get_mode(.x)))%>%
@@ -358,31 +359,41 @@ unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
 # Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)
-lm_df_torpor_ds<-tibble()
-lm_predict_df_torpor_ds<-tibble()
-lm_coef_ef_torpor_ds<-tibble()
+#torpor and post-ovx data only
+lm_df_torpor_ovx_ds<-tibble()
+lm_predict_df_torpor_ovx_ds<-tibble()
+lm_coef_df_torpor_ovx_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
 for (i in 1:shuffle_iterations){
   #Run analysis
-  lm_ls<-sumdf%>%filter(!is.na(df_f0_bin))%>%
+  lm_ls<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="ovx")%>%
     equalize_data_temporal(verbose=T)%>%
     lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=T)
   
   #Add to dataframes
-  lm_df_torpor_ds<-rbind(lm_df_torpor_ds, (lm_ls$lm_df)%>%mutate(iteration=i))
-  lm_predict_df_torpor_ds<-rbind(lm_predict_df_torpor_ds, (lm_ls$predict_df)%>%mutate(iteration=i))
-  lm_coef_ef_torpor_ds<-rbind(lm_coef_ef_torpor_ds,(lm_ls$lm_coef_df)%>%mutate(iteration=i))
+  lm_df_torpor_ovx_ds<-rbind(lm_df_torpor_ovx_ds, (lm_ls$lm_df)%>%mutate(iteration=i))
+  lm_predict_df_torpor_ovx_ds<-rbind(lm_predict_df_torpor_ovx_ds, (lm_ls$predict_df)%>%mutate(iteration=i))
+  lm_coef_df_torpor_ovx_ds<-rbind(lm_coef_df_torpor_ovx_ds,(lm_ls$lm_coef_df)%>%mutate(iteration=i))
   
   #Update progress bar
   setTxtProgressBar(pb, i)
 }
 close(pb)
-torpor_lm_ls_ds_sum<-torpor_lm_ls_ds%>%
+lm_df_torpor_ovx_ds_sum<-lm_df_torpor_ovx_ds%>%
   group_by(session_id)%>%
   mutate(temp_mean_cor_torpor_ = mean(temp_mean_cor_torpor_), 
          temp_cor_sig_torpor_ = get_mode(temp_cor_sig_torpor_))%>%
-  distinct(session_id,.keep_all = T)
-  
+  distinct(session_id,.keep_all = T)%>% 
+  merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
+lm_predict_df_torpor_ovx_ds_sum<-lm_predict_df_torpor_ovx_ds%>%
+  group_by(session_id,id)%>%
+  mutate(predicted = mean(predicted))%>%
+  distinct(session_id,id,.keep_all = T)%>% 
+  merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
+lm_coef_df_torpor_ovx_ds_sum<-lm_coef_df_torpor_ovx_ds%>%
+  group_by(unit_id_id)%>%
+  summarize(temp_MeanLmCoef_torpor_ovx_ds = mean(temp_MeanLmCoef_torpor))
+unit_df<-merge(unit_df,lm_coef_df_torpor_ovx_ds_sum, all=T)
 
 ### PCA
 pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("unit_id_id","telem_ts"))
@@ -392,9 +403,10 @@ pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("
 setwd(output_dir)
 write_output(lm_df)
 write_output(lm_predict_df)
-write_output(torpor_lm_ls_ds_sum)
+write_output(lm_df_torpor_ovx_ds_sum)
+write_output(lm_predict_df_torpor_ovx_ds_sum)
 write_output(unit_df)
-write_output(unit_df_torpor_ds_sum)
+write_output(unit_df_torpor_ovx_ds_sum)
 write_output_rds(pca_ls)
 
 #Read all
@@ -402,9 +414,10 @@ setwd(output_dir)
 sumdf<-read_rds("./output/sumdf.rds")
 lm_df<-read_rds("./output/lm_df.rds")
 lm_predict_df<-read_rds("./output/lm_predict_df.rds")
-torpor_lm_ls_ds_sum<-read_rds("./output/torpor_lm_ls_ds_sum")
+lm_df_torpor_ovx_ds_sum<-read_rds("./output/lm_df_torpor_ovx_ds_sum.rds")
+lm_predict_df_torpor_ovx_ds_sum<-read_rds("./output/lm_predict_df_torpor_ovx_ds_sum.rds")
 unit_df<-read_rds("./output/unit_df.rds")
-unit_df_torpor_ds_sum<-read_rds("./output/unit_df_torpor_ds_sum.rds")
+unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 
 ########### Graph ###########
@@ -575,14 +588,14 @@ p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp
   theme(legend.position = "none")
 p
 save_plot("torpor temperature correlation coefficient by cell type and pellet", w=12,h=8)
-p+(unit_df_torpor_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))
+p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))
 save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=12,h=8)
 
 # Correlation type frequencies
 #Grouped by pellet
 data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
-data_downsampled<-transform_data_piegraph(unit_df_torpor_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
+data_downsampled<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
 chisq<-data%>%
@@ -636,11 +649,11 @@ for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
   print(anov)
 }
 
-t_test(unit_df_torpor_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
-for (cell_type in unique(unit_df_torpor_ds_sum$temp_cor_sig_torpor)){
+t_test(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
+for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df_torpor_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  anov<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
   print(anov)
 }
 
@@ -655,7 +668,7 @@ p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp
   theme(legend.position = "none")
 p
 save_plot("torpor temperature slope by cell type and pellet", w=12,h=8)
-p+unit_df_torpor_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")
+p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")
 save_plot("torpor temperature slope by cell type and pellet downsampled",w=12,h=8)
 
 ## Torpor vs non-torpor bins
@@ -754,6 +767,7 @@ p
 ### dF-F0 - body temperature (population level analysis)
 ##LM significance by pellet
 data<-transform_data_piegraph(lm_df,"pellet","temp_cor_sig_torpor_")
+data_ovx_ds<-transform_data_piegraph(lm_df_torpor_ovx_ds_sum,"pellet","temp_cor_sig_torpor_")
 
 pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor_)) +
   theme_prism()+
@@ -767,6 +781,7 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor_)) +
   facet_grid(vars(pellet))
 pie
 save_plot("lm correlation significance by pellet",w=4,h=5)
+pie+data_ovx_ds
 
 ##LM accuracy
 p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=temp_mean_cor_torpor_))+
@@ -780,6 +795,7 @@ p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=te
   theme(legend.position = "none")
 p
 save_plot("lm correlation coefficient by pellet",w=6,h=6)
+p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
