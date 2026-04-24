@@ -213,7 +213,7 @@ transform_data_piegraph <- function(data, animal_var, cell_var){
 }
 
 ##Popoulation-level analysis
-lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000){
+lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
   lm_df<-tibble()
   lm_coef_df<-tibble()
   lm_add_x_var_coef_df<-tibble()
@@ -226,7 +226,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
     cor_col=paste0(response,"_mean_cor_",type,"_",additional_x_var)
     sig_col=paste0(response,"_cor_sig_",type,"_",additional_x_var)
     coef_col<-paste0(response,"_MeanLmCoef_",type,additional_x_var)
-    print(paste(sid, type, additional_x_var))
+    if(verbose){print(paste(sid, type, additional_x_var))}
     
     ##Format and pivot data
     d<-data%>%filter(session_id==sid)%>%
