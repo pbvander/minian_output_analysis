@@ -42,7 +42,7 @@ shuffle_iterations<-100
 
 #Global graph settings:
 ms<-list(theme_prism(),
-         text=element_text(size=12))
+         theme(text=element_text(size=12)))
 theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis.title.y = element_blank(),axis.ticks = element_blank(),axis.text.x = element_blank(), legend.title = element_blank())
 group_gonad_scale<-c("black","#56B4E9","black","#D55E00")
 pellet_scale<-c("black","#56B4E9","#D55E00")
@@ -577,8 +577,9 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
   guides(color="none")+
   facet_wrap(vars(pellet))
 pie
-save_png_large("torpor temperature correlation types by pellet",w=8,h=5)
+save_plot("torpor temperature correlation types by pellet",w=8,h=5)
 pie+data_downsampled
+save_plot("torpor temperature correlation types by pellet downsampled",w=8,h=5)
 
 #Grouped by mouse and pellet
 mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "temp_cor_sig_torpor")%>%
@@ -606,6 +607,14 @@ for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
   print(anov)
 }
 
+t_test(unit_df_torpor_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
+for (cell_type in unique(unit_df_torpor_ds_sum$temp_cor_sig_torpor)){
+  if (cell_type=="neutral"){next}
+  print(cell_type)
+  anov<-anova(lme(data=unit_df_torpor_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  print(anov)
+}
+
 p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp_slope_torpor))+
   geom_violin(aes(fill=pellet))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
@@ -617,6 +626,8 @@ p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp
   theme(legend.position = "none")
 p
 save_plot("torpor temperature slope by cell type and pellet", w=12,h=8)
+p+unit_df_torpor_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")
+save_plot("torpor temperature slope by cell type and pellet downsampled",w=12,h=8)
 
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
