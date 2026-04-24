@@ -237,12 +237,17 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
     
     ##Partition data for cross-validation
     #Find number of bins to use for stratification of response variable (there must be more observations than cv_folds in each bin)
+    bins<-1
     for (f in 2:cv_folds){
       min<-d%>%pull({{response}})%>%cut(f)%>%table()%>%min()
       if(min<cv_folds){break} #if bin size has gotten too small, stop here (and don't update bins variable)
       bins<-f
     }
-    pcs<-partition_cv_strat(d, coords=colnames(d),strat = d%>%pull({{response}})%>%cut(bins)%>%as.numeric()%>%as.factor(),nfold=cv_folds)
+    if (bins>1){pcs<-partition_cv_strat(d, coords=colnames(d),strat = d%>%pull({{response}})%>%cut(bins)%>%as.numeric()%>%as.factor(),nfold=cv_folds)} #use stratified partition when data has enough observations in each bin
+    if (bins==1){ #use a non-stratified partition when data doesn't have enough observations
+      pcs<-partition_cv(d, coords=colnames(d),nfold=cv_folds)
+      if (verbose){print("Using non-stratified partition here")}
+    } 
     
     ##Make models with observed data for each cv fold
     cor_ls<-c()

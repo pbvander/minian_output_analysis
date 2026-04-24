@@ -357,6 +357,33 @@ lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>%
 unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>% #combine data
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
+# Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)
+lm_df_torpor_ds<-tibble()
+lm_predict_df_torpor_ds<-tibble()
+lm_coef_ef_torpor_ds<-tibble()
+pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
+for (i in 1:shuffle_iterations){
+  #Run analysis
+  lm_ls<-sumdf%>%filter(!is.na(df_f0_bin))%>%
+    equalize_data_temporal(verbose=T)%>%
+    lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=T)
+  
+  #Add to dataframes
+  lm_df_torpor_ds<-rbind(lm_df_torpor_ds, (lm_ls$lm_df)%>%mutate(iteration=i))
+  lm_predict_df_torpor_ds<-rbind(lm_predict_df_torpor_ds, (lm_ls$predict_df)%>%mutate(iteration=i))
+  lm_coef_ef_torpor_ds<-rbind(lm_coef_ef_torpor_ds,(lm_ls$lm_coef_df)%>%mutate(iteration=i))
+  
+  #Update progress bar
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+torpor_lm_ls_ds_sum<-torpor_lm_ls_ds%>%
+  group_by(session_id)%>%
+  mutate(temp_mean_cor_torpor_ = mean(temp_mean_cor_torpor_), 
+         temp_cor_sig_torpor_ = get_mode(temp_cor_sig_torpor_))%>%
+  distinct(session_id,.keep_all = T)
+  
+
 ### PCA
 pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("unit_id_id","telem_ts"))
 
@@ -365,6 +392,7 @@ pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("
 setwd(output_dir)
 write_output(lm_df)
 write_output(lm_predict_df)
+write_output(torpor_lm_ls_ds_sum)
 write_output(unit_df)
 write_output(unit_df_torpor_ds_sum)
 write_output_rds(pca_ls)
@@ -374,6 +402,7 @@ setwd(output_dir)
 sumdf<-read_rds("./output/sumdf.rds")
 lm_df<-read_rds("./output/lm_df.rds")
 lm_predict_df<-read_rds("./output/lm_predict_df.rds")
+torpor_lm_ls_ds_sum<-read_rds("./output/torpor_lm_ls_ds_sum")
 unit_df<-read_rds("./output/unit_df.rds")
 unit_df_torpor_ds_sum<-read_rds("./output/unit_df_torpor_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
