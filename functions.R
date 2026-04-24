@@ -231,8 +231,8 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
     ##Format and pivot data
     d<-data%>%filter(session_id==sid)%>%
       select(unit_id_id, {{id_col}}, {{response}}, {{predictor}},{{additional_x_var}})%>%
-      pivot_wider(values_from = {{predictor}}, names_from = unit_id_id)%>%
-      select(!{{id_col}})
+      pivot_wider(values_from = {{predictor}}, names_from = unit_id_id)#%>%
+      #select(!{{id_col}})
     if (sum(is.na(d))>0)(warning(paste("NAs present in dataset",sid)))
     
     ##Partition data for cross-validation
@@ -269,7 +269,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
       coef_df<-rbind(coef_df,coef_d)
       add_x_var_coef_d<-tibble("add_x_var"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold,"session_id"=sid)%>%filter(add_x_var %in% additional_x_var)
       add_x_var_coef_df<-rbind(add_x_var_coef_df,add_x_var_coef_d)
-      predict_df<-rbind(predict_df,tibble("predicted"=predict,"true"=test%>%pull({{response}}),"session_id"=sid))
+      predict_df<-rbind(predict_df,tibble("predicted"=predict,"true"=test%>%pull({{response}}),"id"=test%>%pull({{id_col}}), "session_id"=sid))
     }
     
     
