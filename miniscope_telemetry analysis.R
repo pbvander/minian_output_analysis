@@ -325,7 +325,7 @@ sumdf<-read_rds("./output/sumdf.rds")
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
 
-# Taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations
+# Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)
 unit_df_torpor_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
 for (i in 1:shuffle_iterations){
@@ -341,7 +341,7 @@ close(pb)
 unit_df_torpor_ds_sum<-unit_df_torpor_ds%>%
   group_by(unit_id_id)%>%
   mutate(across(c(torpor_auc, torpor_fc, temp_cor_torpor, temp_slope_torpor, temp_change1_cor_torpor, temp_change1_slope_torpor), ~mean(.x)),
-                                                                         across(c(torpor_auc_sig,temp_cor_sig_torpor,temp_change1_cor_sig_torpor), ~get_mode(.x)))%>%
+         across(c(torpor_auc_sig,temp_cor_sig_torpor,temp_change1_cor_sig_torpor), ~get_mode(.x)))%>%
   distinct(unit_id_id,.keep_all = T)
 
 ##### Population-level analysis
