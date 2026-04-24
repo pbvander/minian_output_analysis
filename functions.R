@@ -70,7 +70,7 @@ equalize_data_temporal <- function(data, response="temp", grouping_variable="pel
   subject_counts<-data%>%group_by(across(all_of(c(grouping_variable,subject_variable))))%>%count()%>%group_by(across(all_of(grouping_variable)))%>%summarize(n_subjects=n())%>%ungroup()%>%mutate(scale=n_subjects/min(n_subjects))
 
   #Create bin_col by using cut on response
-  d<-data%>%mutate({{bin_col}}:=cut(.data[[response]], seq(min(data%>%pull({{response}}))%>%round(digits=0)-2, max(data%>%pull({{response}}))%>%round(digits=0)+2, bin_width)))
+  d<-data%>%mutate({{bin_col}}:=cut(.data[[response]], seq(min(data%>%pull({{response}}))%>%floor(), max(data%>%pull({{response}}))%>%ceiling(), bin_width)))
   
   #Get the number of timepoints per mouse in each group/bin combination
   timepoint_counts<-d%>%ungroup()%>%distinct(.data[[temporal_variable]], .data[[subject_variable]], .keep_all = T)%>%group_by(across(all_of(c(bin_col,grouping_variable))))%>%summarize(timepoints_per_pellet=n())

@@ -338,8 +338,11 @@ for (i in 1:shuffle_iterations){
   setTxtProgressBar(pb, i)
 }
 close(pb)
-unit_df_torpor_ds_sum<-unit_df_torpor_ds%>%group_by(unit_id_id)%>%mutate(across(c(torpor_auc, torpor_fc, temp_cor_torpor, temp_slope_torpor, temp_change1_cor_torpor, temp_change1_slope_torpor), ~mean(.x)),
-                                                                         across(c(torpor_auc_sig,temp_cor_sig_torpor,temp_change1_cor_sig_torpor), ~get_mode(.x)))
+unit_df_torpor_ds_sum<-unit_df_torpor_ds%>%
+  group_by(unit_id_id)%>%
+  mutate(across(c(torpor_auc, torpor_fc, temp_cor_torpor, temp_slope_torpor, temp_change1_cor_torpor, temp_change1_slope_torpor), ~mean(.x)),
+                                                                         across(c(torpor_auc_sig,temp_cor_sig_torpor,temp_change1_cor_sig_torpor), ~get_mode(.x)))%>%
+  distinct(unit_id_id,.keep_all = T)
 
 ##### Population-level analysis
 ### Linear model
@@ -363,6 +366,7 @@ setwd(output_dir)
 write_output(lm_df)
 write_output(lm_predict_df)
 write_output(unit_df)
+write_output(unit_df_torpor_ds_sum)
 write_output_rds(pca_ls)
 
 #Read all
@@ -371,6 +375,7 @@ sumdf<-read_rds("./output/sumdf.rds")
 lm_df<-read_rds("./output/lm_df.rds")
 lm_predict_df<-read_rds("./output/lm_predict_df.rds")
 unit_df<-read_rds("./output/unit_df.rds")
+unit_df_torpor_ds_sum<-read_rds("./output/unit_df_torpor_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 
 ########### Graph ###########
