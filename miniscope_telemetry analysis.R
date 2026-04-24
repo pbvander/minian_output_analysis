@@ -396,44 +396,20 @@ p
 ### Number of observations
 ##All data
 #Numbers of rows in data (# of cells x # of timepoints)
-p<-ggplot(sumdf%>%filter(session_type=="torpor"), aes(x=temp))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
+data<-sumdf%>%filter(session_type=="torpor")%>%mutate(temp_bin1=cut(temp,seq(min(sumdf$temp)%>%floor(),max(sumdf$temp)%>%ceiling(),1)))
+
+p<-ggplot(data, aes(x=temp))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%floor(), max(sumdf$temp)%>%ceiling(), 1))+
   scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
   scale_y_continuous(expand=c(0,0))+
   labs(x="Core body temperature",y="Observations")+
   scale_fill_manual(values=pellet_scale)+
   ms
 p
-save_png_large("torpor observations by temp and pellet", w=7,h=5)
+save_plot("torpor observations by temp and pellet", w=7,h=5)
 
 #Number of timepoints
-data<-sumdf%>%filter(session_type == "torpor")%>%ungroup()%>%distinct(telem_ts, mouse, session_id,.keep_all = T)
-
-p<-ggplot(data, aes(x=temp))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
-  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
-  scale_y_continuous(expand=c(0,0))+
-  labs(x="Core body temperature",y="Timepoints")+
-  scale_fill_manual(values=pellet_scale)+
-  ms
-p
-save_png_large("torpor timepoints by temp and pellet", w=7,h=5)
-
-##Downsampled
-data<-sumdf%>%filter(session_type == "torpor")%>%equalize_data_temporal()
-
-p<-ggplot(data, aes(x=temp))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%round(digits=0)-1, max(sumdf$temp)%>%round(digits=0)+1, 1))+
-  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
-  scale_y_continuous(expand=c(0,0))+
-  labs(x="Core body temperature",y="Observations")+
-  scale_fill_manual(values=pellet_scale)+
-  ms
-p
-save_png_large("torpor observations by temp and pellet downsampled", w=7,h=5)
-
-#Number of timepoints
-timepoints_per_pellet<-data%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%group_by(pellet,temp_bin1)%>%summarize(timepoints_per_pellet=n())
+timepoints_per_pellet<-data%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%group_by(pellet,temp_bin1,.drop = F)%>%summarize(timepoints_per_pellet=n())
 mice_per_pellet<-data%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
 timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
 
@@ -444,7 +420,7 @@ p<-ggplot(timepoints_per_pellet, aes(x=temp_bin1, y=timepoints_per_pellet))+
   scale_fill_manual(values=pellet_scale)+
   ms
 p
-save_png_large("torpor timepoints by temp and pellet downsampled", w=7,h=5)
+save_plot("torpor timepoints by temp and pellet", w=7,h=5)
 
 #Number of timepoints per mouse
 p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
@@ -454,7 +430,46 @@ p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mou
   scale_fill_manual(values=pellet_scale)+
   ms
 p
-save_png_large("torpor timepoints per mouse by temp and pellet downsampled", w=7,h=5)
+save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
+
+##Downsampled
+data_downsampled<-sumdf%>%filter(session_type == "torpor")%>%equalize_data_temporal()
+
+p<-ggplot(data_downsampled, aes(x=temp))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%floor(), max(sumdf$temp)%>%ceiling(), 1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Observations")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_plot("torpor observations by temp and pellet downsampled", w=7,h=5)
+
+#Number of timepoints
+timepoints_per_pellet<-data_downsampled%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%group_by(pellet,temp_bin1)%>%summarize(timepoints_per_pellet=n())
+mice_per_pellet<-data_downsampled%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
+timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
+
+p<-ggplot(timepoints_per_pellet, aes(x=temp_bin1, y=timepoints_per_pellet))+
+  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
+  geom_col(aes(fill=pellet),position = position_dodge())+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Timepoints")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_plot("torpor timepoints by temp and pellet downsampled", w=7,h=5)
+
+#Number of timepoints per mouse
+p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
+  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
+  geom_col(aes(fill=pellet),position = position_dodge())+
+  scale_y_continuous(expand=c(0,0))+
+  labs(x="Core body temperature",y="Timepoints per mouse")+
+  scale_fill_manual(values=pellet_scale)+
+  ms
+p
+save_plot("torpor timepoints per mouse by temp and pellet downsampled", w=7,h=5)
 
 ## dF/F0 By temperature value
 # Graph all sessions
