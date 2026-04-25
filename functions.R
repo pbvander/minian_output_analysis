@@ -202,6 +202,50 @@ correlation_analysis <- function(data, response, .session_type, predictor="df_f0
   return(compiled_df)
 }
 
+unit_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_session_type="torpor", predictor="df_f0_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
+  ##Generate lagged telemetry data
+  if(verbose){print("Creating lagged telemetry data")}
+  i=1
+  for (lag in window){
+    new_name<-paste0(response,"_",lag)
+    d<-telem_data%>%ungroup()%>%
+      mutate("{timepoint_var}":= .data[[timepoint_var]] + minutes(lag))%>%
+      select(all_of(c(timepoint_var,animal_var,response)))%>%
+      rename("{new_name}":=.data[[response]])
+    if(i==1){telem_data_w_lag<-d}
+    if(i>1){telem_data_w_lag<-merge(telem_data_w_lag,d,all=T)}
+    i=i+1
+  }
+  telem_data_w_lag<-telem_data_w_lag%>%drop_na()
+  
+  ##Add to miniscope data
+  miniscope_d<-merge(miniscope_data%>%filter(session_type==lag_session_type), telem_data_w_lag)
+  
+  ##Calculate correlation for each unit at each lag value
+  if(verbose){print("Computing correlations")}
+  cor_df<-tibble()
+  for (lag in window){
+    col<-paste0(response,"_",lag)
+    cor_col<-paste0(col,"_cor_",lag_session_type)
+    cor_d<-correlation_analysis(miniscope_d, response=col, .session_type = lag_session_type, shuf_iters = shuf_iters, verbose=verbose)%>%
+      mutate(lag=lag)%>%
+      rename(cor = .data[[paste0(col,"_cor_",lag_session_type)]], cor_sig = .data[[paste0(col,"_cor_sig_",lag_session_type)]],slope=.data[[paste0(col,"_slope_",lag_session_type)]])%>%
+      mutate(abs_cor=abs(cor))%>%
+      select(!contains(col))
+    cor_df<-rbind(cor_df,cor_d)
+  }
+  
+  ##Find max correlation value for each unit at each lag value (filter to only significant correlations)
+  strongest_cor_col<-paste0("strongest_",response,"_cor_",lag_session_type)
+  strongest_lag_col<-paste0("strongest_",response,"_lag_",lag_session_type)
+  sig_col<-paste0(response,"_lag_cor_sig",lag_session_type)
+  
+  max_cor_df<-cor_df%>%group_by(unit_id_id)%>%summarize("{strongest_cor_col}":=cor[which.max(abs_cor)], 
+                                                        "{strongest_lag_col}":=lag[which.max(abs_cor)],
+                                                        "{sig_col}":=cor_sig[which.max(abs_cor)])
+  return(max_cor_df)
+}
+
 transform_data_piegraph <- function(data, animal_var, cell_var){
   d<-data%>%filter(!is.na(.data[[cell_var]]))%>%
     group_by(across(all_of(c(animal_var,cell_var))))%>%
