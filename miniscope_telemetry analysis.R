@@ -318,9 +318,15 @@ for (dir in direcs){
   }
 }
 ###Checkpoint 3
+#Write
 setwd(output_dir)
 write_output(sumdf)
+write_output(t_df)
+
+#Read
+setwd(output_dir)
 sumdf<-read_rds("./output/sumdf.rds")
+t_df<-read_rds("./output/t_df.rds")
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
