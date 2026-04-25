@@ -82,7 +82,7 @@ equalize_data_temporal <- function(data, response="temp", grouping_variable="pel
            target_timepoints_per_pellet=ifelse(n_distinct==total_groups, min(timepoints_per_pellet), 0))%>%
     merge(subject_counts,all=T)%>%
     mutate(target_timepoints_per_pellet_scaled = target_timepoints_per_pellet * scale)%>%
-    group_by(temp_bin1)%>%
+    group_by(across(all_of(bin_col)))%>%
     mutate(target_timepoints_per_pellet_scaled = case_when(any(target_timepoints_per_pellet_scaled > timepoints_per_pellet) ~ target_timepoints_per_pellet_scaled / max(scale),
                                                            T ~target_timepoints_per_pellet_scaled))
   
