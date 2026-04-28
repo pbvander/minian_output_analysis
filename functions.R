@@ -482,7 +482,9 @@ pca <- function(data, predictor = "df_f0_bin", dims){
   return(pca_ls)
 }
 
+plot_pca <- function(pca_ls, unit_df, verbose=T){
 
+}
 
 ##Telemetry
 read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = T, round_units = "minute", fstart_time="10:00:00", trial_length_days = 4){
