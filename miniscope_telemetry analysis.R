@@ -439,6 +439,31 @@ pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
 
 ########### Graph ###########
+### Session timing schematic
+record_df<-tibble("start"=c(seq(15,26,1), seq(39,44,1)))%>%mutate("stop"=start+0.167)%>%rbind(tibble("start"=c(45.1,49,50.5, 53),"stop"=c(45.8,50,51.5,53.5)))
+fddf<-data.frame("xmax"=c((lon-ftime)+(-5:30*24)),"xmin"=c((lon-ftime)+(-5:30*24)-12))###use this df below to create automatic shading below 
+
+p<-ggplot(tibble("x"=seq(-2,72), "y"=1),aes(x))+ms+  
+  scale_x_continuous(breaks=seq(0,60,1),#breaks=c(0, seq(15,26,1), seq(39,45,1),seq(49,52,1)),
+                     labels = function(x) ifelse(x %% 3 == 0, x, "") ,
+                     expand = c(0.01,0.01),
+                     name="Hours")+
+  scale_y_continuous(expand=c(0,0),breaks=NULL)+
+  geom_rect(inherit.aes=F, data=fddf, aes(xmin=xmin,xmax=xmax),ymin=0,ymax=2,fill="grey")+
+  geom_rect(inherit.aes=F, data=record_df, aes(xmin=start,xmax=stop),ymin=0,ymax=2,fill="red",alpha=0.5)+
+  geom_vline(xintercept = c(14.75, 26.25, 38.75), linewidth=0.8,linetype="22")+
+  theme(axis.line.y = element_blank(),
+        axis.title.x = element_text(margin=margin(t=2,b=0,l=0,r=0,unit="pt")))
+p+coord_cartesian(xlim=c(0,54))
+save_plot("torpor session timing schematic one plot",w=12,h=1.1)
+p+coord_cartesian(xlim=c(-1,0.9)) + 
+  p+coord_cartesian(xlim=c(14,27)) + 
+  p+coord_cartesian(xlim=c(38,47)) + 
+  p+coord_cartesian(xlim=c(48,52.5)) + 
+  p+coord_cartesian(xlim=c(53,53.5)) +
+  plot_layout(widths=c(2,13,9,4.5,0.5), axis_titles = "collect_x")
+save_plot("torpor session timing schematic split plots", w=12,h=1.1)
+
 ### Number of cells per group/session
 counts<-sumdf%>%filter(!is.na(df_f0_bin))%>%ungroup()%>%distinct(unit_id_id,.keep_all = T)%>%group_by(session_id,pellet)%>%count()
 t_test(counts%>%ungroup()%>%mutate(pellet=as.character(pellet))%>%filter(pellet!="pre-OVX"), n~pellet)
