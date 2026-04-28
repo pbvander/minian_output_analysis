@@ -1192,6 +1192,26 @@ p<-ggplot(data, aes(x=var, y=cor))+
 p
 save_plot("Tcore vs Tcore with change correlation analysis", w=4.5,h=4.5)
 
+data<-lm_df%>%select(temp_mean_cor_EntryArousal_torpor__entry,temp_mean_shuf_cor_EntryArousal_torpor__entry,session_id)%>%
+  pivot_longer(cols=c(temp_mean_cor_EntryArousal_torpor__entry,temp_mean_shuf_cor_EntryArousal_torpor__entry), names_to = "var",values_to = "cor")%>%
+  mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__entry","temp_mean_cor_EntryArousal_torpor__entry"),labels=c("Shuffle entry/arousal","Observed")),
+         mouse = sub("_.*", "", session_id))%>%
+  filter(!is.na(cor))
+anova(lme(data=data, fixed = cor ~ var, random=~1|mouse))
+
+p<-p+aes(y=cor)+data+labs(y="Correlation coefficient",title="Train = entry, test = arousal")
+p
+
+data<-lm_df%>%select(temp_mean_cor_EntryArousal_torpor__arousal,temp_mean_shuf_cor_EntryArousal_torpor__arousal,session_id)%>%
+  pivot_longer(cols=c(temp_mean_cor_EntryArousal_torpor__arousal,temp_mean_shuf_cor_EntryArousal_torpor__arousal), names_to = "var",values_to = "cor")%>%
+  mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__arousal","temp_mean_cor_EntryArousal_torpor__arousal"),labels=c("Shuffle entry/arousal","Observed")),
+         mouse = sub("_.*", "", session_id))%>%
+  filter(!is.na(cor))
+anova(lme(data=data, fixed = cor ~ var, random=~1|mouse))
+
+p<-p+data+labs(title="Train = arousal, test = entry")
+p
+
 ##Stdev of F0 signal across stimuli and pellets
 data<-sumdf%>%filter(!is.na(sd_f0_bin))%>%group_by(unit_id_id, session_id_type)%>%summarize(sd_f0=mean(sd_f0_bin))%>%
   merge(sumdf%>%ungroup()%>%distinct(unit_id_id,  session_id_type, .keep_all = T),all.x=T)%>% #add metadata
