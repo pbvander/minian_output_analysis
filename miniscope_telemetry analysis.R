@@ -359,11 +359,17 @@ torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", 
 torpor_w_tempchange1_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", additional_x_var = "temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
 ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="ambient_ts", .session_type = c("heat","cold"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
 
-lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>% #combine data
+
+#Cross-training entries/arousals
+sessions<-sumdf%>%group_by(session_id,torpor_status)%>%summarize(n=n_distinct(telem_ts))%>%filter(torpor_status %in% c("entry","arousal"),n>=4)%>%group_by(session_id)%>%count()%>%filter(n==2)%>%pull(session_id) #session_ids with both arousal and entry timepoints
+torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(df_f0_bin)), session_id %in% sessions, torpor_status %in% c("entry","arousal")), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=c("entry","arousal"), partition_type="entry_arousal", partition_col="torpor_status", shuf_iters=shuffle_iterations)
+
+#combine data
+lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_df, all=T)%>% #combine data
   merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
-lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$predict_df,all=T)%>% #combine data
+lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$predict_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$predict_df, all=T)%>% #combine data
   merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
-unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>% #combine data
+unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
 # Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)

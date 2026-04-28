@@ -263,29 +263,8 @@ transform_data_piegraph <- function(data, animal_var, cell_var){
 }
 
 ##Popoulation-level analysis
-lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
-  lm_df<-tibble()
-  lm_coef_df<-tibble()
-  lm_add_x_var_coef_df<-tibble()
-  predict_df<-tibble()
-  data<-data%>%filter(session_type %in% .session_type)%>%ungroup()
-  for (sid in unique(data$session_id)){
-    ##Set up column names based on session type
-    type<-case_when(.session_type=="torpor" ~ "torpor",
-                    "heat" %in% .session_type & "cold" %in% .session_type ~ "ambient")[1]
-    cor_col=paste0(response,"_mean_cor_",type,"_",additional_x_var)
-    sig_col=paste0(response,"_cor_sig_",type,"_",additional_x_var)
-    coef_col<-paste0(response,"_MeanLmCoef_",type,additional_x_var)
-    if(verbose){print(paste(sid, type, additional_x_var))}
-    
-    ##Format and pivot data
-    d<-data%>%filter(session_id==sid)%>%
-      select(unit_id_id, {{id_col}}, {{response}}, {{predictor}},{{additional_x_var}})%>%
-      pivot_wider(values_from = {{predictor}}, names_from = unit_id_id)#%>%
-      #select(!{{id_col}})
-    if (sum(is.na(d))>0)(warning(paste("NAs present in dataset",sid)))
-    
-    ##Partition data for cross-validation
+partition_data <- function(d, id_col, partition_type, partition_col, response, cv_folds=5, verbose=T){
+  if (partition_type=="standard"){
     #Find number of bins to use for stratification of response variable (there must be more observations than cv_folds in each bin)
     bins<-1
     for (f in 2:cv_folds){
@@ -298,65 +277,134 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
       pcs<-partition_cv(d, coords=colnames(d),nfold=cv_folds)
       if (verbose){print("Using non-stratified partition here")}
     } 
+  }
+  
+  if (partition_type=="entry_arousal"){
+    pcs<-partition_factor_cv(d, coords=colnames(d),fac=d%>%pull({{partition_col}})%>%droplevels(), nfold=2)
+  }
+  return(pcs)
+}
+
+lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", partition_col=NULL, partition_type="standard", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
+  if (partition_type=="standard"){folds<-1:cv_folds}
+  if (partition_type=="entry_arousal"){folds<-cv_folds}
+  lm_df<-tibble()
+  lm_coef_df<-tibble()
+  lm_add_x_var_coef_df<-tibble()
+  predict_df<-tibble()
+  data<-data%>%filter(session_type %in% .session_type)%>%ungroup()
+  for (sid in unique(data$session_id)){
+    ##Set up column names based on session type
+    type<-case_when(.session_type=="torpor" ~ "torpor",
+                    "heat" %in% .session_type & "cold" %in% .session_type ~ "ambient")[1]
+    if(partition_type=="standard"){
+      cor_col=paste0(response,"_mean_cor_",type,"_",additional_x_var)
+      sig_col=paste0(response,"_cor_sig_",type,"_",additional_x_var)
+      coef_col<-paste0(response,"_MeanLmCoef_",type,additional_x_var)
+    }
+    if(partition_type=="entry_arousal"){
+      cor_col=paste0(response,"_mean_cor_EntryArousal_",type,"_",additional_x_var)
+      sig_col=paste0(response,"_cor_sig_EntryArousal_",type,"_",additional_x_var)
+      coef_col<-paste0(response,"_MeanLmCoef_EntryArousal_",type,additional_x_var)
+      shuf_cor_col=paste0(response,"_mean_shuf_cor_EntryArousal_",type,"_",additional_x_var)
+    }
+    if(verbose){print(paste(sid, type, additional_x_var))}
+    
+    ##Format and pivot data
+    d<-data%>%filter(session_id==sid)%>%
+      select(unit_id_id, {{id_col}}, {{response}}, {{predictor}},{{additional_x_var}},{{partition_col}})%>%
+      pivot_wider(values_from = {{predictor}}, names_from = unit_id_id)
+    if (sum(is.na(d))>0)(warning(paste("NAs present in dataset",sid)))
+    
+    ##Partition data for cross-validation
+    if (partition_type %nin% c("standard","entry_arousal")){stop("Partition type not recognized/supported")}
+    pcs<-partition_data(d, id_col = id_col, response=response, partition_type=partition_type, partition_col=partition_col, cv_folds=cv_folds, verbose=verbose)
     
     ##Make models with observed data for each cv fold
-    cor_ls<-c()
+    cor_df<-tibble()
     coef_df<-tibble()
     add_x_var_coef_df<-tibble()
-    for (fold in 1:cv_folds){
+    formula<-as.formula(paste0(response,"~ . - ",id_col))
+    for (fold in folds){
       #Set up data
-      idx = pcs[["1"]][[fold]]
-      train = d[idx$train,]
-      test = d[idx$test,]
+      if(partition_type=="standard"){
+        idx = pcs[["1"]][[fold]]
+        train = d[idx$train,]
+        test = d[idx$test,]}
+      if(partition_type=="entry_arousal"){
+        train=d%>%filter(.data[[partition_col]] == fold)%>%select(-{{partition_col}})
+        test=d%>%filter(.data[[partition_col]] != fold)%>%select(-{{partition_col}})}
       
       #Train and test model
-      formula<-as.formula(paste0(response,"~ ."))
       model<-lm(formula, train)
       predict<-predict(model, newdata=test)
       cor<-cor(test%>%pull({{response}}), predict, method="pearson")
-      cor_ls<-c(cor_ls,cor)
+      cor_df<-rbind(cor_df, tibble("fold"=fold,"cor"=cor))
       coef_d<-tibble("unit_id_id"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold)%>%filter(unit_id_id %nin% c("(Intercept)",additional_x_var))
       coef_df<-rbind(coef_df,coef_d)
       add_x_var_coef_d<-tibble("add_x_var"=names(model$coefficients),"coefficient"=unlist(model$coefficients),"fold"=fold,"session_id"=sid)%>%filter(add_x_var %in% additional_x_var)
       add_x_var_coef_df<-rbind(add_x_var_coef_df,add_x_var_coef_d)
-      predict_df<-rbind(predict_df,tibble("predicted"=predict,"true"=test%>%pull({{response}}),"id"=test%>%pull({{id_col}}), "session_id"=sid))
+      predict_df<-rbind(predict_df,tibble("predicted"=predict,"true"=test%>%pull({{response}}),"id"=test%>%pull({{id_col}}), "session_id"=sid,"fold"=fold))
     }
     
-    
     ##Make models with shuffled data using same partitions for each cv fold
-    shuf_cor_ls<-c()
+    shuf_cor_df<-tibble()
     shuf_add_x_var_coef_df<-tibble()
     for (i in 1:shuf_iters){
-      shuf_cor<-c()
-      for (fold in 1:cv_folds){
+      shuf_cor_d<-tibble()
+      for (fold in folds){
         #Set up data
-        idx = pcs[["1"]][[fold]]
-        train = (d[idx$train,])
-        shuf_train = train%>%mutate("{response}":=sample(train%>%pull({{response}}),length(train%>%pull({{response}}))))
-        test = d[idx$test,]
+        if(partition_type=="standard"){
+          idx = pcs[["1"]][[fold]]
+          train = (d[idx$train,])
+          shuf_train = train%>%mutate("{response}":=sample(train%>%pull({{response}}),length(train%>%pull({{response}}))))
+          test = d[idx$test,]}
+        if(partition_type=="entry_arousal"){
+          shuf_d = d%>%mutate("{partition_col}":=sample(d%>%pull({{partition_col}}), length(d%>%pull({{partition_col}}))))
+          shuf_train = shuf_d%>%filter(.data[[partition_col]] == fold)%>%select(-{{partition_col}})
+          test = shuf_d%>%filter(.data[[partition_col]] != fold)%>%select(-{{partition_col}})
+        }
         
         #Train and test model
         model<-lm(formula, shuf_train)
         predict<-predict(model, newdata=test)
         cor<-cor(test%>%pull({{response}}), predict, method="pearson")
-        shuf_cor<-c(shuf_cor,cor)
+        shuf_cor_d<-rbind(shuf_cor_d,tibble("fold"=fold,"cor"=cor,"iteration"=i))
         shuf_add_x_var_coef_d<-tibble("add_x_var"=names(model$coefficients),"shuf_coefficient"=unlist(model$coefficients),"fold"=fold,"session_id"=sid,iter=i)%>%filter(add_x_var %in% additional_x_var)
         shuf_add_x_var_coef_df<-rbind(shuf_add_x_var_coef_df, shuf_add_x_var_coef_d)
       }
-      shuf_cor_ls<-c(shuf_cor_ls, mean(shuf_cor))
+      if (partition_type=="standard"){shuf_cor_df<-rbind(shuf_cor_df, tibble("cor"=mean(shuf_cor_d$cor)))}
+      if (partition_type=="entry_arousal"){shuf_cor_df<-rbind(shuf_cor_df, shuf_cor_d)}
     }
     
-    ##Get rank of observed data within shuffled data
-    mean_cor_ls<-mean(cor_ls)
-    rank<-(c(mean_cor_ls,shuf_cor_ls)%>%rank())[1]
-    cor_sig<-ifelse(rank>shuf_iters*0.95, "significant","non-significant")
-    
-    ##Compile data
-    lm_d<-tibble("{cor_col}":= mean(cor_ls), "{sig_col}":=cor_sig, "session_id"=sid)
-    lm_df<-rbind(lm_df,lm_d)
-    lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
-    lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
-    
+    if (partition_type=="standard"){
+      ##Get rank of observed data within shuffled data
+      mean_cor<-mean(cor_df$cor)
+      rank<-(c(mean_cor,shuf_cor_df$cor)%>%rank())[1]
+      cor_sig<-ifelse(rank>shuf_iters*0.95, "significant","non-significant")
+      
+      ##Compile data
+      lm_d<-tibble("{cor_col}":= mean_cor, "{sig_col}":=cor_sig, "session_id"=sid)
+      lm_df<-rbind(lm_df,lm_d)
+      lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
+      lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
+    }
+    if (partition_type=="entry_arousal"){
+      for (.fold in folds){
+        ##Get rank of observed data within shuffled data
+        mean_cor<-cor_df%>%filter(fold==.fold)%>%pull(cor)
+        rank<-(c(mean_cor,shuf_cor_df%>%filter(fold==.fold)%>%pull(cor))%>%rank())[1]
+        cor_sig<-case_when(rank>shuf_iters*0.975 ~ "improved",
+                           rank<shuf_iters*0.025 ~ "worse",
+                           T ~ "non-significant")
+        
+        ##Compile data
+        lm_d<-tibble("train" = .fold,"{cor_col}":= mean_cor, "{shuf_cor_col}":=shuf_cor_df%>%filter(fold==.fold)%>%pull(cor)%>%mean(), "rank"=rank/shuf_iters, "{sig_col}":=cor_sig, "session_id"=sid)
+        lm_df<-rbind(lm_df,lm_d)
+      }
+      lm_coef_d<-coef_df%>%group_by(unit_id_id,fold)%>%summarize("{coef_col}":=mean(coefficient))
+      lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
+    }
     
     for (xvar in additional_x_var){
       #Get rank
@@ -373,6 +421,10 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", ad
       lm_add_x_var_coef_df<-rbind(lm_add_x_var_coef_df,lm_add_x_var_coef_d)
     }
   }
+  if (partition_type=="entry_arousal"){
+    lm_df<-lm_df%>%pivot_wider(id_cols=session_id, names_from=train,values_from=c(cor_col,shuf_cor_col,sig_col,rank))
+    lm_coef_df<-lm_coef_df%>%pivot_wider(id_cols=unit_id_id,names_from=fold,values_from=coef_col)
+    }
   
   ls<-list("lm_df" = lm_df, "lm_coef_df"=lm_coef_df, "predict_df"=predict_df, "lm_add_x_var_coef_df"=lm_add_x_var_coef_df)
   return(ls)
