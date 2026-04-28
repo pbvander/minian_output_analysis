@@ -411,6 +411,8 @@ unit_df<-merge(unit_df,lm_coef_df_torpor_ovx_ds_sum, all=T)
 
 ### PCA
 pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("unit_id_id","telem_ts"))
+pca_time<-merge(pca_ls$telem_ts%>%select(-session_id_type)%>%mutate(telem_ts=ymd_hms(telem_ts)), sumdf%>%ungroup()%>%distinct(telem_ts,session_id,.keep_all = T), all.x=T)
+pca_cell<-merge(pca_ls$unit_id_id, unit_df%>%select(-session_id,-session_id_type), all.x=T)
 
 ##### Checkpoint 3
 #Write new
@@ -421,7 +423,8 @@ write_output(lm_df_torpor_ovx_ds_sum)
 write_output(lm_predict_df_torpor_ovx_ds_sum)
 write_output(unit_df)
 write_output(unit_df_torpor_ovx_ds_sum)
-write_output_rds(pca_ls)
+write_output(pca_time)
+write_output(pca_cell)
 
 #Read all
 setwd(output_dir)
@@ -432,7 +435,8 @@ lm_df_torpor_ovx_ds_sum<-read_rds("./output/lm_df_torpor_ovx_ds_sum.rds")
 lm_predict_df_torpor_ovx_ds_sum<-read_rds("./output/lm_predict_df_torpor_ovx_ds_sum.rds")
 unit_df<-read_rds("./output/unit_df.rds")
 unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
-pca_ls<-read_rds("./output/pca_ls.rds")
+pca_time<-read_rds("./output/pca_time.rds")
+pca_cell<-read_rds("./output/pca_cell.rds")
 
 ########### Graph ###########
 ### Number of cells per group/session
@@ -853,67 +857,6 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
     ms
   p
   save_plot(paste("predicted temp",sess,"torpor"),w=6,h=6)
-}
-
-##PCA
-pca_df<-tibble()
-for (sid in unique(pca_ls$telem_ts$session_id)){ #Each dot is a timepoint, collapsed across all cells
-  data<-(pca_ls$telem_ts)%>%filter(session_id==sid)
-  set<-list()
-  p<-ggplot(data, aes(x=PC1,y=PC2))+
-    scale_color_viridis_c()+
-    xy_point(aes(color=temp))+
-    ms
-  p
-  save_plot(paste("PCA by temp",sid),w=6,h=5)
-  
-  p<-ggplot(data, aes(x=PC1,y=temp))+
-    xy_point2()+
-    regression_line(formula=y~x)+
-    labs(y="Core body temperature (Deg. C)")+
-    ms
-  p
-  save_plot(paste("PC1 - temp correlation",sid),w=6,h=5)
-  
-  p<-ggplot(data, aes(x=PC1,y=PC2))+
-    scale_color_manual(values=colors)+
-    xy_point(aes(color=torpor_status))+
-    ms
-  p
-  save_plot(paste("PCA by torpor status",sid),w=6,h=5)
-  
-  cor<-cor(data$temp, data$PC1, method = "pearson")
-  shuf<-c()
-  for (i in 1:shuffle_iterations){
-    d<-data%>%mutate(temp = sample(temp, length(data$temp)))
-    shuf<-c(shuf, cor(d$temp,d$PC1, method="pearson"))
-  }
-  rank<-(c(cor, shuf)%>%rank())[1]
-  cor_sig<-case_when(rank<shuffle_iterations*0.025 ~ "sig",
-                     rank>shuffle_iterations*0.975 ~ "sig",
-                     T ~ "non-sig")
-  pca_d<-tibble("session_id" = sid, "temp_PC1_cor" = cor, "temp_PC1_cor_sig"=cor_sig)
-  pca_df<-rbind(pca_df,pca_d)
-}
-pca_df<-pca_df%>%merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T)
-
-p<-ggplot(pca_df%>%filter(!is.na(temp_PC1_cor),temp_PC1_cor_sig=="sig"), aes(x=pellet,y=abs(temp_PC1_cor)))+
-  point_summary(aes(color=pellet))+
-  point_errorbar(aes(group=pellet))+
-  point_indiv()+
-  scale_color_manual(values=pellet_scale)+
-  ms+theme(legend.position = "none")
-p
-save_plot("PC1 - temp correlation by pellet", w=6,h=6)
-
-for (sid in unique(pca_ls$unit_id_id$session_id)){ #Each dot is a cell, collapsed across timepoints
-  data<-(pca_ls$unit_id_id)%>%filter(session_id==sid)%>%merge(unit_df,all.x=T)
-  p<-ggplot(data, aes(x=PC1,y=PC2))+
-    xy_point(aes(color=temp_cor_torpor))+
-    scale_color_viridis_c()+
-    ms
-  p
-  save_plot(paste("PCA by temp_cor_torpor",sid),w=6,h=5)
   p+data_ds
   save_plot(paste("predicted temp",sess,"torpor downsampled"),w=6,h=6)
 }
@@ -1234,6 +1177,107 @@ p<-ggplot(unit_df, aes(x=temp_cor_torpor, y=strongest_temp_lag_torpor))+
   xy_point()+
   ms
 p
+
+##PCA
+for (sid in unique(pca_time$session_id)){
+  # if(verbose){print(sid)}
+  #telem_ts (each dot is a timepoint, collapsed across all cells)
+  # if(verbose){print("telem_ts")}
+  d<-pca_time%>%filter(session_id==sid)
+  
+  set<-list(theme(legend.title = element_text(size=12,face="bold"),
+                  legend.text = element_text(size=12,face="bold")))
+  
+  for (sidt in unique(d$session_id_type)){
+    if(grepl("torpor",sidt)){
+      # if(verbose){print(sidt)}
+      data<-d%>%filter(session_id_type==sidt)
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        scale_color_viridis_c(name="TCore (Deg. C)")+
+        xy_point(aes(color=temp))+
+        ms+set
+      p
+      save_plot(paste("PCA by temp",sidt),w=6,h=5)
+      
+      p<-ggplot(data, aes(x=temp,y=PC1))+
+        xy_point2()+
+        regression_line(formula=y~x)+
+        labs(x="Core body temperature (Deg. C)")+
+        ms+set
+      p
+      save_plot(paste("PC1 - temp correlation",sidt),w=6,h=5)
+      
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        scale_color_manual(values=colors,name="Torpor status")+
+        xy_point(aes(color=torpor_status))+
+        ms+set
+      p
+      save_plot(paste("PCA by torpor status",sidt),w=6,h=5)
+    }
+    
+    if(grepl("cold",sidt)){
+      data<-d%>%filter(session_id_type==paste0(sid,"_cold") | session_id_type==paste0(sid,"_heat"))%>%filter(!is.na(ambient_temp_interpolated))
+      # if(verbose){print(paste(sid,"ambient"))}
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        scale_color_viridis_c(name="TAmb (Deg. C)")+
+        xy_point(aes(color=ambient_temp_interpolated))+
+        ms+set
+      p
+      save_plot(paste("PCA by ambient_temp",sid,"ambient"),w=6,h=5)
+      
+      p<-ggplot(data, aes(x=ambient_temp_interpolated,y=PC1))+
+        xy_point2()+
+        regression_line(formula=y~x)+
+        labs(x="Ambient temperature (Deg. C)")+
+        ms+set
+      p
+      save_plot(paste("PC1 - ambient temp correlation",sid, "ambient"),w=6,h=5)
+    }
+    if(grepl("male_interaction",sidt)){
+      data<-d%>%filter(session_id_type==sidt, !is.na(male_interaction))
+      # if (verbose){print(paste(sidt))}
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        scale_color_viridis_c(name="Male social stimulus")+
+        xy_point(aes(color=male_interaction))+
+        ms+set
+      p
+      save_plot(paste("PCA by male_interaction",sidt),w=6,h=5)
+    }
+  }
+  #unit_id_id (each dot is a cell, collapsed across all timepoints)
+  # if(verbose){print("unit_id_id")}
+  d<-pca_cell%>%filter(session_id==sid)
+  for (sidt in unique(d$session_id_type)){
+    if(grepl("torpor",sidt)){
+      data<-d%>%filter(session_id_type==sidt)
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        xy_point(aes(color=temp_cor_torpor))+
+        scale_color_viridis_c()+
+        ms+set
+      p
+      save_plot(paste("PCA by temp_cor_torpor",sid),w=6,h=5)
+    }
+    if(grepl("cold",sidt)){
+      data<-d%>%filter(session_id_type==paste0(sid,"_cold") | session_id_type==paste0(sid,"_heat"))
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        xy_point(aes(color=ambient_temp_interpolated_cor_ambient))+
+        scale_color_viridis_c()+
+        ms+set
+      p
+      save_plot(paste("PCA by ambient_temp_cor_ambient",sid),w=6,h=5)
+    }
+    if(grepl("male_interaction",sidt)){
+      data<-d%>%filter(session_id_type==sidt)
+      p<-ggplot(data, aes(x=PC1,y=PC2))+
+        xy_point(aes(color=male_interaction_auc_sig))+
+        scale_color_viridis_d()+
+        ms+set
+      p
+      save_plot(paste("PCA by male_interaction_auc_sig",sid),w=6,h=5)
+    }
+  }
+}
+
 ####Write final outputs
 write_sessioninfo()
 

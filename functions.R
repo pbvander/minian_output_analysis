@@ -464,15 +464,17 @@ pca <- function(data, predictor = "df_f0_bin", dims){
     reduce<-dims[i]
     id<-dims[-i]
     print(paste0("Reducing over ",reduce,", ID = ",id))
-    for (sid in unique(data$session_id)){
-      sid_data<-data%>%filter(session_id==sid)
-      input_d<-format_data_pca(sid_data, predictor = predictor, dim_to_reduce = reduce, id_dim=id)
+    for (sidt in unique(data$session_id_type)){
+      sidt_data<-data%>%filter(session_id_type==sidt)
+      sid<-unique(sidt_data$session_id)
+      if (grepl("cold",sidt)){sidt_data<-data%>%filter(session_id_type==paste0(sid,"_heat") | session_id_type==paste0(sid,"_cold"))}
+      if (grepl("heat",sidt)){next} #prevents doubling up on ambient temperature data
+      input_d<-format_data_pca(sidt_data, predictor = predictor, dim_to_reduce = reduce, id_dim=id)
       pca<-prcomp(input_d, center=F, scale=F)
-      plot_pca_var(pca, paste("PCA variance",id,sid))
+      plot_pca_var(pca, paste("PCA variance",id,sidt))
       pca_data<-as.data.frame(pca$x)
-      pca_data<-pca_data%>%mutate("{id}":= rownames(pca_data),session_id=sid)
-      pca_data<-merge(pca_data, sid_data%>%ungroup()%>%mutate("{id}":=as.character(.data[[id]]))%>%distinct(!!sym(id), .keep_all = T),
-                      all.x=T)
+      pca_data<-pca_data%>%mutate("{id}":= rownames(pca_data),session_id_type=sidt,session_id=sid)
+      # pca_data<-merge(pca_data, sidt_data%>%ungroup()%>%mutate("{id}":=as.character(.data[[id]]))%>%distinct(!!sym(id), .keep_all = T),all.x=T)
       pca_df<-bind_rows(pca_df,pca_data)
     }
     pca_ls[[id]]<-pca_df
