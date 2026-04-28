@@ -1229,6 +1229,11 @@ for (st in unique(data$session_type)){
   save_plot(paste("F0 stdev",st),w=6,h=5)
 }
 
+##Visualize temporal lag tuning
+p<-ggplot(unit_df, aes(x=temp_cor_torpor, y=strongest_temp_lag_torpor))+
+  xy_point()+
+  ms
+p
 ####Write final outputs
 write_sessioninfo()
 
