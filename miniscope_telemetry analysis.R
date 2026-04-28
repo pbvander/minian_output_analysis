@@ -41,6 +41,10 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
 #Parameters
 shuffle_iterations<-100
 
+#Misc
+lon<-7 #clock time in hours at ZT0 when lights come on
+ftime<-10 #clock time in hours when fasting was started
+
 #Global graph settings:
 ms<-list(theme_prism(),
          theme(text=element_text(size=12),
