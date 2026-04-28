@@ -546,7 +546,7 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
     labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
     theme(text = element_text(size=24))
   p+facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
-  save_png_large(paste("df_f0 by body temperature",id), w=40,h=25)
+  save_plot(paste("df_f0 by body temperature",id), w=40,h=25)
 }
 p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"), aes(x=temp, y=df_f0_bin))+
   xy_point2(alpha=0.2)+
@@ -801,7 +801,7 @@ pie<-ggplot(mouse_data, aes(x="", y=percent, fill=torpor_auc_sig)) +
   guides(color="none")+
   facet_grid(vars(mouse),vars(pellet))
 pie
-save_png_large("torpor roc types by pellet and mouse",w=8,h=5)
+save_plot("torpor roc types by pellet and mouse",w=8,h=5)
 
 #Fold-change between status bins
 p<-ggplot(unit_df%>%filter(!is.na(torpor_auc_sig))%>%mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed"))),aes(x=torpor_auc,y=abs(log2(torpor_fc))))+
@@ -949,7 +949,7 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
     theme(text = element_text(size=24))+
     facet_wrap(vars(unit_id_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
   p
-  save_png_large(paste("df_f0 by ambient temperature",id), w=40,h=25)
+  save_plot(paste("df_f0 by ambient temperature",id), w=40,h=25)
   
   ## Temperature bins
   set<-list(geom_violin(aes(fill=ambient_temp_bin)),
