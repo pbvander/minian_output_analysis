@@ -108,6 +108,8 @@ unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", lag_wi
   ##Correlation analysis with continuous Y variables
   if (verbose){print("Performing correlation analysis with continuous response variables")}
   cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters, verbose=verbose)
+  cor_df_torpor_only<-correlation_analysis(data%>%filter(temp<34), .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters, verbose=verbose)%>%
+    rename_with(~ paste0(.x, "_TempBelow34"), contains("temp"))
   cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), shuf_iters = shuf_iters, verbose=verbose)
   
   ##Lag correlation analysis
@@ -115,7 +117,7 @@ unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", lag_wi
   max_cor_df_torpor<-unit_lag_analysis(telem_data = t_df, miniscope_data = data, lag_session_type = "torpor", response="temp", window=lag_window, shuf_iters = shuf_iters, verbose=verbose)
   
   ##Combine data and add metadata
-  d<-merge(roc_df,cor_df_torpor,all=T)%>%merge(cor_df_ambient,all=T)%>%merge(max_cor_df_torpor, all=T)
+  d<-merge(roc_df,cor_df_torpor,all=T)%>%merge(cor_df_torpor_only,all=T)%>%merge(cor_df_ambient,all=T)%>%merge(max_cor_df_torpor, all=T)
   d<-merge(d,data%>%distinct(unit_id_id, .keep_all = T),all.x=T)
   return(d)
 }
