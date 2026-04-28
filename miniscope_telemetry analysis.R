@@ -15,14 +15,14 @@ library(sperrorest)
 library(ggnewscale)
 library(GGally)
 # summarize<-dplyr::summarize
-source("C:/Users/General Correa Lab/Documents/GitHub/minian_output_analysis/functions.R")
+source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 # filter<-dplyr::filter
 options(dplyr.summarise.inform = FALSE)
 
 ##### Things to set manually:
 #Paths/directories:
-exp_direc<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vander/Experiments"
-output_dir<-"C:/Users/General Correa Lab/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope"
+exp_direc<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Experiments"
+output_dir<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope"
 direcs<-c("250417_circulating_E2_torpor_miniscope/pre-OVX_torpor",
           "250417_circulating_E2_torpor_miniscope/post-OVX_torpor",
           "251013_circulating_E2_torpor_miniscope/pre-ovx_torpor",
