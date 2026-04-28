@@ -34,7 +34,8 @@ separator<-"/" #set depending on OS
 single_session<-"MT29_2025_05_22_session1_torpor" #best session for creating figures
 
 #Exclusions:
-session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20_session1_cold", "MT35_2026_03_07_session1_cold" # These animals do not have data from the full ambient temperature challenge (some issue arose during heat and/or cold exposure that led to exclusion of one "arm" of the ambient temperature challenge). They have been excluded so that all mice represented in the analysis have the same stimuli exposure
+session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20_session1_cold", "MT35_2026_03_07_session1_cold", # These animals do not have data from the full ambient temperature challenge (some issue arose during heat and/or cold exposure that led to exclusion of one "arm" of the ambient temperature challenge). They have been excluded so that all mice represented in the analysis have the same stimuli exposure
+                              "MT30_2025_05_23_session1_torpor", "MT34_2025_11_25_session1_torpor" #sessions where torpor was very shallow and/or infrequent (min temp >33C AND <10 timepoints where temp <34). Can re-include these if cross-registration is implemented, since there was torpor on other torpor recording day for these
                               )
 
 #Parameters
@@ -1090,7 +1091,7 @@ for (i in 1:length(combos[,1])){
 
 #Binary significance
 heatmap_df<-unit_df%>%
-  filter(!is.na(ambient_temp_interpolated_cor_ambient))%>%
+  filter(!is.na(ambient_temp_interpolated_cor_ambient) & !is.na(temp_cor_torpor))%>%
   pivot_longer(cols=target_cols_binary,names_to = "var",values_to = "val")%>%
   mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(temp_cor_torpor)%>%pull(unit_id_id)%>%unique()),
          var=factor(var,levels=target_cols_binary,labels=labs),
