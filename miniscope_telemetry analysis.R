@@ -157,7 +157,7 @@ for (dir in direcs){
 
             #Write intermediate output (Checkpoint 1)
             setwd(output_dir)
-            if ("./output/int" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
+            if ("./output/intermediate" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
             write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint1+",gsub(separator,"+",path)))
             setwd(exp_direc)
 
