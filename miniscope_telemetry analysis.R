@@ -42,10 +42,12 @@ shuffle_iterations<-100
 
 #Global graph settings:
 ms<-list(theme_prism(),
-         theme(text=element_text(size=12)))
+         theme(text=element_text(size=12),
+               strip.text = element_text(size=12,face="bold")))
 theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis.title.y = element_blank(),axis.ticks = element_blank(),axis.text.x = element_blank(), legend.title = element_blank())
 group_gonad_scale<-c("black","#56B4E9","black","#D55E00")
 pellet_scale<-c("black","#56B4E9","#D55E00")
+post_ovx_scale<-c("black","#D55E00")
 cell_type_scale<-c("black","#F0E442","#0072B2")
 cell_type_scale2<-c("grey60","#F0E442","#0072B2")
 ambient_temp_bin_scale<-c("#0072B2","black","#E69F00")
@@ -442,81 +444,56 @@ p
 
 ### dF/F0 - body temperature relationship (single unit analysis)
 ### Number of observations
-##All data
-#Numbers of rows in data (# of cells x # of timepoints)
-data<-sumdf%>%filter(session_type=="torpor")%>%mutate(temp_bin1=cut(temp,seq(min(sumdf$temp)%>%floor(),max(sumdf$temp)%>%ceiling(),1)))
-
-p<-ggplot(data, aes(x=temp))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%floor(), max(sumdf$temp)%>%ceiling(), 1))+
-  scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
-  scale_y_continuous(expand=c(0,0))+
-  labs(x="Core body temperature",y="Observations")+
-  scale_fill_manual(values=pellet_scale)+
-  ms
-p
-save_plot("torpor observations by temp and pellet", w=7,h=5)
-
-#Number of timepoints
-timepoints_per_pellet<-data%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%group_by(pellet,temp_bin1,.drop = F)%>%summarize(timepoints_per_pellet=n())
+##Set up data
+#All data
+data<-sumdf%>%filter(session_type=="torpor",gonad=="ovx")%>%mutate(temp_bin1=cut(temp,seq(min(sumdf$temp)%>%floor(),max(sumdf$temp)%>%ceiling(),1)))
+timepoints_per_pellet<-data%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%mutate(pellet=droplevels(pellet))%>%group_by(pellet,temp_bin1,.drop = F)%>%summarize(timepoints_per_pellet=n())
 mice_per_pellet<-data%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
 timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
 
-p<-ggplot(timepoints_per_pellet, aes(x=temp_bin1, y=timepoints_per_pellet))+
-  geom_col(aes(fill=pellet),position = position_dodge())+
-  scale_y_continuous(expand=c(0,0))+
-  labs(x="Core body temperature",y="Timepoints")+
-  scale_fill_manual(values=pellet_scale)+
-  ms
-p
-save_plot("torpor timepoints by temp and pellet", w=7,h=5)
+#downsampled
+data_downsampled<-sumdf%>%filter(session_type == "torpor",gonad=="ovx")%>%equalize_data_temporal()
+timepoints_per_pellet_ds<-data_downsampled%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%mutate(pellet=droplevels(pellet))%>%group_by(pellet,temp_bin1)%>%summarize(timepoints_per_pellet=n())
+mice_per_pellet_ds<-data_downsampled%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
+timepoints_per_pellet_per_mouse_ds<-merge(timepoints_per_pellet_ds,mice_per_pellet_ds,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
 
-#Number of timepoints per mouse
-p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
-  geom_col(aes(fill=pellet),position = position_dodge())+
-  scale_y_continuous(expand=c(0,0))+
-  labs(x="Core body temperature",y="Timepoints per mouse")+
-  scale_fill_manual(values=pellet_scale)+
-  ms
-p
-save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
-
-##Downsampled
-data_downsampled<-sumdf%>%filter(session_type == "torpor")%>%equalize_data_temporal()
-
-p<-ggplot(data_downsampled, aes(x=temp))+
+#Numbers of rows in data (# of cells x # of timepoints)
+p<-ggplot(data, aes(x=temp))+
   geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(min(sumdf$temp)%>%floor(), max(sumdf$temp)%>%ceiling(), 1))+
   scale_x_continuous(expand=c(0,0),breaks=seq(20,50,1))+
-  scale_y_continuous(expand=c(0,0))+
+  scale_y_continuous(expand=c(0,0),limits=c(0,max(data%>%group_by(pellet,temp_bin1)%>%count()%>%pull(n))*1.1))+
   labs(x="Core body temperature",y="Observations")+
-  scale_fill_manual(values=pellet_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
   ms
 p
+save_plot("torpor observations by temp and pellet", w=7,h=5)
+p+data_downsampled
 save_plot("torpor observations by temp and pellet downsampled", w=7,h=5)
 
 #Number of timepoints
-timepoints_per_pellet<-data_downsampled%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%group_by(pellet,temp_bin1)%>%summarize(timepoints_per_pellet=n())
-mice_per_pellet<-data_downsampled%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
-timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
-
 p<-ggplot(timepoints_per_pellet, aes(x=temp_bin1, y=timepoints_per_pellet))+
-  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
   geom_col(aes(fill=pellet),position = position_dodge())+
-  scale_y_continuous(expand=c(0,0))+
+  scale_y_continuous(expand=c(0,0),limits=c(0,max(timepoints_per_pellet$timepoints_per_pellet)*1.1))+
+  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
   labs(x="Core body temperature",y="Timepoints")+
-  scale_fill_manual(values=pellet_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
   ms
 p
+save_plot("torpor timepoints by temp and pellet", w=7,h=5)
+p+timepoints_per_pellet_ds
 save_plot("torpor timepoints by temp and pellet downsampled", w=7,h=5)
 
 #Number of timepoints per mouse
 p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
-  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
   geom_col(aes(fill=pellet),position = position_dodge())+
-  scale_y_continuous(expand=c(0,0))+
+  scale_y_continuous(expand=c(0,0),limits=c(0,max(timepoints_per_pellet_per_mouse$timepoints_per_mouse)*1.1))+
+  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
   labs(x="Core body temperature",y="Timepoints per mouse")+
-  scale_fill_manual(values=pellet_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
   ms
 p
+save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
+p+timepoints_per_pellet_per_mouse_ds
 save_plot("torpor timepoints per mouse by temp and pellet downsampled", w=7,h=5)
 
 ## dF/F0 By temperature value
@@ -531,11 +508,17 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
     regression_line()+
     ms+
     labs(y="dF/F0", title="Cell ID", x="Core body temperature (Deg. C)")+
-    theme(text = element_text(size=24))+
-    facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
-  p
+    theme(text = element_text(size=24))
+  p+facet_wrap(vars(unit_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
   save_png_large(paste("df_f0 by body temperature",id), w=40,h=25)
 }
+p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"), aes(x=temp, y=df_f0_bin))+
+  xy_point2(alpha=0.2)+
+  regression_line()+
+  ms+
+  labs(y="dF/F0", title=paste0("All cells, all sessions (Slope = ",(lm(temp~df_f0_bin, sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"))$coefficients[[2]])%>%round(digits=4),")"), x="Core body temperature (Deg. C)")+
+  theme(text = element_text(size=24))
+save_plot("df_f0 by body temperature all cells all sessions",plot=p,w=10,h=10)
 
 
 # # Graph a single session
@@ -587,24 +570,51 @@ p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp
   geom_violin(aes(fill=pellet))+
   labs(y="Pearson correlation coefficient")+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
+  coord_cartesian(ylim=c(-1,1))+
   point_indiv()+
   scale_fill_manual(values=pellet_scale)+
-  facet_wrap(vars(temp_cor_sig_torpor),axes="all")+
+  facet_wrap(vars(temp_cor_sig_torpor))+
   ms+
   theme(legend.position = "none")
 p
 save_plot("torpor temperature correlation coefficient by cell type and pellet", w=12,h=8)
-p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))
+p+unit_df%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral")+aes(y=temp_cor_torpor_TempBelow34)+facet_wrap(vars(temp_cor_sig_torpor_TempBelow34))
+save_plot("torpor temperature correlation coefficient by cell type and pellet torpor timepoints only",w=12,h=8)
+p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+scale_fill_manual(values=post_ovx_scale)
+save_plot("torpor temperature correlation coefficient by cell type and pellet ovx",w=12,h=8)
+p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+scale_fill_manual(values=post_ovx_scale)
 save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=12,h=8)
 
 # Correlation type frequencies
 #Grouped by pellet
 data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
+data_torpor_only<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor_TempBelow34")%>%
+  mutate(temp_cor_sig_torpor_TempBelow34=factor(temp_cor_sig_torpor_TempBelow34,levels=c("neutral","negative","positive")))%>%rename(temp_cor_sig_torpor=temp_cor_sig_torpor_TempBelow34)
 data_downsampled<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
 chisq<-data%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+chisq_torpor_only<-data_torpor_only%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+chisq_ds<-data_downsampled%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
   pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
@@ -626,6 +636,8 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
   facet_wrap(vars(pellet))
 pie
 save_plot("torpor temperature correlation types by pellet",w=8,h=5)
+pie+data_torpor_only+aes(fill=temp_cor_sig_torpor)
+save_plot("torpor temperature correlation types by pellet torpor only",w=8,h=5)
 pie+data_downsampled
 save_plot("torpor temperature correlation types by pellet downsampled",w=8,h=5)
 
@@ -644,7 +656,7 @@ pie<-ggplot(mouse_data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
   guides(color="none")+
   facet_grid(vars(mouse),vars(pellet))
 pie
-save_png_large("torpor temperature correlation types by mouse and pellet",w=8,h=5)
+save_plot("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
 #Slope by gonad/E2 state
 t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
@@ -674,7 +686,7 @@ p<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=temp
   theme(legend.position = "none")
 p
 save_plot("torpor temperature slope by cell type and pellet", w=12,h=8)
-p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")
+p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")+scale_fill_manual(values=post_ovx_scale)
 save_plot("torpor temperature slope by cell type and pellet downsampled",w=12,h=8)
 
 ## Torpor vs non-torpor bins
@@ -710,6 +722,9 @@ save_plot("df_f0 by torpor status",w=20,h=15)
 data<-transform_data_piegraph(unit_df, animal_var="pellet", cell_var = "torpor_auc_sig")%>%
   mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
 
+data_ds<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var="pellet", cell_var = "torpor_auc_sig")%>%
+  mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
+
 chisq<-data%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
@@ -731,7 +746,9 @@ pie<-ggplot(data, aes(x="", y=percent, fill=torpor_auc_sig)) +
   guides(color="none")+
   facet_wrap(vars(pellet))
 pie
-save_png_large("torpor roc types by pellet",w=8,h=5)
+save_plot("torpor roc types by pellet",w=8,h=5)
+pie+data_ds
+save_plot("torpor roc types by pellet downsample",w=5,h=3)
 
 #Grouped by mouse and pellet
 mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "torpor_auc_sig")%>%
@@ -758,6 +775,8 @@ p<-ggplot(unit_df%>%filter(!is.na(torpor_auc_sig))%>%mutate(torpor_auc_sig=facto
   theme(legend.position = "none")
 p
 save_plot("torpor status bins fc",w=10,h=7)
+p+unit_df_torpor_ovx_ds_sum%>%filter(!is.na(torpor_auc_sig))%>%mutate(torpor_auc_sig=factor(torpor_auc_sig,levels=c("neutral","activated","suppressed")))
+save_plot("torpor status bins fc downsample",w=8,h=5)
 
 p<-ggplot(unit_df%>%filter(!is.na(torpor_auc_sig),torpor_auc_sig!="neutral"),aes(x=pellet,y=(log2(torpor_fc))))+
   geom_violin(aes(fill=pellet))+
@@ -769,6 +788,9 @@ p<-ggplot(unit_df%>%filter(!is.na(torpor_auc_sig),torpor_auc_sig!="neutral"),aes
   ms+
   theme(legend.position = "none")
 p
+save_plot("torpor roc fold change",w=5,h=4)
+p+unit_df_torpor_ovx_ds_sum%>%filter(!is.na(torpor_auc_sig),torpor_auc_sig!="neutral")+scale_fill_manual(values=post_ovx_scale)
+save_plot("torpor roc fold change downsample",w=6,h=4)
 
 ### dF-F0 - body temperature (population level analysis)
 ##LM significance by pellet
@@ -788,8 +810,16 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor_)) +
 pie
 save_plot("lm correlation significance by pellet",w=4,h=5)
 pie+data_ovx_ds
+save_plot("lm correlation significance by pellet downsample",w=4,h=5)
 
 ##LM accuracy
+lm_anova<-anova(lme(data=lm_df%>%filter(temp_cor_sig_torpor_=="significant"),
+                    fixed=temp_mean_cor_torpor_ ~ pellet,
+                    random=~1|mouse))
+lm_anova_ds<-anova(lme(data=lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant"),
+                       fixed=temp_mean_cor_torpor_ ~ pellet,
+                       random=~1|mouse))
+
 p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=temp_mean_cor_torpor_))+
   geom_violin(aes(fill=pellet))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
@@ -801,12 +831,13 @@ p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=te
   theme(legend.position = "none")
 p
 save_plot("lm correlation coefficient by pellet",w=6,h=6)
-p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")
+p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)
+save_plot("lm correlation coefficient by pellet downsample", w=5,h=4)
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
-  data<-torpor_lm_ls$predict_df
-  data<-data%>%filter(session_id==sess)
+  data<-(torpor_lm_ls$predict_df)%>%filter(session_id==sess)
+  data_ds<-(lm_predict_df_torpor_ovx_ds_sum)%>%filter(session_id==sess)
   
   p<-ggplot(data, aes(x=predicted,y=true))+
     labs(x="Predicted temperature", y="Observed temperature")+
@@ -877,6 +908,8 @@ for (sid in unique(pca_ls$unit_id_id$session_id)){ #Each dot is a cell, collapse
     ms
   p
   save_plot(paste("PCA by temp_cor_torpor",sid),w=6,h=5)
+  p+data_ds
+  save_plot(paste("predicted temp",sess,"torpor downsampled"),w=6,h=6)
 }
 
 ### dF/F0 - ambient temperature relationship
@@ -889,29 +922,44 @@ ggplot(sumdf%>%filter(session_id=="MT30_2025_05_23_session1", session_type %in% 
 save_plot("ambient temperature schematic",w=7,h=5)
 
 ##Observations by pellet group
+#Set up data
+data<-sumdf%>%filter(session_type %in% c("cold","heat"),gonad=="ovx")%>%mutate(ambient_temp_bin1=cut(ambient_temp_interpolated,seq(3,39,1)))
+timepoints_per_pellet<-data%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%mutate(pellet=droplevels(pellet))%>%group_by(pellet,ambient_temp_bin1,.drop = F)%>%summarize(timepoints_per_pellet=n())
+mice_per_pellet<-data%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
+timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
+
 #Numbers of rows in data (# of cells x # of timepoints)
-p<-ggplot(sumdf%>%filter(session_type %in% c("cold","heat")), aes(x=ambient_temp_interpolated))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(3, 39, 2))+
-  scale_x_continuous(expand=c(0,0),breaks=seq(3,39,2))+
+p<-ggplot(data, aes(x=ambient_temp_interpolated))+
+  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(3, 39, 1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(3,39,1))+
   scale_y_continuous(expand=c(0,0))+
   labs(x="Ambient temperature",y="Observations")+
-  scale_fill_manual(values=pellet_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
   ms
 p
-save_png_large("ambient temp observations by ambient_temp and pellet", w=7,h=5)
+save_plot("ambient temp observations by ambient_temp and pellet", w=7,h=5)
 
 #Number of timepoints
-data<-sumdf%>%filter(session_type %in% c("cold","heat"))%>%ungroup()%>%distinct(telem_ts, mouse, session_id,.keep_all = T)
-
-p<-ggplot(data, aes(x=ambient_temp_interpolated))+
-  geom_histogram(aes(fill=pellet),position = position_dodge(),breaks=seq(3, 39, 2))+
-  scale_x_continuous(expand=c(0,0),breaks=seq(3,39,2))+
-  scale_y_continuous(expand=c(0,0))+
+p<-ggplot(timepoints_per_pellet, aes(x=ambient_temp_bin1, y=timepoints_per_pellet))+
+  geom_col(aes(fill=pellet),position = position_dodge())+
+  scale_y_continuous(expand=c(0,0),limits=c(0,max(timepoints_per_pellet$timepoints_per_pellet)*1.1))+
+  scale_x_discrete(limits=c(levels(data$ambient_temp_bin1[1]),levels(data$ambient_temp_bin1)[length(levels(data$ambient_temp_bin1))]))+
   labs(x="Ambient temperature",y="Timepoints")+
-  scale_fill_manual(values=pellet_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
   ms
 p
-save_png_large("ambient temp timepoints by ambient_temp and pellet", w=7,h=5)
+save_plot("ambient temp timepoints by temp and pellet", w=7,h=5)
+
+#Number of timepoints per mouse
+p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=ambient_temp_bin1, y=timepoints_per_mouse))+
+  geom_col(aes(fill=pellet),position = position_dodge())+
+  scale_y_continuous(expand=c(0,0),limits=c(0,max(timepoints_per_pellet_per_mouse$timepoints_per_mouse)*1.1))+
+  scale_x_discrete(limits=c(levels(data$ambient_temp_bin1[1]),levels(data$ambient_temp_bin1)[length(levels(data$ambient_temp_bin1))]))+
+  labs(x="Ambient temperature",y="Timepoints per mouse")+
+  scale_fill_manual(values=post_ovx_scale)+
+  ms
+p
+save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
 
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
@@ -941,6 +989,7 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
   save_plot(paste("df_f0 by ambient temperature bin",id),w=20,h=15)
 }
 
+##correlation coefficient
 t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
 for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
   if (cell_type=="neutral"){next}
@@ -953,13 +1002,19 @@ p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")
   geom_violin(aes(fill=pellet))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
   point_indiv()+
-  labs(x=element_blank(),y="Slope")+
+  labs(x=element_blank(),y="Correlation coefficient")+
   scale_fill_manual(values=pellet_scale)+
-  facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",scales="free")+
+  facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all")+
   ms+
   theme(legend.position = "none")
 p
-save_plot("ambient temperature slope by cell type and pellet", w=12,h=8)
+save_plot("ambient temperature coefficient by cell type and pellet", w=12,h=8)
+
+##slope
+p<-p+aes(x=pellet,y=ambient_temp_interpolated_slope_ambient)+labs(y="Slope")
+p
+
+#correlation type (see below in for loop with other stimuli)
 
 ### dF/F0 - male social stimulus relationship
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
@@ -1109,7 +1164,7 @@ for (target in target_cols_binary){
     labs(title=labs[i])+
     facet_wrap(vars(pellet))
   pie
-  save_plot(paste("lm correlation significance by pellet",target),w=7,h=5)
+  save_plot(paste("correlation significance by pellet",target),w=7,h=5)
   
   i=i+1
 }
