@@ -163,7 +163,7 @@ for (dir in direcs){
             #Write intermediate output (Checkpoint 1)
             setwd(output_dir)
             if ("./output/intermediate" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
-            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint1+",gsub(separator,"+",path)))
+            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint1-",gsub(separator,"-",path)))
             setwd(exp_direc)
 
             # Add metadata on session type
@@ -236,7 +236,7 @@ for (dir in direcs){
 
             ##### Checkpoint 2
             setwd(output_dir)
-            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint2+",gsub(separator,"+",path)))
+            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint2-",gsub(separator,"-",path)))
             setwd(exp_direc)
 
             # Create 1-minute bins in miniscope data
