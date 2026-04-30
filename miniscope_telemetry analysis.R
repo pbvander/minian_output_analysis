@@ -649,6 +649,37 @@ save_plot("df_f0 by temperature all intact cells",w=2.8,h=6.6)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by temperature all ovx cells",w=3.2,h=5)
 
+# Graph all data for one session
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=3, r=0, "pt")))
+
+#all data
+d<-read_rds("./output/intermediate/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_22-session1-concatenated.rds")%>%
+  filter(!is.na(scaled_YrA))%>%
+  merge(unit_df%>%select(temp_cor_sig_torpor,temp_cor_torpor, unit_id_id,session_id,unit_id), all.x=T)
+data<-d%>%mutate(unit_id = factor(unit_id, levels=d%>%arrange(desc(temp_cor_torpor))%>%pull(unit_id)%>%unique()))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())
+p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))
+p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
+save_plot("example session all data",plot=p1+p3+p2+plot_layout(heights=c(10,1),widths=c(60,1),ncol=2),w=13,h=8)
+
+#example cells from a single session
+data<-d%>%filter(start_time %in% c("01_21_59","04_58_09"))
+data<-data%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(desc(temp_cor_torpor))%>%pull(unit_id)%>%unique()))
+
+# rect_data<-data%>%group_by(temp_cor_sig_torpor,start_time)%>%summarise(ymin = min(as.numeric(unit_id)) - 0.1, ymax = max(as.numeric(unit_id)) + 0.9,
+#                                                             xmin = min(session_time_minutes), xmax = max(session_time_minutes),
+#                                                             start_time=first(start_time))
+# rect_set<-list(geom_rect(data=rect_data, inherit.aes=F, fill=NA, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, color = temp_cor_sig_torpor)),
+#                scale_color_manual(values=cell_type_scale[2:3]))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+theme(axis.line=element_blank(),legend.position = "none")
+p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))
+p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_id))+ms+set+rect_label_set
+save_plot("example session selected cells and timepoints",plot=p1+p3+p2+plot_layout(heights=c(10,1),widths=c(20,1),ncol=2),w=4,h=6)
+# save_plot("example session selected cells and timepoints with rectangle",plot=(p1+rect_set)/p2+plot_layout(heights=c(10,1)),w=4,h=5)
 
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
