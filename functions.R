@@ -750,8 +750,8 @@ xy_point3 <- function(...,size=3,shape=21,alpha=0.6, stroke=1.2){
   geom_point(size=size,shape=shape,alpha=alpha, stroke=stroke,...)
 }
 
-regression_line <- function(..., size=1.5, method="lm", se=F){
-  geom_smooth(size=size,method = method, se = se,...)
+regression_line <- function(..., linewidth=1, method="lm", se=F){
+  geom_line(stat="smooth",linewidth=linewidth,method = method, se = se,...)
 }
   
 line_error <- function(..., width=0,alpha=0.3){
@@ -780,6 +780,17 @@ ridgeline <- function(..., scale=0.9,linewidth=0.35,fill=NA){
 
 ridgeline_guide <- function(..., var = "unit_id",color="grey"){
   geom_hline(aes(yintercept=!!sym(var)),color=color, ...)
+}
+
+get_torpor_y <- function(data){
+  torpor_y_increment<-case_when(range(data$temp)%>%diff() < 1.5 ~ 0.5,
+                                range(data$temp)%>%diff() < 3 ~ 1,
+                                range(data$temp)%>%diff() < 6 ~ 2,
+                                range(data$temp)%>%diff() < 9 ~ 3,
+                                range(data$temp)%>%diff() < 12 ~ 4,
+                                T ~ 5)
+  torpor_y<-if(torpor_y_increment %in% c(1,2,3,4,6)){scale_y_continuous(breaks=seq(19,43,torpor_y_increment),expand=c(0.1,0.1))}else{scale_y_continuous(breaks=seq(16,46,torpor_y_increment),expand=c(0.1,0.1))}
+  return(torpor_y)
 }
 
 colors<-c("#000000", "#E69F00", "#56B4E9", "#009E73","#F0E442", "#0072B2", "#D55E00", "#CC79A7") #http://bconnelly.net/posts/creating_colorblind-friendly_figures/
