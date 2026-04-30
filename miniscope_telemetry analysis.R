@@ -90,6 +90,7 @@ male_interaction_scale<-c("black","#F0E442")
 bad_frames<-list()
 sumdf<-tibble()
 A_all<-tibble()
+event_df<-tibble()
 
 ### Read and prepare metadata
 setwd(exp_direc)
@@ -115,7 +116,8 @@ for (dir in direcs){
   event_mdf<-rbind(event_mdf, read_event_metadata(file))
   read<-c(read,file)
 }
-event_mdf<-event_mdf%>%select(event, session_id,start_time, event_ts)%>%pivot_wider(names_from = event,values_from = event_ts)
+event_metadata<-event_mdf%>%select(event, session_id,start_time, event_ts)
+event_mdf<-event_metadata%>%pivot_wider(names_from = event,values_from = event_ts)
 
 #Telemetry data
 read<-c()
@@ -270,6 +272,25 @@ for (dir in direcs){
             if (check !=0){stop("f0 not matching number of session_ids")}
             df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
                                                     z = (YrA - mean_f0) / sd_f0)
+            
+            ###Compile event_df
+            setwd(output_dir)
+            events<-event_metadata%>%filter(session_id == paste0(mouse,"_",start_date,"_",session), !is.na(event_ts))
+            for (.event in events$event){
+              .ts<-events%>%filter(event==.event)%>%pull(event_ts)
+              d<-df%>%
+                filter(miniscope_ts %>% between(.ts-minutes(5), .ts+minutes(5)))%>%
+                mutate(event=.event, event_ts = .ts, event_aligned_time_seconds = as.duration(miniscope_ts - event_ts)%>%as.numeric())
+              
+              p<-ggplot(d, aes(x=event_aligned_time_seconds, y=unit_id))+ms+ls+ridge_set+
+                scale_x_continuous(expand=c(0,0),breaks=seq(-240,240,120))+
+                labs(title=.event,x="Event aligned time (seconds)")+
+                geom_vline(xintercept=0,linewidth=0.5)
+              save_plot(paste0(mouse,"_",start_date,"_",session,"_",.event),plot=p,w=4,h=6)
+              
+              event_df<-rbind(event_df,d)
+            }
+            setwd(exp_direc)
 
             ##### Checkpoint 2
             setwd(output_dir)
