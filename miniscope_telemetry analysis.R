@@ -463,6 +463,7 @@ write_output(unit_df_torpor_ovx_ds_sum)
 write_rds(pca_ls,"./output/pca_ls.rds")
 write_output(pca_time)
 write_output(pca_cell)
+write_output(t_df)
 write_output(A_all)
 
 #Read all
@@ -479,6 +480,7 @@ unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
+t_df<-read_rds("./output/t_df.rds")
 A_all<-read_rds("./output/A_all.rds")
 
 ########### Graph ###########
