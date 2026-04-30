@@ -14,6 +14,8 @@ library(rstatix)
 library(sperrorest)
 library(ggnewscale)
 library(GGally)
+library(ggforce)
+library(spatstat)
 # summarize<-dplyr::summarize
 source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 # filter<-dplyr::filter
@@ -45,6 +47,14 @@ shuffle_iterations<-200
 lon<-7 #clock time in hours at ZT0 when lights come on
 ftime<-10 #clock time in hours when fasting was started
 
+#Settings for tuning analyses
+target_cols<-c("temp_cor_torpor","temp_change1_cor_torpor", 
+               "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
+target_cols_binary<-c("temp_cor_sig_torpor","temp_change1_cor_sig_torpor",
+                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
+labs<-c("TCore", "TCore_change",
+        "TAmb", "Male")
+
 #Global graph settings:
 ms<-list(theme_prism(),
          theme(text=element_text(size=12),
@@ -66,7 +76,7 @@ motion_set<-list(geom_line(),
 temp_set<-list(geom_line(linewidth = lw),
                geom_hline(linewidth=lw, yintercept = 31, linetype="dashed"),
                scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,5)),
-               labs(y="Deg. C",title="Core body tempeature"))
+               labs(y="Deg. C",title="Core body tempeature (T-Core) (Deg. C)"))
 ambient_temp_set<-list(geom_line(linewidth = lw),
                        labs(y="Deg. C",title="Ambient tempeature",x=element_blank()))
 male_interaction_set<-list(geom_line(linewidth = lw),
@@ -799,7 +809,7 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
         legend.title.position = "top",
         legend.text = element_text(size=12,face="bold"))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
-  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core temperature correlation")+
+  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature (T-Core) correlation")+
   coord_polar("y", start=0)+
   geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("black","black","black"))+
@@ -1032,7 +1042,7 @@ p<-ggplot(data, aes(x=temp_cor_sig_torpor,y=temp_mean_cor_torpor_))+
   theme(legend.position = "none",
         axis.title.y = element_text(margin = margin(r=3, unit="pt")))
 p
-save_plot("lm correlation by cell type",w=2.4,h=1.84)
+save_plot("lm correlation by cell type",w=2.3,h=1.84)
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
@@ -1044,11 +1054,11 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
     mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("All","neutral","negative","positive"),labels=c("All","Neutral","Negative","Positive")))
   
   p<-ggplot(data, aes(x=predicted,y=true))+
-    labs(x="Predicted", y="Observed",title="All cells")+
+    labs(x="Predicted", y="Observed",title="T-Core (all cells)")+
     geom_abline(slope=1,linetype="dashed",linewidth=1)+
     regression_line(linewidth=1,alpha=0.5,color="blue")+
     xy_point2(alpha=0.2,size=1)+
-    ms+theme(plot.title=element_text(size=12,margin=margin(0,3,0,0,"pt")),
+    ms+theme(plot.title=element_text(size=12,margin=margin(t=0,r=0,b=3,l=-15,"pt")),
              panel.spacing = unit(3,"pt"),
              axis.title.x = element_text(margin = margin(t = 3,unit="pt")),
              axis.title.y = element_text(margin = margin(r=3, unit="pt")))
@@ -1217,13 +1227,6 @@ p
 save_plot("male log2fc auc by cell type and pellet", w=12,h=8)
 
 ##Comparison of tuning across stimuli
-target_cols<-c("temp_cor_torpor","temp_change1_cor_torpor", 
-               "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
-target_cols_binary<-c("temp_cor_sig_torpor","temp_change1_cor_sig_torpor",
-                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
-labs<-c("TCore", "TCore_change",
-        "TAmb", "Male")
-
 # Heat map
 #Values
 t=1
@@ -1391,12 +1394,16 @@ for (sid in unique(pca_time$session_id)){
   # if(verbose){print("telem_ts")}
   d<-pca_time%>%filter(session_id==sid)
   
-  set<-list(theme(legend.title = element_text(size=12,face="bold"),
+  set<-list(theme(legend.title = element_text(size=12,face="bold",vjust=0.85),
                   axis.title.x = element_text(margin=margin(t=3,unit="pt")),
                   axis.title.y = element_text(margin=margin(r=3,unit="pt")),
+                  legend.justification = "center",
                   legend.key.width = unit(16,"pt"),
+                  legend.position = "top",
                   legend.key.height = unit(14,"pt"),
-                  legend.text = element_text(size=12,face="bold")))
+                  legend.title.position = "left",
+                  legend.box.margin = margin(t=0,r=0,b=-15,l=-15,unit="pt"),
+                  legend.text = element_text(size=12,color="white",face="bold",margin=margin(t=-12,b=0,l=0,r=0,unit = "pt"))))
   
   for (sidt in unique(d$session_id_type)){
     if(grepl("torpor",sidt)){
@@ -1404,12 +1411,12 @@ for (sid in unique(pca_time$session_id)){
       data<-d%>%filter(session_id_type==sidt)
       var_data<-(pca_ls$telem_ts_var)%>%filter(session_id_type==sidt)
       p<-ggplot(data, aes(x=PC1,y=PC2))+
-        scale_color_viridis_c(name="Core body\ntemperature\n(Deg. C)",breaks=seq(25,35,5))+
+        scale_color_viridis_c(name="T-Core",breaks=seq(25,35,5),limits=c(22,38))+
         xy_point(aes(color=temp),shape=21,size=1.8,stroke=0.9,alpha=0.5)+
         labs(x=paste0("PC1 (",var_data%>%filter(PC==1)%>%pull(var), "%)"), y=paste0("PC2 (",var_data%>%filter(PC==2)%>%pull(var),"%)"))+
         ms+set
       p
-      save_plot(paste("PCA by temp",sidt),w=3.1,h=2.2)
+      save_plot(paste("PCA by temp",sidt),w=2.2,h=2.2)
       
       p<-ggplot(data, aes(x=temp,y=PC1))+
         xy_point2()+
