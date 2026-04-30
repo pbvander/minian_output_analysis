@@ -39,7 +39,7 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
                               )
 
 #Parameters
-shuffle_iterations<-100
+shuffle_iterations<-200
 
 #Misc
 lon<-7 #clock time in hours at ZT0 when lights come on
@@ -190,7 +190,7 @@ for (dir in direcs){
             #Write intermediate output (Checkpoint 1)
             setwd(output_dir)
             if ("./output/intermediate" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
-            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint1-",gsub(separator,"-",path)))
+            write_output_rds(df, direc="./output/intermediate/", name=paste0("1_",gsub(separator,"-",path)))
             setwd(exp_direc)
 
             # Add metadata on session type
@@ -263,7 +263,7 @@ for (dir in direcs){
 
             ##### Checkpoint 2
             setwd(output_dir)
-            write_output_rds(df, direc="./output/intermediate/", name=paste0("df_checkpoint2-",gsub(separator,"-",path)))
+            write_output_rds(df, direc="./output/intermediate/", name=paste0("2_",gsub(separator,"-",path)))
             setwd(exp_direc)
 
             # Create 1-minute bins in miniscope data
@@ -297,7 +297,7 @@ for (dir in direcs){
               p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
             
               if (grepl("torpor",id)){
-                aligned_tim<-interval(df$fstart[1], ymd_hms(paste0(start_date,"_00_00_01")))%>%time_length("hours")
+                aligned_tim<-interval(data$fstart[1], ymd_hms(paste0(start_date,"_00_00_01")))%>%time_length("hours")
                 if (aligned_tim < 30){ #day 1 torpor (no re-feed)
                   p<-p2/p1/p3+plot_layout(heights=c(1,10,1))}
                 if (aligned_tim > 30){  #day 2 torpor with re-feed
