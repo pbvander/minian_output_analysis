@@ -394,6 +394,19 @@ lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>%
 unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
+#Gonad-intact different cell types
+data<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,temp_cor_torpor, temp_cor_sig_torpor), all.x=T)
+
+cell_type_lm_df<-tibble()
+cell_type_predict_df<-tibble()
+for (cell_type in unique(data$temp_cor_sig_torpor)){
+  print(cell_type)
+  lm<-lm_analysis(data%>%filter(temp_cor_sig_torpor==cell_type), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
+  cell_type_predict_df<-rbind(cell_type_predict_df,(lm$predict_df)%>%mutate(temp_cor_sig_torpor=cell_type))
+  cell_type_lm_df<-rbind(cell_type_lm_df, (lm$lm_df)%>%mutate(temp_cor_sig_torpor=cell_type))
+}
+
+
 # Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)
 #torpor and post-ovx data only
 lm_df_torpor_ovx_ds<-tibble()
@@ -443,6 +456,8 @@ write_output(lm_df)
 write_output(lm_predict_df)
 write_output(lm_df_torpor_ovx_ds_sum)
 write_output(lm_predict_df_torpor_ovx_ds_sum)
+write_output(cell_type_lm_df)
+write_output(cell_type_predict_df)
 write_output(unit_df)
 write_output(unit_df_torpor_ovx_ds_sum)
 write_rds(pca_ls,"./output/pca_ls.rds")
@@ -457,6 +472,8 @@ lm_df<-read_rds("./output/lm_df.rds")
 lm_predict_df<-read_rds("./output/lm_predict_df.rds")
 lm_df_torpor_ovx_ds_sum<-read_rds("./output/lm_df_torpor_ovx_ds_sum.rds")
 lm_predict_df_torpor_ovx_ds_sum<-read_rds("./output/lm_predict_df_torpor_ovx_ds_sum.rds")
+cell_type_lm_df<-read_rds("./output/cell_type_lm_df.rds")
+cell_type_predict_df<-read_rds("./output/cell_type_predict_df.rds")
 unit_df<-read_rds("./output/unit_df.rds")
 unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
@@ -897,6 +914,25 @@ p+lm_df%>%filter(temp_cor_sig_torpor_=="significant",gonad=="intact")
 save_plot("lm correlation coefficient intact",w=2,h=2)
 p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)
 save_plot("lm correlation coefficient by pellet downsample", w=5,h=4)
+
+data<-cell_type_lm_df%>%
+  merge(lm_df%>%select(session_id,mouse),all.x=T)%>%
+  rbind(lm_df%>%filter(gonad=="intact")%>%select(session_id,temp_mean_cor_torpor_,temp_cor_sig_torpor_,mouse)%>%mutate(temp_cor_sig_torpor="All"))%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("All","neutral","negative","positive"),labels=c("All","Neutral","Negative","Positive")))
+p<-ggplot(data, aes(x=temp_cor_sig_torpor,y=temp_mean_cor_torpor_))+
+  geom_violin(aes(fill=temp_cor_sig_torpor),scale="width",width=0.95)+
+  point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=2.8,shape=21,stroke=1)+
+  point_indiv(size=1.5,position=position_jitter(width=0.25,height=0,seed=321))+
+  labs(x=element_blank(),y="r")+
+  scale_x_discrete(guide = guide_axis(n.dodge=2))+
+  scale_fill_manual(values=c("black",cell_type_scale))+
+  scale_y_continuous(breaks=seq(0,1,0.5),labels=seq(0,1,0.5))+
+  ms+
+  coord_cartesian(ylim=c(0,1))+
+  theme(legend.position = "none",
+        axis.title.y = element_text(margin = margin(r=3, unit="pt")))
+p
+save_plot("lm correlation by cell type",w=2.4,h=1.84)
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
