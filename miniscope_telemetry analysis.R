@@ -344,11 +344,13 @@ for (dir in direcs){
 setwd(output_dir)
 write_output(sumdf)
 write_output(t_df)
+write_output(A_all)
 
 #Read
 setwd(output_dir)
 sumdf<-read_rds("./output/sumdf.rds")
 t_df<-read_rds("./output/t_df.rds")
+A_all<-read_rds("./output/A_all.rds")
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
@@ -446,6 +448,7 @@ write_output(unit_df_torpor_ovx_ds_sum)
 write_rds(pca_ls,"./output/pca_ls.rds")
 write_output(pca_time)
 write_output(pca_cell)
+write_output(A_all)
 
 #Read all
 setwd(output_dir)
@@ -459,6 +462,7 @@ unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
+A_all<-read_rds("./output/A_all.rds")
 
 ########### Graph ###########
 ### Session timing schematic
@@ -1342,6 +1346,23 @@ for (sid in unique(pca_time$session_id)){
     }
   }
 }
+
+## Cell locations
+data<-A_all%>%merge(unit_df, all.x=T)%>%filter(session_id=="MT29_2025_05_22_session1")
+
+for (sid in unique(data$session_id)){
+  p<-ggplot(data, aes(x=width,y=height, color=temp_cor_sig_torpor))+
+    geom_point(aes(alpha=A),shape=15)+
+    geom_mark_hull(aes(group=unit_id_id), expand=unit(1,"pt"),concavity = 0,color="black")+
+    scale_color_manual(values=cell_type_scale)+
+    labs(x="X (pixels)",y="Y (pixels)")+
+    ms
+  p
+  save_plot(paste0("A by temp_cor_sig_torpor ",sid), w=3,h=3)
+}
+
+
+
 
 ####Write final outputs
 write_sessioninfo()
