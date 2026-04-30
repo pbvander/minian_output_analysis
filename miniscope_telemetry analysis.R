@@ -428,6 +428,7 @@ write_output(lm_df_torpor_ovx_ds_sum)
 write_output(lm_predict_df_torpor_ovx_ds_sum)
 write_output(unit_df)
 write_output(unit_df_torpor_ovx_ds_sum)
+write_rds(pca_ls,"./output/pca_ls.rds")
 write_output(pca_time)
 write_output(pca_cell)
 
@@ -440,6 +441,7 @@ lm_df_torpor_ovx_ds_sum<-read_rds("./output/lm_df_torpor_ovx_ds_sum.rds")
 lm_predict_df_torpor_ovx_ds_sum<-read_rds("./output/lm_predict_df_torpor_ovx_ds_sum.rds")
 unit_df<-read_rds("./output/unit_df.rds")
 unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
+pca_ls<-read_rds("./output/pca_ls.rds")
 pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
 
@@ -1222,9 +1224,11 @@ for (sid in unique(pca_time$session_id)){
     if(grepl("torpor",sidt)){
       # if(verbose){print(sidt)}
       data<-d%>%filter(session_id_type==sidt)
+      var_data<-(pca_ls$telem_ts_var)%>%filter(session_id_type==sidt)
       p<-ggplot(data, aes(x=PC1,y=PC2))+
-        scale_color_viridis_c(name="TCore (Deg. C)")+
-        xy_point(aes(color=temp))+
+        scale_color_viridis_c(name="Core body\ntemperature\n(Deg. C)",breaks=seq(25,35,5))+
+        xy_point(aes(color=temp),shape=21,size=1.8,stroke=0.9,alpha=0.5)+
+        labs(x=paste0("PC1 (",var_data%>%filter(PC==1)%>%pull(var), "%)"), y=paste0("PC2 (",var_data%>%filter(PC==2)%>%pull(var),"%)"))+
         ms+set
       p
       save_plot(paste("PCA by temp",sidt),w=6,h=5)
