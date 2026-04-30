@@ -489,6 +489,37 @@ plot_pca <- function(pca_ls, unit_df, verbose=T){
 
 }
 
+spatial_test <- function(data, var, shuf_iters=1000){
+  cell_centroids <- data %>%
+    group_by(across(all_of(c(var,"unit_id_id","session_id")))) %>%
+    summarize(x = sum(width * A) / sum(A), y = sum(height * A) / sum(A))
+  observed<-cell_centroids%>%
+    group_by(across(all_of(c(var,"session_id"))))%>%
+    summarize(obs_dist = mean(nndist(x,y)))%>%
+    filter(!is.na(.data[[var]]))
+  
+  null_distribution <- map_dfr(1:shuf_iters, function(i) {
+    cell_centroids %>%
+      ungroup()%>%
+      mutate("{var}":= sample(cell_centroids%>%pull({{var}}), length(cell_centroids%>%pull({{var}})))) %>% # Shuffle labels
+      group_by(across(all_of(c(var,"session_id")))) %>%
+      summarize(perm_dist = mean(nndist(x, y)))
+  })%>%ungroup()
+  null_distribution_sum<-null_distribution%>%group_by(across(all_of(c(var,"session_id"))))%>%summarize(null_dist=list(perm_dist))
+  
+  observed<-observed%>%
+    merge(null_distribution_sum,all=T)%>%
+    rowwise()%>%
+    mutate(rank = rank(c(obs_dist,null_dist))[1],
+           p = rank/shuf_iters,
+           p.adj=p*length(unique(data%>%pull({{var}}))),
+           sig=ifelse(p.adj<0.05, "significant","ns"))%>%
+    select(-null_dist)%>%
+    ungroup()
+  out<-list("observed"=observed, "null"=null_distribution)
+  return(out)
+}
+
 ##Telemetry
 read_telemetry_data <- function(file, metadata_file, format = "starr-lifesci", idinfo = c("mouse", "misc", "measure", "misc2"), round = T, round_units = "minute", fstart_time="10:00:00", trial_length_days = 4){
   #Read in telemetry data

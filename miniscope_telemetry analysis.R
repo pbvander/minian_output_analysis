@@ -1470,21 +1470,72 @@ for (sid in unique(pca_time$session_id)){
 }
 
 ## Cell locations
-data<-A_all%>%merge(unit_df, all.x=T)%>%filter(session_id=="MT29_2025_05_22_session1")
+d<-A_all%>%merge(unit_df, all.x=T)
 
 for (sid in unique(data$session_id)){
+  data<-d%>%filter(session_id==sid)
+  data<-data%>%mutate(x0=range(width)%>%mean(),
+                      y0=range(height)%>%mean(),
+                      dist_from_center=((width-x0)^2 + (height-y0)^2)^0.5)
+  
   p<-ggplot(data, aes(x=width,y=height, color=temp_cor_sig_torpor))+
-    geom_point(aes(alpha=A),shape=15)+
-    geom_mark_hull(aes(group=unit_id_id), expand=unit(1,"pt"),concavity = 0,color="black")+
-    scale_color_manual(values=cell_type_scale)+
-    labs(x="X (pixels)",y="Y (pixels)")+
-    ms
-  p
-  save_plot(paste0("A by temp_cor_sig_torpor ",sid), w=3,h=3)
+    geom_point(aes(alpha=A),shape=15,size=0.0001)+
+    geom_mark_hull(aes(group=unit_id_id), expand=unit(0,"pt"),radius=unit(0,"pt"),concavity=4,color="black",linewidth=0.2)+
+    scale_color_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3]))+
+    # geom_point(x = range(data$width)%>%mean(), y = range(data$height)%>%mean(), size = max(range(data$width)%>%diff(), range(data$height)%>%diff())/4.5, shape = 21, fill = NA,color="black")+
+    geom_circle(aes(x0=x0,y0=y0,r=max(dist_from_center)*1.05),color="black",linewidth=0.7,n=720)+
+    labs(x=element_blank(),y=element_blank())+
+    scale_x_continuous(breaks=c())+
+    scale_y_continuous(breaks=c())+
+    ms+
+    theme(legend.position = "none",
+          axis.line = element_blank()
+          # panel.border = element_rect(colour = "black", fill = NA)
+          # axis.title.y=element_text(margin=margin(r=3,unit = "pt")),
+          # axis.title.x = element_text(margin=margin(t=3,unit="pt"))
+          )
+  save_plot(paste0("A by temp_cor_sig_torpor ",sid),plot=p, w=2.1,h=2)
+  if (sid=="MT29_2025_05_22_session1"){
+    as_ggplot(get_legend(p+theme(legend.position = "right")))
+    save_plot("A by temp_cor_sig_torpor legend",w=2,h=2)
+  }
 }
 
+#test for spatial localization of cell types
+spatial_test_obs<-tibble()
+spatial_test_null<-tibble()
+pie_data<-tibble()
+for (col in target_cols_binary){
+  test<-spatial_test(d, col,shuf_iters = shuffle_iterations)
+  test_obs<-(test$observed)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))
+  test_null<-(test$null)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))
+  spatial_test_obs<-rbind(spatial_test_obs,test_obs)
+  spatial_test_null<-rbind(spatial_test_null, test_null)
+  pie_data<-rbind(pie_data,
+                  transform_data_piegraph(test_obs%>%merge(unit_df,all.x=T),animal_var="pellet",cell_var="sig")%>%mutate(var=col))
+}
 
+##plot observed vs null
+ggplot(spatial_test_obs%>%filter(session_id=="MT29_2025_05_22_session1",!is.na(obs_dist),var=="temp_cor_sig_torpor"), aes(x=cell_type,y=obs_dist))+
+  geom_violin(inherit.aes = F, data=spatial_test_null%>%filter(session_id=="MT29_2025_05_22_session1",var=="temp_cor_sig_torpor",!is.na(perm_dist)), aes(x=cell_type,y=perm_dist),fill=NA)+
+  point_summary(aes(color=sig))+
+  ms
 
+##plot piegraph of frequencies
+pie<-ggplot(pie_data%>%filter(pellet=="pre-OVX",var=="temp_cor_sig_torpor"), aes(x="", y=percent, fill=sig))+ms+theme_pie+
+  theme(legend.position = "right",
+        legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
+        legend.title.position = "top",
+        legend.text = element_text(size=12,face="bold"))+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Spatial enrichment")+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("black","black","black"))+
+  guides(color="none")+
+  facet_wrap(vars(pellet))
+pie
+save_plot("spatial analysis torpor intact",w=4,h=4)
 
 ####Write final outputs
 write_sessioninfo()
