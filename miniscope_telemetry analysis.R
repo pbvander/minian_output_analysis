@@ -195,6 +195,9 @@ for (dir in direcs){
 
             # Add metadata on session type
             df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
+            if (nrow(df)==0){  #skip the rest of this code if the entire session_id is excluded
+              print("All data excluded, skipping")
+              next} 
 
             # Add event-based metadata
             df<-df%>%merge(event_mdf, all.x=T)
