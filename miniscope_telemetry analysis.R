@@ -203,22 +203,29 @@ for (dir in direcs){
             df<-df%>%merge(event_mdf, all.x=T)
             df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
                                                            session_type == "male_interaction" ~ ifelse(miniscope_ts > male_added & miniscope_ts < male_removed, 1, 0)),
-                            "first_interaction_aligned_time_seconds" = case_when (session_type != "male_interaction" ~ NA,
-                                                                                  session_type == "male_interaction" ~ as.duration(miniscope_ts - first_interaction)%>%as.numeric()),
-                            "first_interact" = case_when(session_type != "male_interaction" ~ NA,
-                                                         session_type == "male_interaction" ~ ifelse(first_interaction_aligned_time_seconds < 1, T, F)),
+                            # "first_interaction_aligned_time_seconds" = case_when (session_type != "male_interaction" ~ NA,
+                                                                                  # session_type == "male_interaction" ~ as.duration(miniscope_ts - first_interaction)%>%as.numeric()),
+                            # "first_interact" = case_when(session_type != "male_interaction" ~ NA,
+                                                         # session_type == "male_interaction" ~ ifelse(first_interaction_aligned_time_seconds < 1, T, F)),
                             "injection" = case_when(session_type != "E2_injection" ~ NA,
                                                     session_type == "E2_injection" & miniscope_ts >= E2_injection ~ "E2",
                                                     session_type == "E2_injection" & miniscope_ts >= veh_injection ~ "Veh",
                                                     session_type == "E2_injection" & miniscope_ts >= sham_injection ~ "Sham",
                                                     session_type == "E2_injection" & miniscope_ts < sham_injection ~ "Baseline")%>%factor(levels=c("Baseline","Sham","Veh","E2")),
+                            "injection_aligned_time_seconds" = case_when(session_type != "E2_injection" ~ NA,
+                                                                         session_type == "E2_injection" & injection=="E2" ~ as.duration(miniscope_ts - E2_injection)%>%as.numeric(),
+                                                                         session_type == "E2_injection" & injection=="Veh" ~ as.duration(miniscope_ts - veh_injection)%>%as.numeric(),
+                                                                         session_type == "E2_injection" & injection=="Sham" ~ as.duration(miniscope_ts - sham_injection)%>%as.numeric(),
+                                                                         session_type == "E2_injection" & injection=="Baseline" ~ as.duration(miniscope_ts - start_ts)%>%as.numeric()),
                             "fed_status" = case_when(session_type != "torpor" ~ NA,
                                                      session_type == "torpor" & miniscope_ts < fed ~ "Fasting",
                                                      session_type == "torpor" & miniscope_ts > first_bite ~ "Eating",
                                                      session_type == "torpor" & miniscope_ts >= fed & miniscope_ts <= first_bite ~ "Fed",
                                                      T ~ "Fasting")%>%factor(levels=c("Fasting","Fed","Eating"),),
+                            "fed_aligned_time_seconds" = case_when(session_type != "torpor" ~ NA,
+                                                                   session_type == "torpor" ~ as.duration(miniscope_ts - fed)%>%as.numeric()),
                             "cage_change_status" = case_when(session_type != "cage_change" ~ NA,
-                                                      session_type == "cage_change" ~ ifelse(miniscope_ts < cage_change, "Home","New")))
+                                                             session_type == "cage_change" ~ ifelse(miniscope_ts < cage_change, "Home","New")))
 
             #Create new column for total time within each session
             df<-df%>%
