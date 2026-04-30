@@ -1039,6 +1039,13 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
   save_plot(paste("predicted temp",sess,"torpor cell types"),w=4.7,h=1.8)
 }
 
+##LM weight
+p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=temp_cor_sig_torpor,y=temp_MeanLmCoef_torpor,fill=temp_cor_sig_torpor))+
+  geom_violin()+
+  scale_fill_manual(values=cell_type_scale)+
+  ms
+p
+
 ### dF/F0 - ambient temperature relationship
 ## Plot ambient temperature challenge schematic
 ggplot(sumdf%>%filter(session_id=="MT30_2025_05_23_session1", session_type %in% c("cold","heat"))%>%mutate(session_type=factor(session_type,levels=c("heat","cold"))),aes(x=session_time_minutes,y=ambient_temp_interpolated))+
