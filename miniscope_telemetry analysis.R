@@ -603,6 +603,52 @@ p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"), aes(x=temp,
   theme(text = element_text(size=24))
 save_plot("df_f0 by body temperature all cells all sessions",plot=p,w=10,h=10)
 
+# Graph all cells on one graph summarized per temp_bin1
+data<-sumdf%>%
+  filter(!is.na(df_f0_bin), session_type=="torpor")%>%
+  merge(unit_df%>%select(unit_id_id, temp_cor_torpor,temp_cor_sig_torpor,session_id))%>%
+  mutate(temp_bin1=cut(temp,breaks=seq(0,50,1), labels = seq(0,49,1)),
+         unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=0, r=0, "inches")))
+rect_label_set<-list(geom_tile(aes(fill=temp_cor_sig_torpor)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+rect_label_pellet<-list(geom_tile(aes(fill=pellet)),
+                        scale_fill_manual(values=post_ovx_scale2),
+                        theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
+
+p<-ggplot(data%>%filter(gonad=="intact"), aes(x=temp_bin1, y=unit_id_id))+
+  labs(x="Core temperature (Deg. C)", y="Cell ID")+
+  geom_tile(aes(fill=scaled_YrA_bin))+
+  scale_y_discrete(breaks=c(),expand=c(0,0))+
+  scale_x_discrete(expand=c(0,0),breaks=seq(20,40,1),labels= ~ ifelse(as.numeric(as.character(.x)) %% 2 == 0, .x, ""))+
+  scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
+  ms+
+  theme(panel.background = element_rect(fill="black"),
+        # legend.title = element_text(),
+        # legend.text = element_text(size=12,face="bold"),
+        axis.title.y=element_text(margin=margin(r=3,unit="pt")),
+        # axis.title.x = element_text(margin=margin(t=3,l=-3,unit="pt")),
+        axis.title.x = element_text(size=12),
+        legend.text = element_blank(),
+        legend.position = "top",
+        legend.key.width = unit(0.2,"inches"),
+        legend.justification = 0,
+        legend.box.spacing = unit(6,"pt"),
+        axis.line.y = element_blank())
+p+labels_intact+plot_layout(widths = c(15,1))
+save_plot("df_f0 by temperature all intact cells",w=2.8,h=6.6)
+p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
+save_plot("df_f0 by temperature all ovx cells",w=3.2,h=5)
+
 
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
