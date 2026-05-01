@@ -74,7 +74,6 @@ ridge_set<-list(ridgeline_guide(),
 motion_set<-list(geom_line(),
                  labs(y="pixels",x=element_blank(),title="Motion distance"))
 temp_set<-list(geom_line(linewidth = lw),
-               geom_hline(linewidth=lw, yintercept = 31, linetype="dashed"),
                scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,5)),
                labs(y="Deg. C",title="Core body tempeature (T-Core) (Deg. C)"))
 ambient_temp_set<-list(geom_line(linewidth = lw),
@@ -207,9 +206,7 @@ for (dir in direcs){
 
             # Add metadata on session type
             df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
-            if (nrow(df)==0){  #skip the rest of this code if the entire session_id is excluded
-              print("All data excluded, skipping")
-              next} 
+            if (nrow(df)>0){  #skip the rest of this code if the entire session_id is excluded
 
             # Add event-based metadata
             df<-df%>%merge(event_mdf, all.x=T)
@@ -287,18 +284,22 @@ for (dir in direcs){
             setwd(output_dir)
             events<-event_metadata%>%filter(session_id == paste0(mouse,"_",start_date,"_",session), !is.na(event_ts))
             for (.event in events$event){
+              print(.event)
               .ts<-events%>%filter(event==.event)%>%pull(event_ts)
               d<-df%>%
                 filter(miniscope_ts %>% between(.ts-minutes(5), .ts+minutes(5)))%>%
                 mutate(event=.event, event_ts = .ts, event_aligned_time_seconds = as.duration(miniscope_ts - event_ts)%>%as.numeric())
-              
-              p<-ggplot(d, aes(x=event_aligned_time_seconds, y=unit_id))+ms+ls+ridge_set+
-                scale_x_continuous(expand=c(0,0),breaks=seq(-240,240,120))+
-                labs(title=.event,x="Event aligned time (seconds)")+
-                geom_vline(xintercept=0,linewidth=0.5)
-              save_plot(paste0(mouse,"_",start_date,"_",session,"_",.event),plot=p,w=4,h=6)
-              
-              event_df<-rbind(event_df,d)
+              if (nrow(d)>0){
+                suppressMessages(#gets rid of "scale for x is already present message
+                  p<-ggplot(d, aes(x=event_aligned_time_seconds, y=unit_id))+ms+ls+ridge_set+
+                    scale_x_continuous(expand=c(0,0),breaks=seq(-240,240,120))+
+                    labs(title=.event,x="Event aligned time (seconds)")+
+                    geom_vline(xintercept=0,linewidth=0.5)
+                  )
+                save_plot(paste0(mouse,"_",start_date,"_",session,"_",.event),plot=p,w=4,h=6)
+                
+                event_df<-rbind(event_df,d)
+              }else{print(paste("Skipping",.event))}
             }
             setwd(exp_direc)
 
@@ -335,9 +336,10 @@ for (dir in direcs){
               # All frames
               p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set
               p2<-ggplot(data, aes(x=session_time_minutes, y=motion_distance))+ms+ls+motion_set
-              p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set
+              suppressMessages(p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set)
             
               if (grepl("torpor",id)){
+                p3<-p3+geom_hline(linewidth=lw, yintercept = 31, linetype="dashed")
                 aligned_tim<-interval(data$fstart[1], ymd_hms(paste0(start_date,"_00_00_01")))%>%time_length("hours")
                 if (aligned_tim < 30){ #day 1 torpor (no re-feed)
                   p<-p2/p1/p3+plot_layout(heights=c(1,10,1))}
@@ -364,6 +366,7 @@ for (dir in direcs){
               gc()
             }
             setwd(exp_direc)
+            }else{print(paste("Skipping",mouse,start_date,session))}
           }
         }
       }
