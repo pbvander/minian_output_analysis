@@ -417,7 +417,6 @@ torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", 
 torpor_w_tempchange1_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", additional_x_var = "temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
 ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="ambient_ts", .session_type = c("heat","cold"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
 
-
 #Cross-training entries/arousals
 sessions<-sumdf%>%group_by(session_id,torpor_status)%>%summarize(n=n_distinct(telem_ts))%>%filter(torpor_status %in% c("entry","arousal"),n>=4)%>%group_by(session_id)%>%count()%>%filter(n==2)%>%pull(session_id) #session_ids with both arousal and entry timepoints
 torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(df_f0_bin)), session_id %in% sessions, torpor_status %in% c("entry","arousal")), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=c("entry","arousal"), partition_type="entry_arousal", partition_col="torpor_status", shuf_iters=shuffle_iterations)
@@ -1311,7 +1310,7 @@ p<-ggplot(unit_df%>%filter(male_interaction_auc_sig!="neutral"), aes(x=pellet, y
   geom_violin(aes(fill=pellet))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
   point_indiv()+
-  labs(x=element_blank(),y="Slope")+
+  labs(x=element_blank(),y="AUROC")+
   scale_fill_manual(values=pellet_scale)+
   facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free")+
   ms+
@@ -1398,8 +1397,6 @@ p<-ggplot(heatmap_df, aes(x=var,y=unit_id_id,fill=val))+
 p
 save_plot("Tuning heatmap binary",w=8,h=5)
 
-
-
 #Frequencies (binary)
 tune_col<-paste(labs,collapse = "_")
 pie_data<-transform_data_piegraph(unit_df%>%drop_na(all_of(target_cols_binary))%>%unite(col=!!tune_col,target_cols_binary), "pellet", tune_col)
@@ -1451,35 +1448,41 @@ save_plot("Tcore vs Tcore with change correlation analysis", w=4.5,h=4.5)
 
 data<-lm_df%>%select(temp_mean_cor_EntryArousal_torpor__entry,temp_mean_shuf_cor_EntryArousal_torpor__entry,session_id)%>%
   pivot_longer(cols=c(temp_mean_cor_EntryArousal_torpor__entry,temp_mean_shuf_cor_EntryArousal_torpor__entry), names_to = "var",values_to = "cor")%>%
-  mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__entry","temp_mean_cor_EntryArousal_torpor__entry"),labels=c("Shuffle entry/arousal","Observed")),
+  mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__entry","temp_mean_cor_EntryArousal_torpor__entry"),labels=c("Train + test = mixed","Train = entry only, test = arousal only")),
          mouse = sub("_.*", "", session_id))%>%
-  filter(!is.na(cor))
+  filter(!is.na(cor))%>%
+  merge(lm_df%>%distinct(session_id,pellet),all.x=T)
 anova(lme(data=data, fixed = cor ~ var, random=~1|mouse))
 
-p<-p+aes(y=cor)+data+labs(y="Correlation coefficient",title="Train = entry, test = arousal")
+p<-p+aes(y=cor)+data+labs(y="r")
 p
+facet(p,"pellet")
 
 data<-lm_df%>%select(temp_mean_cor_EntryArousal_torpor__arousal,temp_mean_shuf_cor_EntryArousal_torpor__arousal,session_id)%>%
   pivot_longer(cols=c(temp_mean_cor_EntryArousal_torpor__arousal,temp_mean_shuf_cor_EntryArousal_torpor__arousal), names_to = "var",values_to = "cor")%>%
-  mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__arousal","temp_mean_cor_EntryArousal_torpor__arousal"),labels=c("Shuffle entry/arousal","Observed")),
+  mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__arousal","temp_mean_cor_EntryArousal_torpor__arousal"),labels=c("Train+test = mixed","Train = aroual, test=entry")),
          mouse = sub("_.*", "", session_id))%>%
-  filter(!is.na(cor))
+  filter(!is.na(cor))%>%
+  merge(lm_df%>%distinct(session_id,pellet),all.x=T)
 anova(lme(data=data, fixed = cor ~ var, random=~1|mouse))
 
-p<-p+data+labs(title="Train = arousal, test = entry")
+p<-p+data
 p
+facet(p,"pellet")
 
 ##Stdev of F0 signal across stimuli and pellets
-data<-sumdf%>%filter(!is.na(sd_f0_bin))%>%group_by(unit_id_id, session_id_type)%>%summarize(sd_f0=mean(sd_f0_bin))%>%
-  merge(sumdf%>%ungroup()%>%distinct(unit_id_id,  session_id_type, .keep_all = T),all.x=T)%>% #add metadata
-  filter(!is.na(sd_f0_bin))
+data<-sumdf%>%filter(!is.na(sd_f0_bin))%>%group_by(unit_id_id, session_id_type)%>%summarize(mean_sd_f0_bin=mean(sd_f0_bin))%>%
+  merge(sumdf%>%ungroup()%>%distinct(unit_id_id,  session_id_type,session_type, mouse, pellet),all.x=T)%>% #add metadata
+  filter(!is.na(mean_sd_f0_bin))
+
+anova(lme(data=data%>%filter(pellet!="pre-OVX"), fixed = mean_sd_f0_bin ~ pellet, random=~1|mouse))
 
 for (st in unique(data$session_type)){
-  p<-ggplot(data%>%filter(session_type==st), aes(x=pellet, y=sd_f0))+
+  p<-ggplot(data%>%filter(session_type==st), aes(x=pellet, y=mean_sd_f0_bin))+
     geom_violin(aes(fill=pellet))+
     scale_fill_manual(values=pellet_scale)+
-    point_indiv()+
-    point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123),alpha=0.7)+
+    point_indiv(position=position_jitter(width=0.25,height=0,seed=123))+
+    point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),alpha=0.7)+
     labs(title=st)+
     ms+theme(legend.position = "none")
   p
@@ -1490,7 +1493,8 @@ for (st in unique(data$session_type)){
 p<-ggplot(unit_df, aes(x=temp_cor_torpor, y=strongest_temp_lag_torpor))+
   xy_point()+
   ms
-p
+p+facet_wrap(vars(pellet))
+save_plot("temporal lag tuning",w=6,h=5)
 
 ##PCA
 for (sid in unique(pca_time$session_id)){
@@ -1605,7 +1609,7 @@ for (sid in unique(pca_time$session_id)){
 ## Cell locations
 d<-A_all%>%merge(unit_df, all.x=T)
 
-for (sid in unique(data$session_id)){
+for (sid in unique(d$session_id)){
   data<-d%>%filter(session_id==sid)
   data<-data%>%mutate(x0=range(width)%>%mean(),
                       y0=range(height)%>%mean(),
