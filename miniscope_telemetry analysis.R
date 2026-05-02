@@ -1138,7 +1138,7 @@ data<-sumdf%>%
   mutate(scaled_df_f0_bin = scales::rescale(df_f0_bin))%>%
   ungroup()%>%
   merge(unit_df%>%select(unit_id_id, ambient_temp_interpolated_cor_ambient,ambient_temp_interpolated_cor_sig_ambient,session_id))%>%
-  mutate(ambient_temp_interpolated_bin1=cut(ambient_temp_interpolated,breaks=c(3.9,5.1,seq(6,36,1),36.9,38.1), labels = seq(4,37,1)),
+  mutate(ambient_temp_interpolated_bin1=cut(ambient_temp_interpolated,breaks=c(c(3.9,6.1),seq(8,34,2),c(36.1,38.1)), labels = seq(5,37,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id_id)%>%unique()))
 
 set<-list(theme(text=element_text(size=12),
@@ -1160,7 +1160,7 @@ p<-ggplot(data%>%filter(gonad=="intact"), aes(x=ambient_temp_interpolated_bin1, 
   labs(x="Ambient temperature (Deg. C)", y="Cell ID")+
   geom_tile(aes(fill=scaled_df_f0_bin))+
   scale_y_discrete(breaks=c(),expand=c(0,0))+
-  scale_x_discrete(expand=c(0,0),breaks=seq(4,37,1), labels= ~ ifelse(as.numeric(as.character(.x)) %% 4 == 0, .x, ""))+
+  scale_x_discrete(expand=c(0,0),breaks= ~ ., labels= ~ ifelse((as.numeric(as.character(.x))-1) %% 4 == 0, .x, ""))+
   scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
   ms+
   theme(panel.background = element_rect(fill="black"),
