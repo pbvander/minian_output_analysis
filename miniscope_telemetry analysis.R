@@ -75,9 +75,9 @@ motion_set<-list(geom_line(),
                  labs(y="pixels",x=element_blank(),title="Motion distance"))
 temp_set<-list(geom_line(linewidth = lw),
                scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,5)),
-               labs(y="Deg. C",title="Core body tempeature (T-Core) (Deg. C)"))
+               labs(y="Deg. C",title="Core body temperature (T-Core) (Deg. C)"))
 ambient_temp_set<-list(geom_line(linewidth = lw),
-                       labs(y="Deg. C",title="Ambient tempeature",x=element_blank()))
+                       labs(y="Deg. C",title="Ambient temperature",x=element_blank()))
 male_interaction_set<-list(geom_line(linewidth = lw),
                            labs(y="",title="Male social stimulus",x=element_blank()),
                            scale_y_continuous(breaks=c(0,1)))
@@ -697,7 +697,7 @@ d<-read_rds("./output/intermediate/2_250417_circulating_E2_torpor_miniscope-pre-
 data<-d%>%mutate(unit_id = factor(unit_id, levels=d%>%arrange(desc(temp_cor_torpor))%>%pull(unit_id)%>%unique()))
 
 p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())
-p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))
+p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))+geom_hline(linewidth=lw, yintercept = 31, linetype="dashed")
 p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
 save_plot("example session all data",plot=p1+p3+p2+plot_layout(heights=c(10,1),widths=c(60,1),ncol=2),w=13,h=8)
 
@@ -712,9 +712,9 @@ data<-data%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(desc(temp_co
 #                scale_color_manual(values=cell_type_scale[2:3]))
 
 p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+theme(axis.line=element_blank(),legend.position = "none")
-p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))
+p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))+geom_hline(linewidth=lw, yintercept = 31, linetype="dashed")
 p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_id))+ms+set+rect_label_set
-save_plot("example session selected cells and timepoints",plot=p1+p3+p2+plot_layout(heights=c(10,1),widths=c(20,1),ncol=2),w=4,h=6)
+save_plot("example session selected cells and timepoints",plot=p1+p3+p2+plot_layout(heights=c(12,1),widths=c(20,1),ncol=2),w=4,h=6)
 # save_plot("example session selected cells and timepoints with rectangle",plot=(p1+rect_set)/p2+plot_layout(heights=c(10,1)),w=4,h=5)
 
 # Temp-temp_change1 correlation during torpor
@@ -1130,6 +1130,97 @@ p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=ambient_temp_bin1, y=timepoints
   ms
 p
 save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
+
+# Graph all cells on one graph summarized per ambient_temp_interpolated_bin1
+data<-sumdf%>%
+  filter(!is.na(df_f0_bin), session_type %in% c("heat","cold"))%>%
+  group_by(unit_id_id)%>%
+  mutate(scaled_df_f0_bin = scales::rescale(df_f0_bin))%>%
+  ungroup()%>%
+  merge(unit_df%>%select(unit_id_id, ambient_temp_interpolated_cor_ambient,ambient_temp_interpolated_cor_sig_ambient,session_id))%>%
+  mutate(ambient_temp_interpolated_bin1=cut(ambient_temp_interpolated,breaks=c(3.9,5.1,seq(6,36,1),36.9,38.1), labels = seq(4,37,1)),
+         unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id_id)%>%unique()))
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=0, r=0, "inches")))
+rect_label_set<-list(geom_tile(aes(fill=ambient_temp_interpolated_cor_sig_ambient)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+rect_label_pellet<-list(geom_tile(aes(fill=pellet)),
+                        scale_fill_manual(values=post_ovx_scale2),
+                        theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
+
+p<-ggplot(data%>%filter(gonad=="intact"), aes(x=ambient_temp_interpolated_bin1, y=unit_id_id))+
+  labs(x="Ambient temperature (Deg. C)", y="Cell ID")+
+  geom_tile(aes(fill=scaled_df_f0_bin))+
+  scale_y_discrete(breaks=c(),expand=c(0,0))+
+  scale_x_discrete(expand=c(0,0),breaks=seq(4,37,1), labels= ~ ifelse(as.numeric(as.character(.x)) %% 4 == 0, .x, ""))+
+  scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
+  ms+
+  theme(panel.background = element_rect(fill="black"),
+        # legend.title = element_text(),
+        # legend.text = element_text(size=12,face="bold"),
+        axis.title.y=element_text(margin=margin(r=3,unit="pt")),
+        axis.title.x = element_text(size=12,margin=margin(t=4,l=-25,unit="pt")),
+        legend.text = element_blank(),
+        legend.position = "top",
+        legend.key.width = unit(0.2,"inches"),
+        legend.justification = 0,
+        legend.box.spacing = unit(6,"pt"),
+        axis.line.y = element_blank())
+p+labels_intact+plot_layout(widths = c(15,1))
+save_plot("df_f0 by ambient temperature all intact cells",w=2.9,h=5.5)
+p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
+save_plot("df_f0 by ambient temperature all ovx cells",w=3.2,h=5)
+
+## Plot an example session
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=3, r=0, "pt"),
+                panel.spacing = unit(0.0375,"inches")))
+
+#all data
+d<-read_rds("./output/intermediate/2_251013_circulating_E2_torpor_miniscope-pre-ovx_torpor-MT31-2025_11_23-session1-concatenated.rds")%>%
+  filter(!is.na(scaled_YrA), session_type %in% c("cold","heat"))%>%
+  group_by(unit_id_id)%>%
+  mutate(scaled_df_f0 = scales::rescale(df_f0))%>%
+  ungroup()%>%
+  mutate(session_time_minutes = session_time_minutes-min(session_time_minutes))%>%
+  merge(unit_df%>%select(ambient_temp_interpolated_cor_sig_ambient,ambient_temp_interpolated_cor_ambient, unit_id_id,session_id,unit_id), all.x=T)
+data<-d%>%mutate(unit_id = factor(unit_id, levels=d%>%arrange(desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id)%>%unique()))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)
+p2<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set+set+scale_y_continuous(expand = c(0.2,0.2))
+p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2))+labs(title="Core body temperature")
+p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
+save_plot("example session all data ambient",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(12,1,1),widths=c(60,1),ncol=2),w=13,h=8)
+
+#subset of all data
+data<-d%>%
+  group_by(session_type)%>%
+  filter(session_time_minutes < min(session_time_minutes + 5) | session_time_minutes > max(session_time_minutes-5))%>%
+  mutate(start_time=cut(session_time_minutes, breaks=c(0,6,80,130,250)))%>%
+  filter(!is.na(start_time))
+data<-data%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id)%>%unique()))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+theme(axis.line=element_blank(),legend.position = "none")+labs(title="F / max(F)")
+p2<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=seq(5,35,15))
+p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=seq(34,40,2))+scale_x_continuous(expand=c(0,0),breaks=seq(0,300,2))+labs(title="Core body temperature")
+p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
+save_plot("example session subset data ambient",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(8,1,1),widths=c(20,1),ncol=2),w=3.8,h=5)
+
+(p4+scale_fill_manual(name="Ambient temperature (T-Amb) correlation",values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3]),labels=tools::toTitleCase)+
+  theme(legend.position = "top",
+        legend.text = element_text(size=12,face="bold"),
+        legend.title=element_text(),
+        legend.title.position = "top"))%>%get_legend()%>%as_ggplot()
+save_plot("ambient temperature cell type legend",w=4,h=0.5)
 
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
