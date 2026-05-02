@@ -52,8 +52,8 @@ target_cols<-c("temp_cor_torpor","temp_change1_cor_torpor",
                "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
 target_cols_binary<-c("temp_cor_sig_torpor","temp_change1_cor_sig_torpor",
                       "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
-labs<-c("TCore", "TCore_change",
-        "TAmb", "Male")
+labs<-c("T-Core", "T-Core_change",
+        "T-Amb", "Male")
 
 #Global graph settings:
 ms<-list(theme_prism(),
@@ -453,7 +453,7 @@ for (i in 1:shuffle_iterations){
   #Run analysis
   lm_ls<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="ovx")%>%
     equalize_data_temporal(verbose=T)%>%
-    lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=T)
+    lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
   
   #Add to dataframes
   lm_df_torpor_ovx_ds<-rbind(lm_df_torpor_ovx_ds, (lm_ls$lm_df)%>%mutate(iteration=i))
@@ -740,7 +740,7 @@ p
 save_plot("torpor temperature correlation coefficient by cell type and group_gonad", w=12,h=8)
 
 t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_coef=mean(temp_cor_torpor))%>%group_by(temp_cor_sig_torpor), mean_coef ~ pellet)
-for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
+for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
@@ -850,7 +850,7 @@ save_plot("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
 #Slope by gonad/E2 state
 t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
-for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
+for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
@@ -903,12 +903,12 @@ set<-list(geom_violin(aes(fill=torpor_status)),
 
 p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), torpor_status %in% c("deep_torpor","non-torpor")), aes(x=torpor_status,y=df_f0_bin))+ms+set
 p
-save_plot("df_f0 non-torpor vs deep torpor",w=20,h=15)
+save_plot("df_f0 non-torpor vs deep torpor",w=40,h=30)
 
 # All torpor status bins
 p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin)), aes(x=torpor_status,y=df_f0_bin))+ms+set
 p
-save_plot("df_f0 by torpor status",w=20,h=15)
+save_plot("df_f0 by torpor status",w=40,h=30)
 
 # ROC analysis
 #Cell type frequencies
@@ -1055,7 +1055,7 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
   data_ds<-lm_predict_df_torpor_ovx_ds_sum%>%filter(session_id==sess)
   data_cell_type<-cell_type_predict_df%>%
     filter(session_id==sess)%>%
-    bind_rows(data%>%mutate(temp_cor_sig_torpor="All"))%>%
+    bind_rows(data%>%mutate(temp_cor_sig_torpor="All"),fold=as.numeric(fold))%>%
     mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("All","neutral","negative","positive"),labels=c("All","Neutral","Negative","Positive")))
   
   p<-ggplot(data, aes(x=predicted,y=true))+
@@ -1251,11 +1251,11 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
 }
 
 ##correlation coefficient
-t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
-for (cell_type in unique(unit_df$temp_cor_sig_torpor)){
+t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_coef=mean(ambient_temp_interpolated_cor_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_coef ~ pellet)
+for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_cor_ambient ~ pellet, random=~1|mouse))
   print(anov)
 }
 
@@ -1272,8 +1272,17 @@ p
 save_plot("ambient temperature coefficient by cell type and pellet", w=12,h=8)
 
 ##slope
-p<-p+aes(x=pellet,y=ambient_temp_interpolated_slope_ambient)+labs(y="Slope")
+t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_slope=mean(ambient_temp_interpolated_slope_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_slope ~ pellet)
+for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
+  if (cell_type=="neutral"){next}
+  print(cell_type)
+  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_slope_ambient ~ pellet, random=~1|mouse))
+  print(anov)
+}
+
+p<-p+aes(x=pellet,y=abs(ambient_temp_interpolated_slope_ambient))+labs(y="|Slope|")
 p
+save_plot("ambient temperature slope by cell type and pellet",w=6,h=5)
 
 #correlation type (see below in for loop with other stimuli)
 
