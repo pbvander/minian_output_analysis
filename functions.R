@@ -757,6 +757,14 @@ point_indiv <- function(...,fill="grey60",size=3,seed=123,position=position_jitt
   geom_point(fill=fill,size=size,position=position,shape=shape,color=color,alpha=alpha,...)
 }
 
+point_cell <- function(...,alpha=0.3){
+  point_indiv(..., size=1.5, position = position_jitter(width=0.25,height=0,seed=123),alpha=alpha)
+}
+
+point_mouse <- function(...){
+  point_summary(...,aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=3,stroke=1,shape=21,fill=NA,alpha=0.8)
+}
+
 point_errorbar <- function(...,width=0.35,size=1,color="grey15"){
   geom_errorbar(stat="summary",width=width,size=size,color=color,...)
 }

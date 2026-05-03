@@ -750,8 +750,8 @@ p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs
   geom_violin(aes())+
   labs(y="|r|")+
   coord_cartesian(ylim=c(0,1))+
-  point_indiv(size=1.5, position = position_jitter(width=0.25,height=0,seed=123),alpha=0.3)+
-  point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=3,stroke=1,shape=21,fill=NA,alpha=0.8)+
+  point_cell()+
+  point_mouse()+
   scale_fill_manual(values=pellet_scale)+
   ms+
   theme(legend.position = "none",
@@ -866,8 +866,8 @@ for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_slope_torpor),fill=pellet))+
   geom_violin(aes())+
-  point_indiv(size=1.5, position = position_jitter(width=0.25,height=0,seed=123),alpha=0.3)+
-  point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=3,stroke=1,shape=21,fill=NA,alpha=0.8)+
+  point_cell()+
+  point_mouse()+
   coord_cartesian(ylim=c(0,NA))+
   labs(x=element_blank(),y="|Slope|")+
   scale_fill_manual(values=pellet_scale)+
