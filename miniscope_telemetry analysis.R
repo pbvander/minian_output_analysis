@@ -427,7 +427,8 @@ lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tem
 unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
-#Gonad-intact different cell types
+# Gonad-intact different cell types
+#torpor
 data<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,temp_cor_torpor, temp_cor_sig_torpor), all.x=T)
 
 cell_type_lm_df<-tibble()
@@ -439,6 +440,17 @@ for (cell_type in unique(data$temp_cor_sig_torpor)){
   cell_type_lm_df<-rbind(cell_type_lm_df, (lm$lm_df)%>%mutate(temp_cor_sig_torpor=cell_type))
 }
 
+#ambient
+data<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,ambient_temp_interpolated_cor_ambient, ambient_temp_interpolated_cor_sig_ambient), all.x=T)
+
+ambient_cell_type_lm_df<-tibble()
+ambient_cell_type_predict_df<-tibble()
+for (cell_type in data%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
+  print(cell_type)
+  lm<-lm_analysis(data%>%filter(ambient_temp_interpolated_cor_sig_ambient==cell_type), id_col="telem_ts", .session_type = c("cold","heat"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
+  ambient_cell_type_predict_df<-rbind(ambient_cell_type_predict_df,(lm$predict_df)%>%mutate(ambient_temp_interpolated_cor_sig_ambient=cell_type))
+  ambient_cell_type_lm_df<-rbind(ambient_cell_type_lm_df, (lm$lm_df)%>%mutate(ambient_temp_interpolated_cor_sig_ambient=cell_type))
+}
 
 # Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations)
 #torpor and post-ovx data only
