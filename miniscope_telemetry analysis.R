@@ -48,11 +48,11 @@ lon<-7 #clock time in hours at ZT0 when lights come on
 ftime<-10 #clock time in hours when fasting was started
 
 #Settings for tuning analyses
-target_cols<-c("temp_cor_torpor","temp_change1_cor_torpor", 
+target_cols<-c("temp_cor_torpor", 
                "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
-target_cols_binary<-c("temp_cor_sig_torpor","temp_change1_cor_sig_torpor",
+target_cols_binary<-c("temp_cor_sig_torpor",
                       "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
-labs<-c("T-Core", "T-Core_change",
+labs<-c("T-Core",
         "T-Amb", "Male")
 
 #Global graph settings:
@@ -461,7 +461,7 @@ pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
 for (i in 1:shuffle_iterations){
   #Run analysis
   lm_ls<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="ovx")%>%
-    equalize_data_temporal(verbose=T)%>%
+    equalize_data_temporal(verbose=F)%>%
     lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
   
   #Add to dataframes
@@ -616,14 +616,18 @@ save_plot("torpor timepoints by temp and pellet downsampled", w=7,h=5)
 p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
   geom_col(aes(fill=pellet),position = position_dodge())+
   scale_y_continuous(expand=c(0,0),limits=c(0,max(timepoints_per_pellet_per_mouse$timepoints_per_mouse)*1.1))+
-  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]))+
-  labs(x="Core temperature",y="Timepoints per mouse")+
-  scale_fill_manual(values=post_ovx_scale)+
-  ms
-p
-save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
-p+timepoints_per_pellet_per_mouse_ds
-save_plot("torpor timepoints per mouse by temp and pellet downsampled", w=7,h=5)
+  scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]), labels = function(x) ifelse(as.numeric(substr(x, 2, 3)) %% 2 == 0, substr(x,2,3), ""))+
+  labs(x="Core body temperature (Deg. C)",y="Timepoints per mouse")+
+  scale_fill_manual(values=post_ovx_scale2,name="Treatment")+
+  ms+
+  theme(legend.position = "none",plot.title = element_text(size=12,margin=margin(b=3,unit="pt")))
+p+labs(title="Observed")
+save_plot("torpor timepoints per mouse by temp and pellet", w=3.2,h=2.4)
+p+timepoints_per_pellet_per_mouse_ds+labs(title="Downsampled")
+save_plot("torpor timepoints per mouse by temp and pellet downsampled", w=3.2,h=2.4)
+as_ggplot(get_legend(p+(p$data)%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+
+                       theme(legend.position = "top", legend.text = element_text(size=12,face="bold"))))
+save_plot("pellet legend",w=4,h=0.5)
 
 ## dF/F0 By temperature value
 # Graph all sessions
@@ -696,7 +700,7 @@ p<-ggplot(data%>%filter(gonad=="intact"), aes(x=temp_bin1, y=unit_id_id))+
 p+labels_intact+plot_layout(widths = c(15,1))
 save_plot("df_f0 by temperature all intact cells",w=2.8,h=6.6)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
-save_plot("df_f0 by temperature all ovx cells",w=3.2,h=5)
+save_plot("df_f0 by temperature all ovx cells",w=2.8,h=6.6)
 
 # Graph all data for one session
 set<-list(theme(text=element_text(size=12),
@@ -825,7 +829,8 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
   theme(legend.position = "none",
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
-        legend.text = element_text(size=12,face="bold"))+
+        legend.text = element_text(size=12,face="bold"),
+        plot.title = element_text(size=12,margin=margin(b=3,unit="pt"),hjust=0))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature (T-Core) correlation")+
   coord_polar("y", start=0)+
@@ -839,8 +844,8 @@ pie+data%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())
 save_plot("torpor temperature correlation types pre-OVX",w=1.7,h=1.7)
 pie+data_torpor_only+aes(fill=temp_cor_sig_torpor)
 save_plot("torpor temperature correlation types by pellet torpor only",w=8,h=5)
-pie+data_downsampled
-save_plot("torpor temperature correlation types by pellet downsampled",w=8,h=5)
+pie+data_downsampled+labs(title="Treatment (X2 result)")
+save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3.2,h=1.7)
 get_legend(pie+theme(legend.position="top"))%>%as_ggplot()
 save_plot("torpor cell type legend",w=4,h=0.5)
 
@@ -1143,7 +1148,7 @@ p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=ambient_temp_bin1, y=timepoints
   scale_fill_manual(values=post_ovx_scale)+
   ms
 p
-save_plot("torpor timepoints per mouse by temp and pellet", w=7,h=5)
+save_plot("ambient temp timepoints per mouse by temp and pellet", w=7,h=5)
 
 # Graph all cells on one graph summarized per ambient_temp_interpolated_bin1
 data<-sumdf%>%
@@ -1408,6 +1413,97 @@ for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_i
 }
 
 ### dF/F0 - male social stimulus relationship
+##plot all cells on one graph summarized by timepoint bin
+data<-sumdf%>%
+  filter(!is.na(df_f0_bin), session_type=="male_interaction")%>%
+  merge(unit_df%>%select(male_interaction_auc, male_interaction_auc_sig, male_interaction_fc,unit_id_id, unit_id),all.x=T)%>%
+  group_by(unit_id_id)%>%
+  mutate(session_time_minutes = as.duration(telem_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
+male_entry_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_entry_minutes=min(session_time_minutes))
+data<-data%>%merge(male_entry_minutes,all.x=T)%>%
+  mutate(time_bin = case_when(male_interaction==0 & session_time_minutes<10 ~ "Pre-male",
+                                          male_interaction==0 & session_time_minutes>10 ~ "Post-male",
+                                          male_interaction==1 & session_time_minutes < male_entry_minutes+1.1 ~ "0-1 min. +male",
+                                          male_interaction==1 & session_time_minutes < male_entry_minutes+6 ~ "1-5 min. +male",
+                                          male_interaction==1 & session_time_minutes ~ "5-10 min. +male")%>%
+                      factor(levels=c("Pre-male","0-1 min. +male","1-5 min. +male","5-10 min. +male","Post-male")),
+                    unit_id_id = factor(unit_id_id, levels=data%>%arrange(male_interaction_auc)%>%pull(unit_id_id)%>%unique()))
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=0, r=0, "inches")))
+rect_label_set<-list(geom_tile(aes(fill=male_interaction_auc_sig)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+rect_label_pellet<-list(geom_tile(aes(fill=pellet)),
+                        scale_fill_manual(values=post_ovx_scale2),
+                        theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
+
+p<-ggplot(data%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
+  labs(x=element_blank(), y="Cell ID")+
+  geom_tile(aes(fill=scaled_YrA_bin))+
+  scale_y_discrete(breaks=c(),expand=c(0,0))+
+  scale_x_discrete(expand=c(0,0))+
+  scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
+  ms+
+  theme(panel.background = element_rect(fill="black"),
+        # legend.title = element_text(),
+        # legend.text = element_text(size=12,face="bold"),
+        axis.title.y=element_text(margin=margin(r=3,unit="pt")),
+        axis.title.x = element_text(size=12,margin=margin(t=4,l=-25,unit="pt")),
+        axis.text.x = element_text(angle = 300, hjust = 0.2, vjust = 0.5),
+        legend.text = element_blank(),
+        legend.position = "top",
+        legend.key.width = unit(0.2,"inches"),
+        legend.justification = 0,
+        legend.box.spacing = unit(6,"pt"),
+        axis.line.y = element_blank())
+p+labels_intact+plot_layout(widths = c(15,1))
+save_plot("df_f0 by male interactin time bin all intact cells",w=2.9,h=6.5)
+p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
+save_plot("df_f0 by male interaction time bin all ovx cells",w=3.2,h=5)
+
+
+##plot an example session
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=-3, r=0, "pt"),
+                panel.spacing = unit(0.0375,"inches"),
+                axis.title.y=element_text(margin=margin(r=-35,unit="pt"))))
+
+#all data
+d<-event_df%>%filter(session_id_type=="MT29_2025_05_23_session1_male_interaction", !is.na(scaled_YrA))%>%
+  ungroup()%>%
+  mutate(session_time_minutes = session_time_minutes-min(session_time_minutes))%>%
+  merge(unit_df%>%select(male_interaction_auc,male_interaction_auc_sig, male_interaction_fc, unit_id_id,session_id,unit_id), all.x=T)
+data<-d%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(male_interaction_auc)%>%pull(unit_id)%>%unique()))
+
+rect_label_set<-list(geom_tile(aes(fill=male_interaction_auc_sig)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+geom_vline(xintercept=min(data%>%filter(male_interaction==1)%>%pull(session_time_minutes)),alpha=0.5)
+p2<-ggplot(data, aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=c(0,1),labels=c("-","+"))
+p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=c(36,38))+labs(title="Core body temperature",y=element_blank())
+p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set+labs(x=element_blank(),y=element_blank())
+save_plot("example session all data male_interaction",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(12,1,1),widths=c(60,1),ncol=2),w=13,h=8)
+
+#subset
+data<-data%>%filter(session_time_minutes<10)
+
+p1<-p1+data+theme(axis.line=element_blank(),legend.position = "none")+labs(title="F / max(F)")
+p2<-p2+data
+p3<-p3+data+scale_y_continuous(expand = c(0.2,0.2),breaks=c(35.5,36.5))
+p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
+save_plot("example session subset data male_interaction",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(10,1,1),widths=c(20,1),ncol=2),w=3.8,h=6)
+
+##plot values by male_interaction for each session
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
   print(id)
   data<-sumdf%>%filter(!is.na(male_interaction), session_id==id)%>%mutate(male_interaction=factor(male_interaction))
@@ -1667,13 +1763,15 @@ for (sid in unique(pca_time$session_id)){
     
     if(grepl("cold",sidt)){
       data<-d%>%filter(session_id_type==paste0(sid,"_cold") | session_id_type==paste0(sid,"_heat"))%>%filter(!is.na(ambient_temp_interpolated))
+      var_data<-(pca_ls$telem_ts_var)%>%filter(session_id_type==paste0(sid,"_cold") | session_id_type==paste0(sid,"_heat"))
       # if(verbose){print(paste(sid,"ambient"))}
       p<-ggplot(data, aes(x=PC1,y=PC2))+
-        scale_color_viridis_c(name="TAmb (Deg. C)")+
-        xy_point(aes(color=ambient_temp_interpolated))+
+        scale_color_viridis_c(name="T-Amb")+
+        xy_point(aes(color=ambient_temp_interpolated),shape=21,size=1.8,stroke=0.9,alpha=0.5)+
+        labs(x=paste0("PC1 (",var_data%>%filter(PC==1)%>%pull(var), "%)"), y=paste0("PC2 (",var_data%>%filter(PC==2)%>%pull(var),"%)"))+
         ms+set
       p
-      save_plot(paste("PCA by ambient_temp",sid,"ambient"),w=6,h=5)
+      save_plot(paste("PCA by ambient_temp",sid,"ambient"),w=2.2,h=2.2)
       
       p<-ggplot(data, aes(x=ambient_temp_interpolated,y=PC1))+
         xy_point2()+
