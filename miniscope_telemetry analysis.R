@@ -512,6 +512,8 @@ write_output(pca_time)
 write_output(pca_cell)
 write_output(t_df)
 write_output(A_all)
+write_output(ambient_cell_type_lm_df)
+write_output(ambient_cell_type_predict_df)
 
 #Read all
 setwd(output_dir)
@@ -531,6 +533,9 @@ pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
 t_df<-read_rds("./output/t_df.rds")
 A_all<-read_rds("./output/A_all.rds")
+event_df<-read_rds("./output/event_df.rds")
+ambient_cell_type_lm_df<-read_rds("./output/ambient_cell_type_lm_df.rds")
+ambient_cell_type_predict_df<-read_rds("./output/ambient_cell_type_predict_df.rds")
 
 ########### Graph ###########
 ### Session timing schematic
