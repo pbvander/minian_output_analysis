@@ -424,8 +424,6 @@ torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(df_f0_bin)), sess
 #combine data
 lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_df, all=T)%>% #combine data
   merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
-lm_predict_df<-merge(torpor_lm_ls$predict_df, ambient_lm_ls$predict_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$predict_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$predict_df, all=T)%>% #combine data
-  merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
 unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
@@ -487,8 +485,10 @@ pca_cell<-merge(pca_ls$unit_id_id, unit_df%>%select(-session_id,-session_id_type
 ##### Checkpoint 3
 #Write new
 setwd(output_dir)
+write_rds(torpor_lm_ls, "./output/torpor_lm_ls.rds")
+write_rds(torpor_w_tempchange1_lm_ls, "./output/torpor_w_tempchange1_lm_ls.rds")
+write_rds(ambient_lm_ls, "./output/ambient_lm_ls.rds")
 write_output(lm_df)
-write_output(lm_predict_df)
 write_output(lm_df_torpor_ovx_ds_sum)
 write_output(lm_predict_df_torpor_ovx_ds_sum)
 write_output(cell_type_lm_df)
@@ -504,8 +504,10 @@ write_output(A_all)
 #Read all
 setwd(output_dir)
 sumdf<-read_rds("./output/sumdf.rds")
+torpor_lm_ls<-read_rds("./output/torpor_lm_ls.rds")
+torpor_w_tempchange1_lm_ls<-read_rds("./output/torpor_w_tempchange1_lm_ls.rds")
+ambient_lm_ls<-read_rds("./output/ambient_lm_ls.rds")
 lm_df<-read_rds("./output/lm_df.rds")
-lm_predict_df<-read_rds("./output/lm_predict_df.rds")
 lm_df_torpor_ovx_ds_sum<-read_rds("./output/lm_df_torpor_ovx_ds_sum.rds")
 lm_predict_df_torpor_ovx_ds_sum<-read_rds("./output/lm_predict_df_torpor_ovx_ds_sum.rds")
 cell_type_lm_df<-read_rds("./output/cell_type_lm_df.rds")
@@ -1050,11 +1052,12 @@ save_plot("lm correlation by cell type",w=2.3,h=1.84)
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
-  data<-lm_predict_df%>%filter(session_id==sess)
+  data<-(torpor_lm_ls$predict_df)%>%filter(session_id==sess)
   data_ds<-lm_predict_df_torpor_ovx_ds_sum%>%filter(session_id==sess)
   data_cell_type<-cell_type_predict_df%>%
     filter(session_id==sess)%>%
-    bind_rows(data%>%mutate(temp_cor_sig_torpor="All"),fold=as.numeric(fold))%>%
+    mutate(fold=as.numeric(fold))%>%
+    bind_rows(data%>%mutate(temp_cor_sig_torpor="All"))%>%
     mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("All","neutral","negative","positive"),labels=c("All","Neutral","Negative","Positive")))
   
   p<-ggplot(data, aes(x=predicted,y=true))+
