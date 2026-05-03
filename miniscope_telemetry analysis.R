@@ -15,7 +15,7 @@ library(sperrorest)
 library(ggnewscale)
 library(GGally)
 library(ggforce)
-library(spatstat)
+library(spatstat.geom)
 # summarize<-dplyr::summarize
 source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 # filter<-dplyr::filter
