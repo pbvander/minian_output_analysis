@@ -1264,6 +1264,39 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
   save_plot(paste("df_f0 by ambient temperature bin",id),w=20,h=15)
 }
 
+##Cell type frequencies
+data<-transform_data_piegraph(unit_df, animal_var="pellet",cell_var="ambient_temp_interpolated_cor_sig_ambient")%>%
+  mutate(ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
+
+chisq<-data%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = ambient_temp_interpolated_cor_sig_ambient, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+pie<-ggplot(data, aes(x="", y=percent, fill=ambient_temp_interpolated_cor_sig_ambient))+ms+theme_pie+
+  theme(legend.position = "none",
+        legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
+        legend.title.position = "top",
+        legend.text = element_text(size=12,face="bold"))+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature (T-Core) correlation")+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=ambient_temp_interpolated_cor_sig_ambient,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("black","black","black"))+
+  guides(color="none")+
+  facet_wrap(vars(pellet))
+pie
+save_plot("ambient temperature correlation types by pellet",w=4,h=2)
+pie+data%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())
+save_plot("ambient tempertaure correlation types intact",w=1.7,h=1.7)
+pie+data%>%filter(pellet!="pre-OVX")
+save_plot("ambient temperature correlation types by pellet ovx",w=4,h=2)
+
 ##correlation coefficient
 t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_coef=mean(ambient_temp_interpolated_cor_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_coef ~ pellet)
 for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
@@ -1273,17 +1306,21 @@ for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambi
   print(anov)
 }
 
-p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=pellet, y=ambient_temp_interpolated_cor_ambient))+
-  geom_violin(aes(fill=pellet))+
-  point_summary(aes(color=mouse),position=position_jitter(width=0.05,height=0,seed=123))+
-  point_indiv()+
-  labs(x=element_blank(),y="Correlation coefficient")+
-  scale_fill_manual(values=pellet_scale)+
-  facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all")+
+p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_cor_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
+  geom_violin()+
+  point_cell()+
+  point_mouse()+
+  labs(x=element_blank(),y="|r|")+
+  scale_fill_manual(values=cell_type_scale[2:3])+
+  scale_x_discrete(breaks= ~., labels=tools::toTitleCase)+
   ms+
   theme(legend.position = "none")
-p
+p+facet_wrap(vars(pellet),axes="all")
 save_plot("ambient temperature coefficient by cell type and pellet", w=12,h=8)
+p+(p$data)%>%filter(pellet=="pre-OVX")
+save_plot("ambient temeprature coefficient by cell type intact",w=2.2,h=2)
+p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2"),labels=c("Vehicle","E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all")+scale_fill_manual(values=post_ovx_scale)
+save_plot("ambient temperature coefficient by cell type and pellet ovx",w=3.5,h=2)
 
 ##slope
 t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_slope=mean(ambient_temp_interpolated_slope_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_slope ~ pellet)
@@ -1294,11 +1331,81 @@ for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambi
   print(anov)
 }
 
-p<-p+aes(x=pellet,y=abs(ambient_temp_interpolated_slope_ambient))+labs(y="|Slope|")
-p
-save_plot("ambient temperature slope by cell type and pellet",w=6,h=5)
+p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_slope_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
+  geom_violin()+
+  point_cell()+
+  point_mouse()+
+  labs(x=element_blank(),y="|Slope|")+
+  scale_fill_manual(values=cell_type_scale[2:3])+
+  scale_x_discrete(breaks= ~., labels=tools::toTitleCase)+
+  ms+
+  theme(legend.position = "none")
+p+facet_wrap(vars(pellet),axes="all")
+save_plot("ambient temperature slope by cell type and pellet", w=12,h=8)
+p+(p$data)%>%filter(pellet=="pre-OVX")
+save_plot("ambient temeprature slope by cell type intact",w=2.2,h=2)
+p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2"),labels=c("Vehicle","E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all")+scale_fill_manual(values=post_ovx_scale)
+save_plot("ambient temperature slope by cell type and pellet ovx",w=3.5,h=2)
 
-#correlation type (see below in for loop with other stimuli)
+##LM results
+#LM significance by pellet
+data<-transform_data_piegraph(lm_df,"pellet","ambient_temp_interpolated_cor_sig_ambient_")
+
+pie<-ggplot(data, aes(x="", y=percent, fill=ambient_temp_interpolated_cor_sig_ambient_)) +
+  theme_prism()+
+  theme_pie+
+  geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  scale_fill_manual(values=cell_type_scale)+
+  coord_polar("y", start=0)+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=ambient_temp_interpolated_cor_sig_ambient_,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+  scale_color_manual(values=c("grey90","black","black"))+
+  guides(color="none")+
+  facet_grid(vars(pellet))
+pie
+save_plot("ambient lm correlation significance by pellet",w=4,h=5)
+
+##LM accuracy
+ambient_lm_anova<-anova(lme(data=lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX"),
+                            fixed=ambient_temp_interpolated_mean_cor_ambient_ ~ pellet,
+                            random=~1|mouse))
+
+p<-ggplot(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant"), aes(x=pellet,y=ambient_temp_interpolated_mean_cor_ambient_))+
+  geom_violin(aes(fill=pellet))+
+  point_cell(alpha=0.5)+
+  point_mouse()+
+  labs(x=element_blank(),y="r")+
+  scale_fill_manual(values=pellet_scale)+
+  ms+
+  coord_cartesian(ylim=c(0,1))+
+  theme(legend.position = "none")
+p
+save_plot("ambient lm correlation coefficient by pellet",w=6,h=6)
+p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(breaks=c())
+save_plot("ambient lm correlation coefficient intact",w=1.4,h=2)
+
+##LM predictions (ambient)
+for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
+  data<-(ambient_lm_ls$predict_df)%>%filter(session_id==sess)
+  data_cell_type<-ambient_cell_type_predict_df%>%
+    filter(session_id==sess)%>%
+    mutate(fold=as.numeric(fold))%>%
+    bind_rows(data%>%mutate(ambient_temp_interpolated_cor_sig_ambient="All"))%>%
+    mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient,levels=c("All","neutral","negative","positive"),labels=c("All","Neutral","Negative","Positive")))
+  
+  p<-ggplot(data, aes(x=predicted,y=true))+
+    labs(x="Predicted", y="Observed",title="T-Amb (all cells)")+
+    geom_abline(slope=1,linetype="dashed",linewidth=1)+
+    regression_line(linewidth=1,alpha=0.5,color="blue")+
+    xy_point2(alpha=0.2,size=1)+
+    ms+theme(plot.title=element_text(size=12,margin=margin(t=0,r=0,b=3,l=-15,"pt")),
+             panel.spacing = unit(3,"pt"),
+             axis.title.x = element_text(margin = margin(t = 3,unit="pt")),
+             axis.title.y = element_text(margin = margin(r=3, unit="pt")))
+  p
+  save_plot(paste("predicted temp",sess,"ambient"),w=2,h=2)
+  p+data_cell_type+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",nrow=1)+labs(title=element_blank())
+  save_plot(paste("predicted temp",sess,"ambient cell types"),w=4.7,h=1.8)
+}
 
 ### dF/F0 - male social stimulus relationship
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
