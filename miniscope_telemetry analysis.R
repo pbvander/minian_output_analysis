@@ -745,9 +745,10 @@ p+facet_wrap(vars(session_id))
 save_plot("temp-temp_change1 relationship during torpor by session_id",w=7,h=6)
 
 temp_tempchange_lm<-lm_analysis(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
+temp_tempchange_lm$lm_df
 
 # Correlation coefficient by gonad/E2 state or pellet
-p<-ggplot(unit_df, aes(x=group_gonad, y=temp_cor_torpor))+
+p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=group_gonad, y=temp_cor_torpor))+
   geom_violin(aes(fill=group_gonad))+
   point_indiv()+
   scale_fill_manual(values=group_gonad_scale)+
@@ -1099,11 +1100,12 @@ p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=temp_cor_sig_torp
   geom_violin()+
   scale_fill_manual(values=cell_type_scale)+
   ms
-p
+p+facet_wrap(vars(pellet))
+save_plot("lm coefficient by cell type and pellet",w=5,h=3)
 
 ### dF/F0 - ambient temperature relationship
 ## Plot ambient temperature challenge schematic
-ggplot(sumdf%>%filter(session_id=="MT30_2025_05_23_session1", session_type %in% c("cold","heat"))%>%mutate(session_type=factor(session_type,levels=c("heat","cold"))),aes(x=session_time_minutes,y=ambient_temp_interpolated))+
+ggplot(sumdf%>%filter(session_id=="MT35_2026_02_10_session1", session_type %in% c("cold","heat"))%>%mutate(session_type=factor(session_type,levels=c("heat","cold"))),aes(x=session_time_minutes,y=ambient_temp_interpolated))+
   labs(x="Time (minutes)",y="Ambient temperature (Deg. C)")+
   continuous_line()+
   ms+theme(panel.spacing=unit(1,"in"))+
@@ -1477,7 +1479,8 @@ set<-list(theme(text=element_text(size=12),
                 axis.title.y=element_text(margin=margin(r=-35,unit="pt"))))
 
 #all data
-d<-event_df%>%filter(session_id_type=="MT29_2025_05_23_session1_male_interaction", !is.na(scaled_YrA))%>%
+d<-read_rds("./output/intermediate/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_23-session1-concatenated.rds")%>%
+  filter(session_type=="male_interaction", !is.na(scaled_YrA))%>%
   ungroup()%>%
   mutate(session_time_minutes = session_time_minutes-min(session_time_minutes))%>%
   merge(unit_df%>%select(male_interaction_auc,male_interaction_auc_sig, male_interaction_fc, unit_id_id,session_id,unit_id), all.x=T)
@@ -1523,6 +1526,7 @@ p<-ggplot(unit_df%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_
   scale_color_manual(values=cell_type_scale2)+
   ms
 p
+save_plot("male interaction volcano plot",w=5,h=3)
 
 p<-ggplot(unit_df%>%filter(male_interaction_auc_sig!="neutral"), aes(x=pellet, y=male_interaction_auc))+
   geom_violin(aes(fill=pellet))+
@@ -1879,7 +1883,7 @@ ggplot(spatial_test_obs%>%filter(session_id=="MT29_2025_05_22_session1",!is.na(o
   ms
 
 ##plot piegraph of frequencies
-pie<-ggplot(pie_data%>%filter(pellet=="pre-OVX",var=="temp_cor_sig_torpor"), aes(x="", y=percent, fill=sig))+ms+theme_pie+
+pie<-ggplot(pie_data%>%filter(var=="temp_cor_sig_torpor"), aes(x="", y=percent, fill=sig))+ms+theme_pie+
   theme(legend.position = "right",
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
@@ -1889,10 +1893,13 @@ pie<-ggplot(pie_data%>%filter(pellet=="pre-OVX",var=="temp_cor_sig_torpor"), aes
   coord_polar("y", start=0)+
   geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("black","black","black"))+
-  guides(color="none")+
-  facet_wrap(vars(pellet))
-pie
-save_plot("spatial analysis torpor intact",w=4,h=4)
+  guides(color="none")
+pie+facet_wrap(vars(pellet))
+save_plot("spatial analysis torpor by pellet",w=4,h=4)
+pie+(pie$data)%>%filter(pellet=="pre-OVX")
+save_plot("spatial analysis torpor intact",w=3,h=3)
+pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
+save_plot("spatial analysis torpor ovx",w=5,h=3)
 
 ####Write final outputs
 write_sessioninfo()
