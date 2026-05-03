@@ -134,7 +134,11 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
     if (type=="torpor"){roc_data<-data%>%filter(torpor_status=="non-torpor" | torpor_status=="deep_torpor")%>%mutate(label=ifelse(torpor_status=="non-torpor",0,1))}
     if (type=="heat"){roc_data<-data%>%filter(session_type=="heat")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="37C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
     if (type=="cold"){roc_data<-data%>%filter(session_type=="cold")%>%filter(ambient_temp_bin=="22C" | ambient_temp_bin=="5C")%>%mutate(label=ifelse(ambient_temp_bin=="22C",0,1))}
-    if (type=="male_interaction"){roc_data<-data%>%filter(session_type=="male_interaction", !is.na(male_interaction))%>%mutate(label=male_interaction)}
+    if (type=="male_interaction"){
+      roc_data<-data%>%filter(session_type=="male_interaction", !is.na(male_interaction))%>%mutate(label=male_interaction)
+      male_removal_minutes<-roc_data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_removal_minutes=max(session_time_minutes))
+      roc_data<-roc_data%>%merge(male_removal_minutes,all.x=T)%>%filter(session_time_minutes < male_removal_minutes-1) #remove post-male time from ROC analysis
+      }
     
     #Run analysis and return results
     for (id in unique(roc_data$unit_id_id)){
