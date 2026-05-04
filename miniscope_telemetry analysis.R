@@ -1656,7 +1656,74 @@ save_plot("male log2fc by cell type intact",w=2.7,h=2)
 p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig),axes="all")+labs(title="Treatment ns (both cell types)")+scale_fill_manual(values=post_ovx_scale)
 save_plot("male log2fc by cell type and pellet ovx",w=4.2,h=2.4)
 
-##Comparison of tuning across stimuli
+##Logistic regression
+data<-event_df%>%filter(!is.na(df_f0),event=="male_added",!is.na(male_interaction))
+
+auc_df<-tibble()
+for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(male_interaction_auc_sig)%>%unique(),"all")){
+  cells<-unit_df%>%filter(male_interaction_auc_sig==cell_type)%>%pull(unit_id_id)%>%unique()
+  if(cell_type=="all"){cells<-unique(unit_df$unit_id_id)}
+  print(paste(cell_type,length(cells)))
+  for (sid in unique(data$session_id)){
+    print(sid)
+    d<-data%>%filter(session_id==sid,unit_id_id %in% cells)%>%
+      select(unit_id_id, frame, male_interaction, df_f0)%>%
+      pivot_wider(values_from = df_f0, names_from = unit_id_id)%>%
+      select(-frame)
+    if(nrow(d)==0){
+      print("No data, skipping")
+      next}
+    
+    pcs<-partition_data(d, id_col = "frame", response="male_interaction", partition_type="standard", cv_folds=5, verbose=F)
+    
+    auc_values<-c()
+    roc_df<-tibble()
+    for (fold in 1:5){
+      idx= pcs[["1"]][[fold]]
+      train = d[idx$train,]
+      test = d[idx$test,]
+      
+      model<-glm(male_interaction ~ ., data = train, family="binomial")
+      predict<-predict(model, newdata=test, type="response")
+      auc<-suppressMessages(roc(test%>%pull(male_interaction),predict)%>%auc())
+      auc_values<-c(auc_values,auc)
+      if (fold==1 & sid=="MT29_2025_05_23_session1"){
+        p<-ggroc(roc(test%>%pull(male_interaction),predict), linewidth=1)+ms+
+          scale_x_continuous(breaks=c(1,0.5,0),transform = "reverse")+
+          scale_y_continuous(breaks=c(0,0.5,1))+
+          labs(x="Specificity",y="Sensitivity",title="All cells")+
+          geom_abline(slope=1,intercept=1,color="grey50",alpha=0.8,linewidth=0.6,linetype="dashed")+
+          theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")))
+        save_plot(paste(sid,cell_type,"male interaction roc"),plot=p,w=2,h=2)
+      }
+    }
+    auc_df<-rbind(auc_df, tibble("session_id"=sid, "mouse"=strsplit(sid,"_")[[1]][1], "male_interaction_auc_sig"=cell_type, mean_auc=mean(auc_values)))
+  }
+}
+auc_df<-auc_df%>%
+  mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig,levels=c("all","neutral","activated","suppressed"),labels=c("All","Neutral","Activated","Suppressed")))%>%
+  merge(lm_df%>%select(pellet,session_id,mouse),all.x=T)
+
+t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%mutate(pellet=as.character(pellet)), mean_auc~pellet)
+
+p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interaction_auc_sig))+ms+
+  geom_violin(scale = "width",width=0.9)+
+  point_mouse()+
+  coord_cartesian(ylim=c(0,1))+
+  scale_x_discrete(guide = guide_axis(n.dodge=2))+
+  scale_fill_manual(values=c("black",cell_type_scale))+
+  labs(x=element_blank(),y="AUROC")+
+  theme(legend.position = "none",
+        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
+p+auc_df%>%filter(pellet=="pre-OVX")
+save_plot("male interaction auc by cell type intact",w=3.5,h=2.5)
+p+auc_df%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
+save_plot("male interaction auc ovx by cell type and pellet",w=4.5,h=2.5)
+p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pellet,fill=pellet)+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete()
+save_plot("male interaction auc ovx all cells by pellet",w=2.5,h=2.5)
+save_plot("male interaction auc ovx all cells by pellet zoom y",plot=last_plot()+coord_cartesian(ylim=c(0.98,1))+labs(title="Treatment ns"),w=2.5,h=2.5)
+
+####Comparison of tuning across stimuli ----
 # Heat map
 #Values
 t=1
