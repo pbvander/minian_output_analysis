@@ -2058,6 +2058,71 @@ save_plot("spatial analysis torpor intact",w=3,h=3)
 pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
 save_plot("spatial analysis torpor ovx",w=5,h=3)
 
+####Plot events
+#example
+data<-event_df%>%
+  filter(event=="fed",session_id=="MT35_2026_02_10_session1",event_aligned_time_seconds%>%between(-60,60))%>%
+  mutate(event_time_bin=ifelse(event_aligned_time_seconds>0,"after","before")%>%factor(levels=c("before","after")))
+sum_data<-data%>%
+  group_by(event_time_bin,unit_id)%>%
+  summarize(mean_YrA=mean(YrA))%>%
+  pivot_wider(id_cols=unit_id, names_from=event_time_bin, values_from=mean_YrA)%>%
+  ungroup()%>%
+  mutate(fc=after/before)
+data<-data%>%mutate(unit_id = factor(unit_id, levels=sum_data%>%arrange(desc(fc))%>%pull(unit_id)%>%unique()))%>%
+  merge(unit_df%>%select(unit_id_id,unit_id,temp_cor_sig_torpor),all.x=T)
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=-3, r=0, "pt"),
+                panel.spacing = unit(0.0375,"inches"),
+                axis.title.y=element_text(margin=margin(r=-35,unit="pt"))))
+
+rect_label_set<-list(geom_tile(aes(fill=temp_cor_sig_torpor)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+p1<-ggplot(data, aes(x=event_aligned_time_seconds, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+geom_vline(xintercept=0,alpha=0.5)+labs(title="F / max(F)")+theme(axis.line.y = element_blank())
+p2<-ggplot(data, aes(x=event_aligned_time_seconds, y=event_time_bin,group=mouse))+ms+ls+fed_set+set+scale_y_discrete(breaks=c("before","after"),labels=c("Fasting","Fed"))
+p3<-ggplot(data, aes(x=event_aligned_time_seconds, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=c(26.8,27.3))+labs(title="Core body temperature",y=element_blank(),x="Time from re-feeding (seconds)")+scale_x_continuous(breaks=seq(-60,60,20),expand=c(0,0))
+p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set+labs(x=element_blank(),y=element_blank())
+save_plot("example session re-feeding response",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(12,1,1),widths=c(20,1),ncol=2),w=3.6,h=6)
+
+#compiled data
+data<-event_df%>%
+  filter(event_aligned_time_seconds%>%between(-60,60))%>%
+  mutate(event_time_bin = cut(event_aligned_time_seconds, seq(-60,60,1), labels=seq(-60,59,1))%>%as.character()%>%as.numeric())%>%
+  group_by(unit_id_id, event, event_time_bin)%>%
+  summarize(mean_scaled_YrA = mean(scaled_YrA))%>%
+  merge(unit_df, all.x=T)%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
+
+for (.event in unique(data$event)){
+  print(.event)
+  d<-data%>%filter(event==.event)
+  .title<-case_when(.event=="male_removed" ~ "Male removed",
+                   .event=="male_added" ~ "Male added",
+                   .event=="fed" ~ "Re-feeding",
+                   .event=="first_bite" ~ "First bite",
+                   T ~ .event)
+  
+  p<-ggplot(d, aes(x=event_time_bin,y=mean_scaled_YrA,color=temp_cor_sig_torpor))+ms+
+    continuous_errorbar()+
+    continuous_line()+
+    labs(y="F / max(F)", x="Time (seconds)",title=.title)+
+    scale_color_manual(values=cell_type_scale)+
+    geom_vline(xintercept=0,linewidth=1,alpha=0.5)+
+    theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")),
+          legend.position = "none")
+  p+facet_wrap(vars(pellet),axes="all")
+  save_plot(paste(.event, "summary by pellet"),w=5,h=2.5)
+  p+(p$data)%>%filter(pellet=="pre-OVX")
+  save_plot(paste(.event, "summary intact"),w=3.5,h=2.5)
+  p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
+  save_plot(paste(.event, "summary ovx"), w=4.5,h=2.5)
+}
+
 ####Write final outputs
 write_sessioninfo()
 
