@@ -1628,7 +1628,7 @@ p+(p$data)%>%filter(pellet=="pre-OVX")+
   aes(x=male_interaction_auc_sig,fill=male_interaction_auc_sig)+
   scale_fill_manual(values=cell_type_scale[2:3])
 save_plot("male auc intact by cell type",w=2.7,h=2)
-p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types")
+p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")
 save_plot("male auc by cell type and pellet ovx",w=4.2,h=2.4)
 
 ##fold-change
@@ -1818,9 +1818,9 @@ for (i in 1:length(combos[,1])){
     ms+
     theme(plot.title=element_text(size=12,face="bold",hjust=0,margin=margin(t=0,b=3,l=0,r=0)))
   p+(p$data)%>%filter(pellet=="pre-OVX")
-  save_plot(paste("intact",combos[i,1],"-",combos[i,2]),w=3.5,h=3)
+  save_plot(paste("intact",combos[i,1],"-",combos[i,2]),w=3,h=2.5)
   p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")+labs(title=element_blank())
-  save_plot(paste("ovx", combos[i,1], "-",combos[i,2]), w=4.5,h=3)
+  save_plot(paste("ovx", combos[i,1], "-",combos[i,2]), w=4,h=2.2)
 }
 
 #Binary significance
