@@ -1042,19 +1042,20 @@ lm_anova_ds<-anova(lme(data=lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor
 
 p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=temp_mean_cor_torpor_))+
   geom_violin(aes(fill=pellet))+
-  point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123))+
-  point_indiv(position=position_jitter(width=0.25,height=0,seed=123))+
-  labs(x=element_blank(),y="Pearson correlation coefficient")+
+  point_mouse()+
+  point_cell()+
+  labs(x=element_blank(),y="r")+
   scale_fill_manual(values=pellet_scale)+
   ms+
   coord_cartesian(ylim=c(0,1))+
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
 p
 save_plot("lm correlation coefficient by pellet",w=6,h=6)
 p+lm_df%>%filter(temp_cor_sig_torpor_=="significant",gonad=="intact")
 save_plot("lm correlation coefficient intact",w=2,h=2)
-p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)
-save_plot("lm correlation coefficient by pellet downsample", w=5,h=4)
+p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns")
+save_plot("lm correlation coefficient by pellet downsample", w=3.2,h=2.4)
 
 data<-cell_type_lm_df%>%
   merge(lm_df%>%select(session_id,mouse),all.x=T)%>%
