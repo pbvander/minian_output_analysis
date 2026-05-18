@@ -62,22 +62,22 @@ ms<-list(theme_prism(),
 theme_pie <- theme(axis.line=element_blank(),axis.title.x = element_blank(),axis.title.y = element_blank(),axis.ticks = element_blank(),axis.text.x = element_blank(), legend.title = element_blank())
 lw<-0.5
 ls<-list(scale_x_continuous(expand=c(0,0), breaks=NULL),
-         theme(text=element_text(size=18),plot.title = element_text(size=18,margin=margin(t=2,b=2,l=0,r=0,unit="pt")),panel.spacing=unit(0.075,"inches")),
+         theme(text=element_text(size=12),plot.title = element_text(size=12,margin=margin(t=2,b=2,l=0,r=0,unit="pt")),panel.spacing=unit(0.06,"inches")),
          labs(x="Time (minutes)"),
          facet_wrap(vars(start_time), nrow=1, scales="free_x", space="free_x"),
          theme(strip.text.x = element_blank()))
 ridge_set<-list(ridgeline_guide(),
                 ridgeline(aes(height=scaled_YrA)),
                 scale_fill_viridis_c(),
-                labs(title="Detrended + demixed signal (F) / max F", y="Cell ID",x=element_blank()),
+                labs(title="Cells (F / max F)", y=element_blank(),x=element_blank()),
                 scale_y_discrete(breaks=seq(0,1000,5)))
 motion_set<-list(geom_line(),
                  labs(y="pixels",x=element_blank(),title="Motion distance"))
 temp_set<-list(geom_line(linewidth = lw),
                scale_x_continuous(expand=c(0,0),breaks=seq(0,5000,5)),
-               labs(y="Deg. C",title="Core body temperature (T-Core) (Deg. C)"))
+               labs(y=element_blank(),title="T-Core (Deg. C)"))
 ambient_temp_set<-list(geom_line(linewidth = lw),
-                       labs(y="Deg. C",title="Ambient temperature",x=element_blank()))
+                       labs(y=element_blank(),title="T-Amb (Deg. C)",x=element_blank()))
 male_interaction_set<-list(geom_line(linewidth = lw),
                            labs(y="",title="Male social stimulus",x=element_blank()),
                            scale_y_continuous(breaks=c(0,1)))
@@ -649,9 +649,10 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
     scale_y_continuous(expand=c(0.2,0.2))+
     ms+
     labs(y="dF/F0", title="Cell ID", x="Core temperature (Deg. C)")+
-    theme(strip.text = element_blank(),legend.position = "none")+
-    facet_wrap(vars(unit_id),scales="free_y",ncol=5)#+theme(strip.text.x = element_blank())
-  save_plot(paste("df_f0 by body temperature",id),plot=p, w=6,h=8)
+    theme(legend.position = "none")+
+    facet_wrap(vars(unit_id),scales="free_y",axes="all")#+theme(strip.text.x = element_blank())
+  save_plot(paste("df_f0 by body temperature",id),plot=p, w=15,h=12)
+  save_plot(paste("df_f0 by body temperature no color",id),plot=p+scale_color_manual(values=c("black","black","black")),w=15,h=12)
 }
 p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"), aes(x=temp, y=df_f0_bin))+
   xy_point2(alpha=0.2)+
@@ -684,7 +685,7 @@ labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+re
 pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
 
 p<-ggplot(data%>%filter(gonad=="intact"), aes(x=temp_bin1, y=unit_id_id))+
-  labs(x="Core temperature (Deg. C)", y="Cell ID")+
+  labs(x="T-Core (Deg. C)", y=element_blank())+
   geom_tile(aes(fill=scaled_YrA_bin))+
   scale_y_discrete(breaks=c(),expand=c(0,0))+
   scale_x_discrete(expand=c(0,0),breaks=seq(20,40,1),labels= ~ ifelse(as.numeric(as.character(.x)) %% 2 == 0, .x, ""))+
@@ -703,7 +704,7 @@ p<-ggplot(data%>%filter(gonad=="intact"), aes(x=temp_bin1, y=unit_id_id))+
         legend.box.spacing = unit(6,"pt"),
         axis.line.y = element_blank())
 p+labels_intact+plot_layout(widths = c(15,1))
-save_plot("df_f0 by temperature all intact cells",w=2.8,h=6.6)
+save_plot("df_f0 by temperature all intact cells",w=2.4,h=6)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by temperature all ovx cells",w=2.8,h=6.6)
 
@@ -736,7 +737,7 @@ data<-data%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(desc(temp_co
 p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+theme(axis.line=element_blank(),legend.position = "none")
 p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=seq(24,38,7),expand = c(0.2,0.2))+geom_hline(linewidth=lw, yintercept = 31, linetype="dashed")
 p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_id))+ms+set+rect_label_set
-save_plot("example session selected cells and timepoints",plot=p1+p3+p2+plot_layout(heights=c(12,1),widths=c(20,1),ncol=2),w=4,h=6)
+save_plot("example session selected cells and timepoints",plot=p1+p3+p2+plot_layout(heights=c(12,1),widths=c(20,1),ncol=2),w=3.2,h=5)
 # save_plot("example session selected cells and timepoints with rectangle",plot=(p1+rect_set)/p2+plot_layout(heights=c(10,1)),w=4,h=5)
 
 # Temp-temp_change1 correlation during torpor
@@ -762,11 +763,10 @@ p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=group_gonad, y=te
 p
 save_plot("torpor temperature correlation coefficient by cell type and group_gonad", w=12,h=8)
 
-t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_coef=mean(temp_cor_torpor))%>%group_by(temp_cor_sig_torpor), mean_coef ~ pellet)
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
+  anov<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
   print(anov)
 }
 
@@ -784,14 +784,14 @@ p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs
 p<-p1+facet_wrap(vars(temp_cor_sig_torpor), labeller = as_labeller(tools::toTitleCase))
 p
 save_plot("torpor temperature correlation coefficient by cell type and pellet", w=12,h=8)
-p1+unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="intact")+labs(x=element_blank())+scale_x_discrete(labels=c("Negative","Positive"))+scale_fill_manual(values=cell_type_scale[2:3])+aes(x=temp_cor_sig_torpor,fill=temp_cor_sig_torpor)
-save_plot("torpor temperature correlation coefficient by cell type intact",w=2.2,h=2)
+p1+unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="intact")+labs(x=element_blank())+scale_x_discrete(labels=c("Negative","Positive"))+scale_fill_manual(values=cell_type_scale[2:3])+aes(x=temp_cor_sig_torpor,fill=temp_cor_sig_torpor)+scale_x_discrete(labels=c("Neg.","Pos."))
+save_plot("torpor temperature correlation coefficient by cell type intact",w=1.8,h=1.6)
 p+unit_df%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral")+aes(y=temp_cor_torpor_TempBelow34)+facet_wrap(vars(temp_cor_sig_torpor_TempBelow34))
 save_plot("torpor temperature correlation coefficient by cell type and pellet torpor timepoints only",w=12,h=8)
-p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")
+p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+scale_fill_manual(values=post_ovx_scale)
 save_plot("torpor temperature correlation coefficient by cell type and pellet ovx",w=4,h=3)
-p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+scale_fill_manual(values=post_ovx_scale)
-save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=12,h=8)
+p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")
+save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=4,h=3)
 
 # Correlation type frequencies
 #Grouped by pellet
@@ -800,6 +800,8 @@ data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_c
 data_torpor_only<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor_TempBelow34")%>%
   mutate(temp_cor_sig_torpor_TempBelow34=factor(temp_cor_sig_torpor_TempBelow34,levels=c("neutral","negative","positive")))%>%rename(temp_cor_sig_torpor=temp_cor_sig_torpor_TempBelow34)
 data_downsampled<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
+data_group_gonad<-transform_data_piegraph(unit_df, animal_var = "group_gonad", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
 chisq<-data%>%
@@ -837,9 +839,10 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
         legend.text = element_text(size=12,face="bold"),
+        legend.text.position = "top",
         plot.title = element_text(size=12,margin=margin(b=3,unit="pt"),hjust=0))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
-  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature (T-Core) correlation")+
+  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature\n(T-Core) correlation")+
   coord_polar("y", start=0)+
   geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("black","black","black"))+
@@ -847,14 +850,16 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
   facet_wrap(vars(pellet))
 pie
 save_plot("torpor temperature correlation types by pellet",w=8,h=5)
+pie+data_group_gonad+facet_wrap(vars(group_gonad))
+save_plot("torpor temperature correlation types by group_gonad",w=3,h=3)
 pie+data%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())
-save_plot("torpor temperature correlation types pre-OVX",w=1.7,h=1.7)
+save_plot("torpor temperature correlation types pre-OVX",w=1.6,h=1.6)
 pie+data_torpor_only+aes(fill=temp_cor_sig_torpor)
 save_plot("torpor temperature correlation types by pellet torpor only",w=8,h=5)
 pie+data_downsampled+labs(title="Treatment ****")
-save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3.2,h=1.7)
+save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3.6,h=1.9)
 get_legend(pie+theme(legend.position="top"))%>%as_ggplot()
-save_plot("torpor cell type legend",w=4,h=0.5)
+save_plot("torpor cell type legend",w=3,h=2)
 
 #Grouped by mouse and pellet
 mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "temp_cor_sig_torpor")%>%
@@ -889,6 +894,7 @@ for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
   anov<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
   print(anov)
 }
+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor)))%>%group_by(temp_cor_sig_torpor)%>%wilcox_test(mean_slope ~ pellet)%>%adjust_pvalue()
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_slope_torpor),fill=pellet))+
   geom_violin(aes())+
@@ -904,8 +910,8 @@ p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs
 p<-p1+facet_wrap(vars(temp_cor_sig_torpor),axes="all",scales="free",labeller = as_labeller(tools::toTitleCase))
 p
 save_plot("torpor temperature slope by cell type and pellet", w=12,h=8)
-p1+unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="intact")+labs(x=element_blank())+scale_x_discrete(labels=c("Negative","Positive"))+scale_fill_manual(values=cell_type_scale[2:3])+aes(x=temp_cor_sig_torpor,fill=temp_cor_sig_torpor)
-save_plot("torpor temperature slope by cell type intact",w=2.2,h=2)
+p1+unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="intact")+labs(x=element_blank())+scale_x_discrete(labels=c("Negative","Positive"))+scale_fill_manual(values=cell_type_scale[2:3])+aes(x=temp_cor_sig_torpor,fill=temp_cor_sig_torpor)+scale_x_discrete(labels=c("Neg.","Pos."))
+save_plot("torpor temperature slope by cell type intact",w=1.8,h=1.6)
 p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")
 save_plot("torpor temperature slope by cell type and pellet downsampled",w=4,h=3)
 
@@ -1049,12 +1055,13 @@ p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=te
   ms+
   coord_cartesian(ylim=c(0,1))+
   theme(legend.position = "none",
-        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
+        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")),
+        plot.subtitle = element_text(size=12,hjust=0.5,margin=margin(t=3,b=3,unit="pt")))
 p
 save_plot("lm correlation coefficient by pellet",w=6,h=6)
 p+lm_df%>%filter(temp_cor_sig_torpor_=="significant",gonad=="intact")
 save_plot("lm correlation coefficient intact",w=2,h=2)
-p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns")
+p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns",subtitle="All cells")
 save_plot("lm correlation coefficient by pellet downsample", w=3.2,h=2.4)
 
 data<-cell_type_lm_df%>%
@@ -1066,15 +1073,15 @@ p<-ggplot(data, aes(x=temp_cor_sig_torpor,y=temp_mean_cor_torpor_))+
   point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=2.8,shape=21,stroke=1)+
   point_indiv(size=1.5,position=position_jitter(width=0.25,height=0,seed=321))+
   labs(x=element_blank(),y="r")+
-  scale_x_discrete(guide = guide_axis(n.dodge=2))+
   scale_fill_manual(values=c("black",cell_type_scale))+
   scale_y_continuous(breaks=seq(0,1,0.5),labels=seq(0,1,0.5))+
   ms+
   coord_cartesian(ylim=c(0,1))+
   theme(legend.position = "none",
-        axis.title.y = element_text(margin = margin(r=3, unit="pt")))
+        axis.title.y = element_text(margin = margin(r=3, unit="pt")))+
+  scale_x_discrete(labels=c("All","Neutral","Neg.","Pos."), guide=guide_axis(n.dodge = 2))
 p
-save_plot("lm correlation by cell type",w=2.3,h=1.84)
+save_plot("lm correlation by cell type",w=2,h=1.84)
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
@@ -1096,7 +1103,7 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
              axis.title.x = element_text(margin = margin(t = 3,unit="pt")),
              axis.title.y = element_text(margin = margin(r=3, unit="pt")))
   p
-  save_plot(paste("predicted temp",sess,"torpor"),w=2,h=2)
+  save_plot(paste("predicted temp",sess,"torpor"),w=1.9,h=1.9)
   p+data_ds
   save_plot(paste("predicted temp",sess,"torpor downsampled"),w=6,h=6)
   p+data_cell_type+facet_wrap(vars(temp_cor_sig_torpor),axes="all",nrow=1)+labs(title=element_blank())
@@ -1186,7 +1193,7 @@ labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+re
 pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
 
 p<-ggplot(data%>%filter(gonad=="intact"), aes(x=ambient_temp_interpolated_bin1, y=unit_id_id))+
-  labs(x="Ambient temperature (Deg. C)", y="Cell ID")+
+  labs(x="T-Amb (Deg. C)", y=element_blank())+
   geom_tile(aes(fill=scaled_df_f0_bin))+
   scale_y_discrete(breaks=c(),expand=c(0,0))+
   scale_x_discrete(expand=c(0,0),breaks= ~ ., labels= ~ ifelse((as.numeric(as.character(.x))-1) %% 4 == 0, .x, ""))+
@@ -1200,18 +1207,19 @@ p<-ggplot(data%>%filter(gonad=="intact"), aes(x=ambient_temp_interpolated_bin1, 
         legend.text = element_blank(),
         legend.position = "top",
         legend.key.width = unit(0.2,"inches"),
-        legend.justification = 0,
+        legend.justification = 0.2,
         legend.box.spacing = unit(6,"pt"),
         axis.line.y = element_blank())
 p+labels_intact+plot_layout(widths = c(15,1))
-save_plot("df_f0 by ambient temperature all intact cells",w=2.9,h=5.5)
+save_plot("df_f0 by ambient temperature all intact cells",w=2,h=4.2)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
-save_plot("df_f0 by ambient temperature all ovx cells",w=3.2,h=6)
+save_plot("df_f0 by ambient temperature all ovx cells",w=2,h=4.2)
 
 ## Plot an example session
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
                 plot.margin = margin(t=0, b=0, l=3, r=0, "pt"),
+                legend.text.position = "top",
                 panel.spacing = unit(0.0375,"inches")))
 
 #all data
@@ -1238,19 +1246,19 @@ data<-d%>%
   filter(!is.na(start_time))
 data<-data%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id)%>%unique()))
 
-p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+theme(axis.line=element_blank(),legend.position = "none")+labs(title="F / max(F)")
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+theme(axis.line=element_blank(),legend.position = "none")
 p2<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=seq(5,35,15))
-p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=seq(34,40,2))+scale_x_continuous(expand=c(0,0),breaks=seq(0,300,2))+labs(title="Core body temperature")
+p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=seq(34,40,2))+scale_x_continuous(expand=c(0,0),breaks=seq(1,300,3))
 p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
-save_plot("example session subset data ambient",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(8,1,1),widths=c(20,1),ncol=2),w=3.8,h=5)
+save_plot("example session subset data ambient",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(8,1,1),widths=c(20,1),ncol=2),w=2.4,h=5)
 
 (p4+(p4$data)%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient,levels=c("neutral","negative","positive")))+
-    scale_fill_manual(name="Ambient temperature (T-Amb) correlation",values=cell_type_scale,labels=tools::toTitleCase)+
+    scale_fill_manual(name="Ambient temperature\n(T-Amb) correlation",values=cell_type_scale,labels=tools::toTitleCase)+
   theme(legend.position = "top",
         legend.text = element_text(size=12,face="bold"),
-        legend.title=element_text(),
+        legend.title=element_text(hjust=0.5),
         legend.title.position = "top"))%>%get_legend()%>%as_ggplot()
-save_plot("ambient temperature cell type legend",w=4,h=0.5)
+save_plot("ambient temperature cell type legend",w=3.2,h=1.5)
 
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
@@ -1299,7 +1307,7 @@ pie<-ggplot(data, aes(x="", y=percent, fill=ambient_temp_interpolated_cor_sig_am
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
         legend.text = element_text(size=12,face="bold"),
-        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="")))+
+        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature (T-Core) correlation")+
   coord_polar("y", start=0)+
@@ -1336,8 +1344,8 @@ p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")
         plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
 p+facet_wrap(vars(pellet),axes="all")
 save_plot("ambient temperature coefficient by cell type and pellet", w=12,h=8)
-p+(p$data)%>%filter(pellet=="pre-OVX")
-save_plot("ambient temeprature coefficient by cell type intact",w=2.2,h=2)
+p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(labels=c("Neg.","Pos."))
+save_plot("ambient temeprature coefficient by cell type intact",w=1.6,h=1.2)
 p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),labeller = as_labeller(tools::toTitleCase))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")
 save_plot("ambient temperature coefficient by cell type and pellet ovx",w=4,h=3)
 
@@ -1361,8 +1369,8 @@ p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")
   theme(legend.position = "none")
 p+facet_wrap(vars(pellet),axes="all")
 save_plot("ambient temperature slope by cell type and pellet", w=12,h=8)
-p+(p$data)%>%filter(pellet=="pre-OVX")
-save_plot("ambient temeprature slope by cell type intact",w=2.2,h=2)
+p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(labels=c("Neg.","Pos."))
+save_plot("ambient temeprature slope by cell type intact",w=1.6,h=1.2)
 p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",labeller = as_labeller(tools::toTitleCase))+scale_fill_manual(values=post_ovx_scale)
 save_plot("ambient temperature slope by cell type and pellet ovx",w=4,h=3)
 
@@ -1419,7 +1427,7 @@ p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_i
   point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=2.8,shape=21,stroke=1)+
   point_indiv(size=1.5,position=position_jitter(width=0.25,height=0,seed=321))+
   labs(x=element_blank(),y="r")+
-  scale_x_discrete(guide = guide_axis(n.dodge=2))+
+  scale_x_discrete(guide = guide_axis(n.dodge=2),labels=c("All","Neutral","Neg.","Pos."))+
   scale_fill_manual(values=c("black",cell_type_scale))+
   scale_y_continuous(breaks=seq(0,1,0.5),labels=seq(0,1,0.5))+
   ms+
@@ -1427,7 +1435,7 @@ p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_i
   theme(legend.position = "none",
         axis.title.y = element_text(margin = margin(r=3, unit="pt")))
 p
-save_plot("ambient lm correlation by cell type",w=2.3,h=1.84)
+save_plot("ambient lm correlation by cell type",w=1.7,h=1.6)
 
 ##LM predictions (ambient)
 for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
@@ -1972,7 +1980,7 @@ for (sid in unique(pca_time$session_id)){
         labs(x=paste0("PC1 (",var_data%>%filter(PC==1)%>%pull(var), "%)"), y=paste0("PC2 (",var_data%>%filter(PC==2)%>%pull(var),"%)"))+
         ms+set
       p
-      save_plot(paste("PCA by temp",sidt),w=2.2,h=2.2)
+      save_plot(paste("PCA by temp",sidt),w=2,h=2)
       
       p<-ggplot(data, aes(x=temp,y=PC1))+
         xy_point2()+
@@ -1998,9 +2006,10 @@ for (sid in unique(pca_time$session_id)){
         scale_color_viridis_c(name="T-Amb")+
         xy_point(aes(color=ambient_temp_interpolated),shape=21,size=1.8,stroke=0.9,alpha=0.5)+
         labs(x=paste0("PC1 (",var_data%>%filter(PC==1)%>%pull(var), "%)"), y=paste0("PC2 (",var_data%>%filter(PC==2)%>%pull(var),"%)"))+
-        ms+set
+        ms+set+
+        theme(legend.box.margin = margin(t=0,b=-15,l=-50,r=0,unit="pt"))
       p
-      save_plot(paste("PCA by ambient_temp",sid,"ambient"),w=2.2,h=2.2)
+      save_plot(paste("PCA by ambient_temp",sid,"ambient"),w=1.9,h=1.9)
       
       p<-ggplot(data, aes(x=ambient_temp_interpolated,y=PC1))+
         xy_point2()+
