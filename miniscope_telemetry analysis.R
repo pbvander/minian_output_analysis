@@ -2101,9 +2101,10 @@ spatial_test_obs<-tibble()
 spatial_test_null<-tibble()
 pie_data<-tibble()
 for (col in target_cols_binary){
+  print(col)
   test<-spatial_test(d, col,shuf_iters = shuffle_iterations)
-  test_obs<-(test$observed)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))
-  test_null<-(test$null)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))
+  test_obs<-(test$observed)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))%>%merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T), all.x=T)
+  test_null<-(test$null)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))%>%merge(sumdf%>%ungroup()%>%distinct(session_id, .keep_all = T), all.x=T)
   spatial_test_obs<-rbind(spatial_test_obs,test_obs)
   spatial_test_null<-rbind(spatial_test_null, test_null)
   pie_data<-rbind(pie_data,
@@ -2111,29 +2112,33 @@ for (col in target_cols_binary){
 }
 
 ##plot observed vs null
-ggplot(spatial_test_obs%>%filter(session_id=="MT29_2025_05_22_session1",!is.na(obs_dist),var=="temp_cor_sig_torpor"), aes(x=cell_type,y=obs_dist))+
+p<-ggplot(spatial_test_obs%>%filter(session_id=="MT29_2025_05_22_session1",!is.na(obs_dist),var=="temp_cor_sig_torpor"), aes(x=cell_type,y=obs_dist))+
   geom_violin(inherit.aes = F, data=spatial_test_null%>%filter(session_id=="MT29_2025_05_22_session1",var=="temp_cor_sig_torpor",!is.na(perm_dist)), aes(x=cell_type,y=perm_dist),fill=NA)+
-  point_summary(aes(color=sig))+
+  point_summary(aes(color=sig),color="black")+
+  coord_cartesian(ylim=c(0,NA))+
+  labs(x=element_blank(), y="Distance (pixels)")+
   ms
+p
+save_plot("example observed vs null spatial distance",w=5,h=3)
 
 ##plot piegraph of frequencies
-pie<-ggplot(pie_data%>%filter(var=="temp_cor_sig_torpor"), aes(x="", y=percent, fill=sig))+ms+theme_pie+
+pie<-ggplot(pie_data%>%mutate(var=factor(var,levels=target_cols_binary, labels=c("T-Core","T-Amb","Male"))), aes(x="", y=percent, fill=sig))+ms+theme_pie+
   theme(legend.position = "right",
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
         legend.text = element_text(size=12,face="bold"))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
-  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Spatial enrichment")+
+  scale_fill_manual(values=c("grey50","red"), name="Spatial enrichment")+
   coord_polar("y", start=0)+
   geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("black","black","black"))+
   guides(color="none")
-pie+facet_wrap(vars(pellet))
-save_plot("spatial analysis torpor by pellet",w=4,h=4)
-pie+(pie$data)%>%filter(pellet=="pre-OVX")
-save_plot("spatial analysis torpor intact",w=3,h=3)
-pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
-save_plot("spatial analysis torpor ovx",w=5,h=3)
+pie+facet_grid(vars(pellet),vars(var))
+save_plot("spatial analysis torpor by pellet and var",w=4,h=4)
+pie+(pie$data)%>%filter(pellet=="pre-OVX")+facet_wrap(vars(var),nrow=1)+theme(legend.position = "top",legend.box.margin = margin(t=0,b=-15, l=0, r=0,unit="pt"))
+save_plot("spatial analysis torpor intact",w=3,h=2)
+pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_grid(vars(pellet),vars(var),switch = "y")+theme(legend.position = "top",legend.box.margin = margin(t=0,b=-15, l=0, r=0,unit="pt"))
+save_plot("spatial analysis torpor ovx",w=3,h=3)
 
 ####Plot events
 #example

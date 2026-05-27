@@ -495,12 +495,12 @@ plot_pca <- function(pca_ls, unit_df, verbose=T){
 
 spatial_test <- function(data, var, shuf_iters=1000){
   cell_centroids <- data %>%
+    filter(!is.na(.data[[var]])) %>%
     group_by(across(all_of(c(var,"unit_id_id","session_id")))) %>%
     summarize(x = sum(width * A) / sum(A), y = sum(height * A) / sum(A))
   observed<-cell_centroids%>%
     group_by(across(all_of(c(var,"session_id"))))%>%
-    summarize(obs_dist = mean(nndist(x,y)))%>%
-    filter(!is.na(.data[[var]]))
+    summarize(obs_dist = mean(nndist(x,y)))
   
   null_distribution <- map_dfr(1:shuf_iters, function(i) {
     cell_centroids %>%
@@ -516,8 +516,9 @@ spatial_test <- function(data, var, shuf_iters=1000){
     rowwise()%>%
     mutate(rank = rank(c(obs_dist,null_dist))[1],
            p = rank/shuf_iters,
-           p.adj=p*length(unique(data%>%pull({{var}}))),
-           sig=ifelse(p.adj<0.05, "significant","ns"))%>%
+           p.adj=p*length(unique(observed%>%pull({{var}}))),
+           p.adj=ifelse(p.adj>1, 1, p.adj),
+           sig=ifelse(p.adj<0.05, "p<0.05","ns"))%>%
     select(-null_dist)%>%
     ungroup()
   out<-list("observed"=observed, "null"=null_distribution)
