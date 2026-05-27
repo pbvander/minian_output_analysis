@@ -768,8 +768,12 @@ save_plot("torpor temperature correlation coefficient by cell type and group_gon
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
+  anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
+  print(anov_ds)
+  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
   print(anov)
+  anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_cor_torpor_TempBelow34 ~ pellet, random=~1|mouse))
+  print(anov_torpor_only)
 }
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_cor_torpor), fill=pellet))+
@@ -803,6 +807,8 @@ data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_c
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 data_torpor_only<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor_TempBelow34")%>%
   mutate(temp_cor_sig_torpor_TempBelow34=factor(temp_cor_sig_torpor_TempBelow34,levels=c("neutral","negative","positive")))%>%rename(temp_cor_sig_torpor=temp_cor_sig_torpor_TempBelow34)
+data_torpor_only_ds<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor_TempBelow34")%>%
+  mutate(temp_cor_sig_torpor_TempBelow34=factor(temp_cor_sig_torpor_TempBelow34,levels=c("neutral","negative","positive")))%>%rename(temp_cor_sig_torpor=temp_cor_sig_torpor_TempBelow34)
 data_downsampled<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 data_group_gonad<-transform_data_piegraph(unit_df, animal_var = "group_gonad", cell_var = "temp_cor_sig_torpor")%>%
@@ -829,6 +835,16 @@ chisq_torpor_only<-data_torpor_only%>%
   chisq.test()
 
 chisq_ds<-data_downsampled%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+chisq_ds_to<-data_torpor_only_ds%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
   pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
@@ -896,8 +912,14 @@ t_test(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=
 for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  print(anov_ds)
+  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
   print(anov)
+  anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
+  print(anov_torpor_only)
+  anov_torpor_only_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
+  print(anov_torpor_only_ds)
 }
 (unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor)))%>%group_by(temp_cor_sig_torpor)%>%wilcox_test(mean_slope ~ pellet)%>%adjust_pvalue()
 
