@@ -38,7 +38,7 @@ single_session<-"MT29_2025_05_22_session1_torpor" #best session for creating fig
 #Exclusions:
 session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20_session1_cold", "MT35_2026_03_07_session1_cold", # These animals do not have data from the full ambient temperature challenge (some issue arose during heat and/or cold exposure that led to exclusion of one "arm" of the ambient temperature challenge). They have been excluded so that all mice represented in the analysis have the same stimuli exposure
                               "MT30_2025_05_23_session1_torpor", "MT34_2025_11_25_session1_torpor" #sessions where torpor was very shallow and/or infrequent (min temp >33C AND <10 timepoints where temp <34). Can re-include these if cross-registration is implemented, since there was torpor on other torpor recording day for these
-                              )
+)
 
 #Parameters
 shuffle_iterations<-200
@@ -179,7 +179,7 @@ for (dir in direcs){
             ts<-read_timestamps(paste(path,"My_V4_Miniscope","timeStamps.csv", sep=separator))
             bad_frames[[path]]<-setdiff(unique(motion$frame), unique(C$frame)) ##Detects frame in motion, but not C. This should be equal to bad_frames set in minian
             motion<-motion%>%filter(frame %nin% bad_frames[[path]])
-
+            
             #Convert to one dataframe
             df<-merge(C,S)%>%
               merge(YrA)%>%
@@ -190,182 +190,182 @@ for (dir in direcs){
               mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
                      session_id = paste0(mouse,"_",start_date,"_",session))%>%
               scale_temporal()
-
+            
             A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
                           session_id = paste0(mouse,"_",start_date,"_",session))
-
+            
             # Clean up variables and memory
             rm(C,S,YrA,ts,motion)
             gc()
-
+            
             #Write intermediate output (Checkpoint 1)
             setwd(output_dir)
             if ("./output/intermediate" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
             write_output_rds(df, direc="./output/intermediate/", name=paste0("1_",gsub(separator,"-",path)))
             setwd(exp_direc)
-
+            
             # Add metadata on session type
             df<-df%>%merge(session_mdf, all.x=T)%>%mutate(session_id_type = paste0(session_id,"_",session_type))%>%filter(session_id_type %nin% session_id_type_to_exclude)
             if (nrow(df)>0){  #skip the rest of this code if the entire session_id is excluded
-
-            # Add event-based metadata
-            df<-df%>%merge(event_mdf, all.x=T)
-            df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
-                                                           session_type == "male_interaction" ~ ifelse(miniscope_ts > male_added & miniscope_ts < male_removed, 1, 0)),
-                            # "first_interaction_aligned_time_seconds" = case_when (session_type != "male_interaction" ~ NA,
-                                                                                  # session_type == "male_interaction" ~ as.duration(miniscope_ts - first_interaction)%>%as.numeric()),
-                            # "first_interact" = case_when(session_type != "male_interaction" ~ NA,
-                                                         # session_type == "male_interaction" ~ ifelse(first_interaction_aligned_time_seconds < 1, T, F)),
-                            "injection" = case_when(session_type != "E2_injection" ~ NA,
-                                                    session_type == "E2_injection" & miniscope_ts >= E2_injection ~ "E2",
-                                                    session_type == "E2_injection" & miniscope_ts >= veh_injection ~ "Veh",
-                                                    session_type == "E2_injection" & miniscope_ts >= sham_injection ~ "Sham",
-                                                    session_type == "E2_injection" & miniscope_ts < sham_injection ~ "Baseline")%>%factor(levels=c("Baseline","Sham","Veh","E2")),
-                            "injection_aligned_time_seconds" = case_when(session_type != "E2_injection" ~ NA,
-                                                                         session_type == "E2_injection" & injection=="E2" ~ as.duration(miniscope_ts - E2_injection)%>%as.numeric(),
-                                                                         session_type == "E2_injection" & injection=="Veh" ~ as.duration(miniscope_ts - veh_injection)%>%as.numeric(),
-                                                                         session_type == "E2_injection" & injection=="Sham" ~ as.duration(miniscope_ts - sham_injection)%>%as.numeric(),
-                                                                         session_type == "E2_injection" & injection=="Baseline" ~ as.duration(miniscope_ts - start_ts)%>%as.numeric()),
-                            "fed_status" = case_when(session_type != "torpor" ~ NA,
-                                                     session_type == "torpor" & miniscope_ts < fed ~ "Fasting",
-                                                     session_type == "torpor" & miniscope_ts > first_bite ~ "Eating",
-                                                     session_type == "torpor" & miniscope_ts >= fed & miniscope_ts <= first_bite ~ "Fed",
-                                                     T ~ "Fasting")%>%factor(levels=c("Fasting","Fed","Eating"),),
-                            "fed_aligned_time_seconds" = case_when(session_type != "torpor" ~ NA,
-                                                                   session_type == "torpor" ~ as.duration(miniscope_ts - fed)%>%as.numeric()),
-                            "cage_change_status" = case_when(session_type != "cage_change" ~ NA,
-                                                             session_type == "cage_change" ~ ifelse(miniscope_ts < cage_change, "Home","New")))
-
-            #Create new column for total time within each session
-            df<-df%>%
-              group_by(session_id)%>%
-              mutate(session_start_ts = min(miniscope_ts))%>%
-              ungroup()%>%
-              mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60, #time within the entire "session"
-                     time_seconds = interval(start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric()) #time in seconds within each "start_time"
-
-            ##### Merge telemetry and miniscope data
-            # Create time bin column as basis for merging
-            df<-df%>%mutate(ts_bin = cut(miniscope_ts, ts_seq))
-
-            # Preserve all miniscope data, and assign one temperature/act/ambient temperature to all frames in the given range
-            #Filter data to match mouse and date (avoid duplicates for later)
-            mous<-mouse
-            start_d<-start_date
-            t_d<-t_df%>%filter(mouse==mous, mdy(date)==ymd(start_d))
-            at_d<-at_df%>%filter(mouse==mous, start_date==start_d)
-
-            #Merge
-            df<-merge(df, t_d, all=T)
-            df<-merge(df, at_d%>%select(!c(session_type,start_date)), all=T)
-            if (df%>%filter(session_type %in% c("cold","heat"), is.na(ambient_temp_interpolated))%>%nrow() > 0){warning("NAs present in ambient_temp_interpolated column")}
-            df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
-
-            ##### Calculate dF/F0
-            df<-df%>%mutate(f0 = case_when(
-              session_type == "cage_change" & time_seconds < 300 ~ T, #5-minute baseline before cage change
-              session_type == "torpor" & aligned_time<30 & temp>35 ~ T, #day 1 torpor (euthermia timepoints)
-              session_type == "torpor" & temp>35 ~ T, #day 2 torpor (euthermia timepoints)
-              session_type == "cold" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
-              session_type == "heat" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
-              session_type == "male_interaction" & time_seconds < 300 ~ T, #5-minute baseline before adding male
-              session_type == "E2_injection" & time_seconds < 300 ~ T, #5-minute baseline before starting injections
-              T ~ F)
-              )
-
-            f0_df<-df%>%filter(f0)%>%group_by(unit_id_id,session_id,session_type)%>%summarize(mean_f0 = mean(YrA), sd_f0 = sd(YrA))
-            check<-f0_df%>%group_by(session_id,session_type)%>%count()%>%nrow() - df%>%filter(!is.na(session_id))%>%group_by(session_id,session_type)%>%count()%>%nrow()
-            print(check) #check that f0 is calculated for all sesssion_id values. This should equal 0
-            if (check !=0){stop("f0 not matching number of session_ids")}
-            df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
-                                                    z = (YrA - mean_f0) / sd_f0)
-            
-            ###Compile event_df
-            setwd(output_dir)
-            events<-event_metadata%>%filter(session_id == paste0(mouse,"_",start_date,"_",session), !is.na(event_ts))
-            for (.event in events$event){
-              print(.event)
-              .ts<-events%>%filter(event==.event)%>%pull(event_ts)
-              d<-df%>%
-                filter(miniscope_ts %>% between(.ts-minutes(5), .ts+minutes(5)))%>%
-                mutate(event=.event, event_ts = .ts, event_aligned_time_seconds = as.duration(miniscope_ts - event_ts)%>%as.numeric())
-              if (nrow(d)>0){
-                suppressMessages(#gets rid of "scale for x is already present message
-                  p<-ggplot(d, aes(x=event_aligned_time_seconds, y=unit_id))+ms+ls+ridge_set+
-                    scale_x_continuous(expand=c(0,0),breaks=seq(-240,240,120))+
-                    labs(title=.event,x="Event aligned time (seconds)")+
-                    geom_vline(xintercept=0,linewidth=0.5)
-                  )
-                save_plot(paste0(mouse,"_",start_date,"_",session,"_",.event),plot=p,w=4,h=6)
-                
-                event_df<-rbind(event_df,d)
-              }else{print(paste("Skipping",.event))}
-            }
-            setwd(exp_direc)
-
-            ##### Checkpoint 2
-            setwd(output_dir)
-            write_output_rds(df, direc="./output/intermediate/", name=paste0("2_",gsub(separator,"-",path)))
-            setwd(exp_direc)
-
-            # Create 1-minute bins in miniscope data
-            sumd<-df%>%
-              filter(!is.na(YrA))%>%
-              group_by(ts_bin,unit_id_id)%>%
-              arrange(ts_bin)%>%
-              mutate(C_bin=mean(C), S_bin=mean(S), YrA_bin=mean(YrA), mean_motion_distance=mean(motion_distance), df_f0_bin=mean(df_f0), z_bin=mean(z), sd_f0_bin=mean(sd_f0))%>%
-              ungroup()%>%
-              distinct(ts_bin,unit_id_id, .keep_all = T)%>%
-              scale_temporal_bin()
-            sumdf<-rbind(sumdf,sumd)
-            
-            # Compile A
-            A_all<-rbind(A_all,A)
-
-            ## Graph full data for all sessions
-            setwd(output_dir)
-            for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
-              # if (paste0("line plot and motion and temp ",id,".png") %in% list.files("./output")){next}
-              print(id)
-              data<-df%>%filter(!is.na(YrA), session_id_type==id)
-
-              ### Lines with motion (quality check)
-              torpor_y<-get_torpor_y(data)
-              # male_interaction_set<-c(male_interaction_set,geom_vline(xintercept = (data%>%filter(first_interact)%>%pull(session_time_minutes))[1], linewidth=lw,color="red"))
               
-              # All frames
-              p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set
-              p2<-ggplot(data, aes(x=session_time_minutes, y=motion_distance))+ms+ls+motion_set
-              suppressMessages(p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set)
-            
-              if (grepl("torpor",id)){
-                p3<-p3+geom_hline(linewidth=lw, yintercept = 31, linetype="dashed")
-                aligned_tim<-interval(data$fstart[1], ymd_hms(paste0(start_date,"_00_00_01")))%>%time_length("hours")
-                if (aligned_tim < 30){ #day 1 torpor (no re-feed)
-                  p<-p2/p1/p3+plot_layout(heights=c(1,10,1))}
-                if (aligned_tim > 30){  #day 2 torpor with re-feed
-                  p4<-ggplot(data, aes(x=session_time_minutes, y=fed_status,group=mouse))+ms+ls+fed_set
-                  p<-p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1))}
-                save_png_large(paste("line plot and motion and temp",id),plot=p,w=32,h=25)}
-              if (grepl("heat",id) | grepl("cold",id)){
-                p4<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
-                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
-              if (grepl("male_interaction",id)){
-                p4<-ggplot(data, aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
-                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
-              if (grepl("E2_injection", id)){
-                p4<-ggplot(data, aes(x=session_time_minutes, y=injection, group=mouse))+ms+ls+injection_set
-                save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
-
-              # Subset of frames
-              # s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-              # s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-              # s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
-              # s2/s1/s3+plot_layout(heights=c(1,10,1))
-              # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
-              gc()
-            }
-            setwd(exp_direc)
+              # Add event-based metadata
+              df<-df%>%merge(event_mdf, all.x=T)
+              df<-df%>%mutate("male_interaction" = case_when(session_type != "male_interaction" ~ NA,
+                                                             session_type == "male_interaction" ~ ifelse(miniscope_ts > male_added & miniscope_ts < male_removed, 1, 0)),
+                              # "first_interaction_aligned_time_seconds" = case_when (session_type != "male_interaction" ~ NA,
+                              # session_type == "male_interaction" ~ as.duration(miniscope_ts - first_interaction)%>%as.numeric()),
+                              # "first_interact" = case_when(session_type != "male_interaction" ~ NA,
+                              # session_type == "male_interaction" ~ ifelse(first_interaction_aligned_time_seconds < 1, T, F)),
+                              "injection" = case_when(session_type != "E2_injection" ~ NA,
+                                                      session_type == "E2_injection" & miniscope_ts >= E2_injection ~ "E2",
+                                                      session_type == "E2_injection" & miniscope_ts >= veh_injection ~ "Veh",
+                                                      session_type == "E2_injection" & miniscope_ts >= sham_injection ~ "Sham",
+                                                      session_type == "E2_injection" & miniscope_ts < sham_injection ~ "Baseline")%>%factor(levels=c("Baseline","Sham","Veh","E2")),
+                              "injection_aligned_time_seconds" = case_when(session_type != "E2_injection" ~ NA,
+                                                                           session_type == "E2_injection" & injection=="E2" ~ as.duration(miniscope_ts - E2_injection)%>%as.numeric(),
+                                                                           session_type == "E2_injection" & injection=="Veh" ~ as.duration(miniscope_ts - veh_injection)%>%as.numeric(),
+                                                                           session_type == "E2_injection" & injection=="Sham" ~ as.duration(miniscope_ts - sham_injection)%>%as.numeric(),
+                                                                           session_type == "E2_injection" & injection=="Baseline" ~ as.duration(miniscope_ts - start_ts)%>%as.numeric()),
+                              "fed_status" = case_when(session_type != "torpor" ~ NA,
+                                                       session_type == "torpor" & miniscope_ts < fed ~ "Fasting",
+                                                       session_type == "torpor" & miniscope_ts > first_bite ~ "Eating",
+                                                       session_type == "torpor" & miniscope_ts >= fed & miniscope_ts <= first_bite ~ "Fed",
+                                                       T ~ "Fasting")%>%factor(levels=c("Fasting","Fed","Eating"),),
+                              "fed_aligned_time_seconds" = case_when(session_type != "torpor" ~ NA,
+                                                                     session_type == "torpor" ~ as.duration(miniscope_ts - fed)%>%as.numeric()),
+                              "cage_change_status" = case_when(session_type != "cage_change" ~ NA,
+                                                               session_type == "cage_change" ~ ifelse(miniscope_ts < cage_change, "Home","New")))
+              
+              #Create new column for total time within each session
+              df<-df%>%
+                group_by(session_id)%>%
+                mutate(session_start_ts = min(miniscope_ts))%>%
+                ungroup()%>%
+                mutate(session_time_minutes = (interval(session_start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric())/60, #time within the entire "session"
+                       time_seconds = interval(start_ts, miniscope_ts)%>%as.period(unit = "seconds")%>%as.numeric()) #time in seconds within each "start_time"
+              
+              ##### Merge telemetry and miniscope data
+              # Create time bin column as basis for merging
+              df<-df%>%mutate(ts_bin = cut(miniscope_ts, ts_seq))
+              
+              # Preserve all miniscope data, and assign one temperature/act/ambient temperature to all frames in the given range
+              #Filter data to match mouse and date (avoid duplicates for later)
+              mous<-mouse
+              start_d<-start_date
+              t_d<-t_df%>%filter(mouse==mous, mdy(date)==ymd(start_d))
+              at_d<-at_df%>%filter(mouse==mous, start_date==start_d)
+              
+              #Merge
+              df<-merge(df, t_d, all=T)
+              df<-merge(df, at_d%>%select(!c(session_type,start_date)), all=T)
+              if (df%>%filter(session_type %in% c("cold","heat"), is.na(ambient_temp_interpolated))%>%nrow() > 0){warning("NAs present in ambient_temp_interpolated column")}
+              df<-df%>%mutate(ts = ifelse(is.na(miniscope_ts), telem_ts, miniscope_ts)) #set timestamp to miniscope timestamp (when available), otherwise use telem timestamp
+              
+              ##### Calculate dF/F0
+              df<-df%>%mutate(f0 = case_when(
+                session_type == "cage_change" & time_seconds < 300 ~ T, #5-minute baseline before cage change
+                session_type == "torpor" & aligned_time<30 & temp>35 ~ T, #day 1 torpor (euthermia timepoints)
+                session_type == "torpor" & temp>35 ~ T, #day 2 torpor (euthermia timepoints)
+                session_type == "cold" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
+                session_type == "heat" & time_seconds < 300 ~ T, #5-minute baseline before changing temperature
+                session_type == "male_interaction" & time_seconds < 300 ~ T, #5-minute baseline before adding male
+                session_type == "E2_injection" & time_seconds < 300 ~ T, #5-minute baseline before starting injections
+                T ~ F)
+              )
+              
+              f0_df<-df%>%filter(f0)%>%group_by(unit_id_id,session_id,session_type)%>%summarize(mean_f0 = mean(YrA), sd_f0 = sd(YrA))
+              check<-f0_df%>%group_by(session_id,session_type)%>%count()%>%nrow() - df%>%filter(!is.na(session_id))%>%group_by(session_id,session_type)%>%count()%>%nrow()
+              print(check) #check that f0 is calculated for all sesssion_id values. This should equal 0
+              if (check !=0){stop("f0 not matching number of session_ids")}
+              df<-df%>%merge(f0_df, all.x=T)%>%mutate(df_f0 = (YrA - mean_f0) / mean_f0,
+                                                      z = (YrA - mean_f0) / sd_f0)
+              
+              ###Compile event_df
+              setwd(output_dir)
+              events<-event_metadata%>%filter(session_id == paste0(mouse,"_",start_date,"_",session), !is.na(event_ts))
+              for (.event in events$event){
+                print(.event)
+                .ts<-events%>%filter(event==.event)%>%pull(event_ts)
+                d<-df%>%
+                  filter(miniscope_ts %>% between(.ts-minutes(5), .ts+minutes(5)))%>%
+                  mutate(event=.event, event_ts = .ts, event_aligned_time_seconds = as.duration(miniscope_ts - event_ts)%>%as.numeric())
+                if (nrow(d)>0){
+                  suppressMessages(#gets rid of "scale for x is already present message
+                    p<-ggplot(d, aes(x=event_aligned_time_seconds, y=unit_id))+ms+ls+ridge_set+
+                      scale_x_continuous(expand=c(0,0),breaks=seq(-240,240,120))+
+                      labs(title=.event,x="Event aligned time (seconds)")+
+                      geom_vline(xintercept=0,linewidth=0.5)
+                  )
+                  save_plot(paste0(mouse,"_",start_date,"_",session,"_",.event),plot=p,w=4,h=6)
+                  
+                  event_df<-rbind(event_df,d)
+                }else{print(paste("Skipping",.event))}
+              }
+              setwd(exp_direc)
+              
+              ##### Checkpoint 2
+              setwd(output_dir)
+              write_output_rds(df, direc="./output/intermediate/", name=paste0("2_",gsub(separator,"-",path)))
+              setwd(exp_direc)
+              
+              # Create 1-minute bins in miniscope data
+              sumd<-df%>%
+                filter(!is.na(YrA))%>%
+                group_by(ts_bin,unit_id_id)%>%
+                arrange(ts_bin)%>%
+                mutate(C_bin=mean(C), S_bin=mean(S), YrA_bin=mean(YrA), mean_motion_distance=mean(motion_distance), df_f0_bin=mean(df_f0), z_bin=mean(z), sd_f0_bin=mean(sd_f0))%>%
+                ungroup()%>%
+                distinct(ts_bin,unit_id_id, .keep_all = T)%>%
+                scale_temporal_bin()
+              sumdf<-rbind(sumdf,sumd)
+              
+              # Compile A
+              A_all<-rbind(A_all,A)
+              
+              ## Graph full data for all sessions
+              setwd(output_dir)
+              for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
+                # if (paste0("line plot and motion and temp ",id,".png") %in% list.files("./output")){next}
+                print(id)
+                data<-df%>%filter(!is.na(YrA), session_id_type==id)
+                
+                ### Lines with motion (quality check)
+                torpor_y<-get_torpor_y(data)
+                # male_interaction_set<-c(male_interaction_set,geom_vline(xintercept = (data%>%filter(first_interact)%>%pull(session_time_minutes))[1], linewidth=lw,color="red"))
+                
+                # All frames
+                p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set
+                p2<-ggplot(data, aes(x=session_time_minutes, y=motion_distance))+ms+ls+motion_set
+                suppressMessages(p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set)
+                
+                if (grepl("torpor",id)){
+                  p3<-p3+geom_hline(linewidth=lw, yintercept = 31, linetype="dashed")
+                  aligned_tim<-interval(data$fstart[1], ymd_hms(paste0(start_date,"_00_00_01")))%>%time_length("hours")
+                  if (aligned_tim < 30){ #day 1 torpor (no re-feed)
+                    p<-p2/p1/p3+plot_layout(heights=c(1,10,1))}
+                  if (aligned_tim > 30){  #day 2 torpor with re-feed
+                    p4<-ggplot(data, aes(x=session_time_minutes, y=fed_status,group=mouse))+ms+ls+fed_set
+                    p<-p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1))}
+                  save_png_large(paste("line plot and motion and temp",id),plot=p,w=32,h=25)}
+                if (grepl("heat",id) | grepl("cold",id)){
+                  p4<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set
+                  save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+                if (grepl("male_interaction",id)){
+                  p4<-ggplot(data, aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set
+                  save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+                if (grepl("E2_injection", id)){
+                  p4<-ggplot(data, aes(x=session_time_minutes, y=injection, group=mouse))+ms+ls+injection_set
+                  save_png_large(paste("line plot and motion and temp",id),plot=p2/p1/p4/p3+plot_layout(heights=c(1,10,1,1)),w=32,h=25)}
+                
+                # Subset of frames
+                # s1<-p1+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+                # s2<-p2+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+                # s3<-p3+filter(p1$data, start_time=="01_55_00"|start_time=="02_56_59")
+                # s2/s1/s3+plot_layout(heights=c(1,10,1))
+                # save_png_large(paste("line plot and motion and temp subset",session_id_type),plot=s2/s1/s3+plot_layout(heights=c(1,10,1)),w=18,h=25)
+                gc()
+              }
+              setwd(exp_direc)
             }else{print(paste("Skipping",mouse,start_date,session))}
           }
         }
@@ -922,6 +922,7 @@ for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
   print(anov_torpor_only_ds)
 }
 (unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor)))%>%group_by(temp_cor_sig_torpor)%>%wilcox_test(mean_slope ~ pellet)%>%adjust_pvalue()
+
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_slope_torpor),fill=pellet))+
   geom_violin(aes())+
@@ -1793,7 +1794,7 @@ for (target in target_cols){
     pivot_longer(cols=target_cols,names_to = "var",values_to = "val")%>%
     mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(!!sym(target_cols[t]))%>%pull(unit_id_id)%>%unique()),
            var=factor(var,levels=target_cols,labels=labs))
-
+  
   p<-ggplot(heatmap_df_intact, aes(x=var,y=unit_id_id,fill=val))+
     geom_tile()+
     labs(x=element_blank(),y="Cell ID")+
@@ -2128,7 +2129,7 @@ for (sid in unique(d$session_id)){
           # panel.border = element_rect(colour = "black", fill = NA)
           # axis.title.y=element_text(margin=margin(r=3,unit = "pt")),
           # axis.title.x = element_text(margin=margin(t=3,unit="pt"))
-          )
+    )
   save_plot(paste0("A by temp_cor_sig_torpor ",sid),plot=p, w=2.1,h=2)
   if (sid=="MT29_2025_05_22_session1"){
     as_ggplot(get_legend(p+theme(legend.position = "right")))
@@ -2224,10 +2225,10 @@ for (.event in unique(data$event)){
   print(.event)
   d<-data%>%filter(event==.event)
   .title<-case_when(.event=="male_removed" ~ "Male removed",
-                   .event=="male_added" ~ "Male added",
-                   .event=="fed" ~ "Re-feeding",
-                   .event=="first_bite" ~ "First bite",
-                   T ~ .event)
+                    .event=="male_added" ~ "Male added",
+                    .event=="fed" ~ "Re-feeding",
+                    .event=="first_bite" ~ "First bite",
+                    T ~ .event)
   
   p<-ggplot(d, aes(x=event_time_bin,y=mean_scaled_YrA,color=temp_cor_sig_torpor))+ms+
     continuous_errorbar()+
