@@ -742,6 +742,15 @@ p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_i
 save_plot("example session selected cells and timepoints",plot=p1+p3+p2+plot_layout(heights=c(15,1),widths=c(20,1),ncol=2),w=3.1,h=4.8)
 # save_plot("example session selected cells and timepoints with rectangle",plot=(p1+rect_set)/p2+plot_layout(heights=c(10,1)),w=4,h=5)
 
+#fewer example cells from a single session
+data<-data%>%
+  filter(unit_id %in% c(18, 6, 34, 1, 33, 15))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+theme(axis.line=element_blank(),legend.position = "none")+labs(title="Selected cells (F / max F)")
+p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=c(24,38),expand = c(0.25,0.25))
+p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_id))+ms+set+rect_label_set
+save_plot("example session selected cells and timepoints fewer cells",plot=p1+p3+p2+plot_layout(heights=c(5,1),widths=c(20,1),ncol=2),w=3.3,h=3)
+
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
   xy_point2(alpha=0.2)+
@@ -1277,13 +1286,13 @@ set<-list(theme(text=element_text(size=12),
 d<-read_rds("./output/intermediate/2_251013_circulating_E2_torpor_miniscope-pre-ovx_torpor-MT31-2025_11_23-session1-concatenated.rds")%>%
   filter(!is.na(scaled_YrA), session_type %in% c("cold","heat"))%>%
   group_by(unit_id_id)%>%
-  mutate(scaled_df_f0 = scales::rescale(df_f0))%>%
+  mutate(scaled_df_f0 = scaled_YrA)%>%
   ungroup()%>%
   mutate(session_time_minutes = session_time_minutes-min(session_time_minutes))%>%
   merge(unit_df%>%select(ambient_temp_interpolated_cor_sig_ambient,ambient_temp_interpolated_cor_ambient, unit_id_id,session_id,unit_id), all.x=T)
 data<-d%>%mutate(unit_id = factor(unit_id, levels=d%>%arrange(desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id)%>%unique()))
 
-p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+labs(title = "Selected cells (F / max F)")
 p2<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set+set+scale_y_continuous(expand = c(0.2,0.2))
 p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.2,0.2))+labs(title="Core body temperature")
 p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
@@ -1297,7 +1306,7 @@ data<-d%>%
   filter(!is.na(start_time))
 data<-data%>%mutate(unit_id = factor(unit_id, levels=data%>%arrange(desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id)%>%unique()))
 
-p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+theme(axis.line=element_blank(),legend.position = "none")
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+theme(axis.line=element_blank(),legend.position = "none")+labs(title = "Selected cells (F / max F)")
 p2<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set+set+scale_y_continuous(expand = c(0.25,0.25),breaks=c(5,37))
 p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.25,0.25),breaks=seq(34,40,4))+scale_x_continuous(expand=c(0.01,0.01),breaks=c(0,3,46,49,102,105,181,184))
 p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
@@ -1310,6 +1319,15 @@ save_plot("example session subset data ambient",plot=p1+p4+p2+plot_spacer()+p3+p
           legend.title=element_text(hjust=0.5),
           legend.title.position = "top"))%>%get_legend()%>%as_ggplot()
 save_plot("ambient temperature cell type legend",w=4,h=0.5)
+
+#subset with fewer cells and showing acute effects of ambient temperature change
+data<-data%>%filter(unit_id %in% c(12, 9, 5, 7, 15, 14))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+aes(height=scaled_df_f0)+theme(axis.line=element_blank(),legend.position = "none")+labs(title = "Selected cells (F / max F)")
+p2<-ggplot(data, aes(x=session_time_minutes, y=ambient_temp_interpolated))+ms+ls+ambient_temp_set+set+scale_y_continuous(expand = c(0.25,0.25),breaks=c(5,37))
+p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(expand = c(0.25,0.25),breaks=seq(34,40,4))+scale_x_continuous(expand=c(0.01,0.01),breaks=c(0,3,46,49,102,105,181,184))
+p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
+save_plot("example session subset data ambient fewer cells",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(5,1,1),widths=c(20,1),ncol=2),w=3.4,h=3.2)
 
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
@@ -1592,18 +1610,27 @@ rect_label_set<-list(geom_tile(aes(fill=male_interaction_auc_sig)),
 
 p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+scale_y_discrete(breaks=c())+geom_vline(xintercept=min(data%>%filter(male_interaction==1)%>%pull(session_time_minutes)),alpha=0.5)
 p2<-ggplot(data, aes(x=session_time_minutes, y=male_interaction))+ms+ls+male_interaction_set+set+scale_y_continuous(expand = c(0.2,0.2),breaks=c(0,1),labels=c("-","+"))
-p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(limits=c(35.9,38.1),breaks=c(36,38))+labs(title="T-Core (Deg. C)",y=element_blank())+scale_x_continuous(breaks=c(0,4,8),expand=c(0,0))
+p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(limits=c(35.9,38.1),breaks=c(36,38))+labs(title="T-Core (Deg. C)",y=element_blank())
 p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set+labs(x=element_blank(),y=element_blank())
 save_plot("example session all data male_interaction",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(12,1,1),widths=c(60,1),ncol=2),w=13,h=8)
 
 #subset
-data<-data%>%filter(session_time_minutes<10)
+data<-data%>%filter(session_time_minutes<10.5)
 
 p1<-p1+data+theme(axis.line=element_blank(),legend.position = "none")+labs(title="Cells (F / max F)")
 p2<-p2+data
-p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))
+p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))+scale_x_continuous(breaks=seq(0,10,5),expand=c(0,0))
 p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
 save_plot("example session subset data male_interaction",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(10,1,1),widths=c(20,1),ncol=2),w=2.6,h=3.3)
+
+#subset with fewer cells
+data<-data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))
+
+p1<-p1+data+theme(axis.line=element_blank(),legend.position = "none")+labs(title="Cells (F / max F)")
+p2<-p2+data
+p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))+scale_x_continuous(breaks=seq(0,10,5),expand=c(0,0))
+p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
+save_plot("example session subset data male_interaction fewer cells",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(5,1,1),widths=c(20,1),ncol=2),w=2.72,h=3.3)
 
 ##plot values by male_interaction for each session
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
