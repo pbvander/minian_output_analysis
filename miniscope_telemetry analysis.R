@@ -668,7 +668,7 @@ save_plot("df_f0 by body temperature all cells all sessions",plot=p,w=10,h=10)
 data<-sumdf%>%
   filter(!is.na(df_f0_bin), session_type=="torpor")%>%
   merge(unit_df%>%select(unit_id_id, temp_cor_torpor,temp_cor_sig_torpor,session_id))%>%
-  mutate(temp_bin1=cut(temp,breaks=seq(0,50,1), labels = seq(0,49,1)),
+  mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
 
 set<-list(theme(text=element_text(size=12),
