@@ -710,6 +710,22 @@ save_plot("df_f0 by temperature all intact cells",w=2.3,h=5)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by temperature all ovx cells",w=2.3,h=4)
 
+#as lines
+p<-ggplot(data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive"))),
+          aes(x=temp, y=df_f0_bin,color=temp_cor_sig_torpor,fill=temp_cor_sig_torpor))+
+  geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=1)+
+  scale_color_manual(values=cell_type_scale)+
+  geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
+  scale_fill_manual(values=cell_type_scale)+
+  labs(x="T-Core (Deg. C)", y=expression(bold(Delta * F / F[0])))+
+  ms+theme(legend.position = "none")
+p
+save_plot("df_f0 by temperature and cell type as lines", w=3,h=3)
+p+(p$data)%>%filter(gonad=="intact")
+save_plot("df_f0 by temperature and cell type as lines intact", w=2.4,h=2.4)
+p+(p$data)%>%filter(gonad=="ovx")+facet_wrap(vars(pellet))
+save_plot("df_f0 by temperature and cell type as lines ovx", w=3.5,h=2.4)
+
 # Graph all data for one session
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
