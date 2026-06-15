@@ -303,6 +303,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", pa
                     "heat" %in% .session_type & "cold" %in% .session_type ~ "ambient")[1]
     if(partition_type=="standard"){
       cor_col=paste0(response,"_mean_cor_",type,"_",additional_x_var)
+      cor_shuf_col=paste0(response,"_mean_cor_shuf_",type,"_",additional_x_var)
       sig_col=paste0(response,"_cor_sig_",type,"_",additional_x_var)
       coef_col<-paste0(response,"_MeanLmCoef_",type,additional_x_var)
     }
@@ -388,7 +389,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", pa
       cor_sig<-ifelse(rank>shuf_iters*0.95, "significant","non-significant")
       
       ##Compile data
-      lm_d<-tibble("{cor_col}":= mean_cor, "{sig_col}":=cor_sig, "session_id"=sid)
+      lm_d<-tibble("{cor_col}":= mean_cor, "{sig_col}":=cor_sig, "{cor_shuf_col}":=mean(shuf_cor_d$cor), "session_id"=sid)
       lm_df<-rbind(lm_df,lm_d)
       lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
       lm_coef_df<-rbind(lm_coef_df,lm_coef_d)

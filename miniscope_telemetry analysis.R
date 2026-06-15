@@ -1098,22 +1098,41 @@ save_plot("lm correlation coefficient by pellet downsample", w=2.7,h=2)
 
 data<-cell_type_lm_df%>%
   merge(lm_df%>%select(session_id,mouse),all.x=T)%>%
-  rbind(lm_df%>%filter(gonad=="intact")%>%select(session_id,temp_mean_cor_torpor_,temp_cor_sig_torpor_,mouse)%>%mutate(temp_cor_sig_torpor="All"))%>%
-  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("All","neutral","negative","positive"),labels=c("All","Neutral","Negative","Positive")))
+  rbind(lm_df%>%filter(gonad=="intact")%>%select(session_id,temp_mean_cor_torpor_,temp_mean_cor_shuf_torpor_,temp_cor_sig_torpor_,mouse)%>%mutate(temp_cor_sig_torpor="All"))%>%
+  rbind(lm_df%>%filter(gonad=="intact")%>%select(session_id,temp_mean_cor_torpor_,temp_mean_cor_shuf_torpor_,temp_cor_sig_torpor_,mouse)%>%mutate(temp_cor_sig_torpor="All (shuffle)",temp_mean_cor_torpor_=temp_mean_cor_shuf_torpor_))%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("All (shuffle)", "All","neutral","negative","positive"),labels=c("All (shuffle)","All", "Neutral","Negative","Positive")))
+
+cell_type_lme<-anova(lme(data = data%>%filter(!is.na(temp_mean_cor_torpor_), temp_cor_sig_torpor %in% c("All","Neutral","Positive")), 
+                         fixed = temp_mean_cor_torpor_ ~ temp_cor_sig_torpor, 
+                         random=~1|mouse))
+if (cell_type_lme[["temp_cor_sig_torpor","p-value"]]<0.05){
+  lme_df<-tibble()
+  for (comp in list(c("All","All (shuffle)"), c("All","Neutral"), c("All","Negative"), c("All","Positive"))){
+    lme<-anova(lme(data = data%>%filter(!is.na(temp_mean_cor_torpor_), temp_cor_sig_torpor %in% comp), fixed = temp_mean_cor_torpor_ ~ temp_cor_sig_torpor, random=~1|mouse))
+    lme_df<-lme_df%>%rbind(tibble(".y."="temp_mean_cor_torpor_", "group1"=comp[1], "group2"=comp[2], "F_value"=lme[["temp_cor_sig_torpor","F-value"]], "p"=lme[["temp_cor_sig_torpor","p-value"]]))
+  }
+}
+lme_df<-lme_df%>%mutate(p.adj=p*nrow(lme_df))%>%add_significance()%>%
+  mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(), 
+         xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(),
+         y.position=seq(1.1,1.1+(0.15*(nrow(lme_df)-1)),0.15)+0.04)
+
 p<-ggplot(data, aes(x=temp_cor_sig_torpor,y=temp_mean_cor_torpor_))+
   geom_violin(aes(fill=temp_cor_sig_torpor),scale="width",width=0.95)+
   point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=2.8,shape=21,stroke=1)+
   point_indiv(size=1.5,position=position_jitter(width=0.25,height=0,seed=321))+
-  labs(x=element_blank(),y="r")+
-  scale_fill_manual(values=c("black",cell_type_scale))+
+  labs(x=element_blank(),y="r",title="Cell type ****")+
+  scale_fill_manual(values=c("white","black",cell_type_scale))+
   scale_y_continuous(breaks=seq(0,1,0.5),labels=seq(0,1,0.5))+
   ms+
-  coord_cartesian(ylim=c(0,1))+
+  coord_cartesian(ylim=c(0,1.65))+
+  draw_pvalue(data=lme_df, label = "p.adj.signif",label.size = 12/.pt, face="bold")+
   theme(legend.position = "none",
-        axis.title.y = element_text(margin = margin(r=3, unit="pt")))+
-  scale_x_discrete(labels=c("All","Neutral","Neg.","Pos."), guide=guide_axis(n.dodge = 2))
+        axis.title.y = element_text(margin = margin(r=3, unit="pt")),
+        plot.title=element_text(size=12, hjust=0,margin=margin(t=0,b=5,l=0,r=0)))+
+  scale_x_discrete(labels=c("Shuf.","All","Neutral","Neg.","Pos."), guide=guide_axis(n.dodge = 2))
 p
-save_plot("lm correlation by cell type",w=2,h=1.84)
+save_plot("lm correlation by cell type",w=2.4,h=2.6)
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
