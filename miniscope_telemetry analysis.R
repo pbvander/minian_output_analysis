@@ -100,6 +100,8 @@ bad_frames<-list()
 sumdf<-tibble()
 A_all<-tibble()
 event_df<-tibble()
+bulk_df<-tibble()
+male_df<-tibble()
 
 ### Read and prepare metadata
 setwd(exp_direc)
@@ -322,6 +324,19 @@ for (dir in direcs){
               # Compile A
               A_all<-rbind(A_all,A)
               
+              # Combine across cells to get pseudo-fiber data
+              bulk_d<-df%>%
+                filter(!is.na(df_f0))%>%
+                group_by(session_id, frame)%>%
+                mutate(bulk_df_f0 = mean(df_f0))%>%
+                distinct(session_id, frame, .keep_all = T)
+              bulk_df<-rbind(bulk_df, bulk_d)
+              
+              # Extract and compile male_interaction data
+              male_d<-df%>%
+                filter(!is.na(df_f0), session_type=="male_interaction")
+              male_df<-rbind(male_d, male_df)
+              
               ## Graph full data for all sessions
               setwd(output_dir)
               for (id in df%>%filter(!is.na(session_id))%>%pull(session_id_type)%>%unique()){
@@ -380,6 +395,8 @@ write_output(sumdf)
 write_output(t_df)
 write_output(A_all)
 write_output(event_df)
+write_output(bulk_df)
+write_output(male_df)
 
 #Read
 setwd(output_dir)
@@ -387,6 +404,8 @@ sumdf<-read_rds("./output/sumdf.rds")
 t_df<-read_rds("./output/t_df.rds")
 A_all<-read_rds("./output/A_all.rds")
 event_df<-read_rds("./output/event_df.rds")
+bulk_df<-read_rds("./output/bulk_df.rds")
+male_df<-read_rds("./output/male_df.rds")
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
@@ -541,12 +560,13 @@ pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
 t_df<-read_rds("./output/t_df.rds")
 A_all<-read_rds("./output/A_all.rds")
-event_df<-read_rds("./output/event_df.rds")
 ambient_cell_type_lm_df<-read_rds("./output/ambient_cell_type_lm_df.rds")
 ambient_cell_type_predict_df<-read_rds("./output/ambient_cell_type_predict_df.rds")
 temporal_lm_ls<-read_rds("./output/temporal_lm_ls.rds")
 temporal_lm_df<-read_rds("./output/temporal_lm_df.rds")
+bulk_df<-read_rds("./output/bulk_df.rds")
 event_df<-read_rds("./output/event_df.rds")
+male_df<-read_rds("./output/male_df.rds")
 
 ########### Graph ###########
 ### Session timing schematic
@@ -1306,7 +1326,6 @@ save_plot("df_f0 by ambient temperature all ovx cells",w=2.3,h=4.4)
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
                 plot.margin = margin(t=0, b=-5, l=3, r=0, "pt"),
-                axis.title.y = element_text(margin(t=3,b=-5,l=0,r=0,unit="pt")),
                 panel.spacing = unit(0.05,"inches")))
 
 #all data
