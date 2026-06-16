@@ -348,6 +348,8 @@ partition_data <- function(d, id_col, partition_type, partition_col, response, c
   return(pcs)
 }
 
+safe_var <- function(x) paste0("`", x, "`")
+
 lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", partition_col=NULL, partition_type="standard", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
   if (partition_type=="standard"){folds<-1:cv_folds}
   if (partition_type=="entry_arousal"){folds<-cv_folds}
@@ -388,7 +390,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", pa
     cor_df<-tibble()
     coef_df<-tibble()
     add_x_var_coef_df<-tibble()
-    formula<-as.formula(paste0(response,"~ . - ",id_col))
+    formula<-as.formula(paste0(safe_var(response),"~ . - ",id_col))
     for (fold in folds){
       #Set up data
       if(partition_type=="standard"){
