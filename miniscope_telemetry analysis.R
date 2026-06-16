@@ -440,6 +440,12 @@ for (cell_type in unique(data$temp_cor_sig_torpor)){
   cell_type_lm_df<-rbind(cell_type_lm_df, (lm$lm_df)%>%mutate(temp_cor_sig_torpor=cell_type))
 }
 
+#population temporal tuning analysis
+temporal_lm_ls<-population_lag_analysis(telem_data = t_df, miniscope_data = sumdf%>%filter(session_type=="torpor"), window=seq(-5,5,1), response="temp", verbose=F, shuf_iters = 10)
+
+temporal_lm_df<-(temporal_lm_ls$temporal_session_df)%>%merge(lm_df,all.x=T) #add metadata
+unit_df<-merge(unit_df, temporal_lm_ls$temporal_unit_df, all.x=T)
+
 #ambient
 data<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,ambient_temp_interpolated_cor_ambient, ambient_temp_interpolated_cor_sig_ambient), all.x=T)
 
@@ -514,6 +520,8 @@ write_output(t_df)
 write_output(A_all)
 write_output(ambient_cell_type_lm_df)
 write_output(ambient_cell_type_predict_df)
+write_rds(temporal_lm_ls, "./output/temporal_lm_ls.rds")
+write_output(temporal_lm_df)
 
 #Read all
 setwd(output_dir)
@@ -536,6 +544,9 @@ A_all<-read_rds("./output/A_all.rds")
 event_df<-read_rds("./output/event_df.rds")
 ambient_cell_type_lm_df<-read_rds("./output/ambient_cell_type_lm_df.rds")
 ambient_cell_type_predict_df<-read_rds("./output/ambient_cell_type_predict_df.rds")
+temporal_lm_ls<-read_rds("./output/temporal_lm_ls.rds")
+temporal_lm_df<-read_rds("./output/temporal_lm_df.rds")
+event_df<-read_rds("./output/event_df.rds")
 
 ########### Graph ###########
 ### Session timing schematic
@@ -2048,11 +2059,26 @@ for (st in unique(data$session_type)){
 }
 
 ##Visualize temporal lag tuning
+#cell-wise analysis
 p<-ggplot(unit_df, aes(x=temp_cor_torpor, y=strongest_temp_lag_torpor))+
   xy_point()+
   ms
 p+facet_wrap(vars(pellet))
 save_plot("temporal lag tuning",w=6,h=5)
+
+#population-level analysis
+p<-ggplot(temporal_lm_df, aes(x=strongest_temp_cor_torpor, y=strongest_temp_lag_torpor))+
+  xy_point()+
+  ms
+p
+save_plot("population temporal lag tuning", w=3,h=3)
+
+p<-ggplot(unit_df, aes(x=heaviest_lag_temp_cor_torpor, y=heaviest_weight_temp_cor_torpor))+
+  point_indiv(aes(fill=temp_cor_sig_torpor), fill=NULL)+
+  scale_fill_manual(values=cell_type_scale)+
+  ms
+p+facet_wrap(vars(pellet))
+save_plot("lm temporal lag tuning by cell by pellet and cell type",w=4,h=3)
 
 ##PCA
 for (sid in unique(pca_time$session_id)){
