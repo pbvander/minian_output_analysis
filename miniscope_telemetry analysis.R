@@ -41,7 +41,7 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
 )
 
 #Parameters
-shuffle_iterations<-200
+shuffle_iterations<-500
 
 #Misc
 lon<-7 #clock time in hours at ZT0 when lights come on
@@ -2017,7 +2017,7 @@ for (target in target_cols_binary){
   i=i+1
 }
 
-## Compare lm results by variable
+## Compare lm results by variable ----
 #Tcore only vs Tcore + change
 data<-lm_df%>%select(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1,session_id)%>%
   pivot_longer(cols=c(temp_mean_cor_torpor_,temp_mean_cor_torpor_temp_change1), names_to = "var",values_to = "cor")%>%
@@ -2058,7 +2058,7 @@ p<-p+data
 p
 facet(p,"pellet")
 
-##Stdev of F0 signal across stimuli and pellets
+##Stdev of F0 signal across stimuli and pellets ----
 data<-sumdf%>%filter(!is.na(sd_f0_bin))%>%group_by(unit_id_id, session_id_type)%>%summarize(mean_sd_f0_bin=mean(sd_f0_bin))%>%
   merge(sumdf%>%ungroup()%>%distinct(unit_id_id,  session_id_type,session_type, mouse, pellet),all.x=T)%>% #add metadata
   filter(!is.na(mean_sd_f0_bin))
@@ -2077,7 +2077,7 @@ for (st in unique(data$session_type)){
   save_plot(paste("F0 stdev",st),w=6,h=5)
 }
 
-##Visualize temporal lag tuning
+##Visualize temporal lag tuning ----
 #cell-wise analysis
 p<-ggplot(unit_df, aes(x=temp_cor_torpor, y=strongest_temp_lag_torpor))+
   xy_point()+
@@ -2099,7 +2099,7 @@ p<-ggplot(unit_df, aes(x=heaviest_lag_temp_cor_torpor, y=heaviest_weight_temp_co
 p+facet_wrap(vars(pellet))
 save_plot("lm temporal lag tuning by cell by pellet and cell type",w=4,h=3)
 
-##PCA
+##PCA ----
 for (sid in unique(pca_time$session_id)){
   # if(verbose){print(sid)}
   #telem_ts (each dot is a timepoint, collapsed across all cells)
@@ -2212,7 +2212,7 @@ for (sid in unique(pca_time$session_id)){
   }
 }
 
-## Cell locations
+## Spatial analysis ----
 d<-A_all%>%merge(unit_df, all.x=T)
 
 for (sid in unique(d$session_id)){
@@ -2288,7 +2288,7 @@ save_plot("spatial analysis torpor intact",w=3,h=2)
 pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_grid(vars(pellet),vars(var),switch = "y")+theme(legend.position = "top",legend.box.margin = margin(t=0,b=-15, l=0, r=0,unit="pt"))
 save_plot("spatial analysis torpor ovx",w=3,h=3)
 
-####Plot events
+####Plot events ----
 #example
 data<-event_df%>%
   filter(event=="fed",session_id=="MT35_2026_02_10_session1",event_aligned_time_seconds%>%between(-60,60))%>%
@@ -2335,6 +2335,7 @@ for (.event in unique(data$event)){
                     .event=="male_added" ~ "Male added",
                     .event=="fed" ~ "Re-feeding",
                     .event=="first_bite" ~ "First bite",
+                    .event--"first_interaction" ~ "First interaction",
                     T ~ .event)
   
   p<-ggplot(d, aes(x=event_time_bin,y=mean_scaled_YrA,color=temp_cor_sig_torpor))+ms+
