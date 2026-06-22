@@ -409,6 +409,9 @@ male_df<-read_rds("./output/male_df.rds")
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
+male_unit_df<-roc_analysis(male_df%>%filter(!is.na(df_f0), session_type=="male_interaction"), session_type = "male_interaction", predictor="df_f0", shuf_iters = shuffle_iterations)%>%
+  rename(male_interaction_auc_nobin = male_interaction_auc, male_interaction_fc_nobin = male_interaction_fc, male_interaction_auc_sig_nobin = male_interaction_auc_sig)
+unit_df<-merge(unit_df,male_unit_df,all.x=T)
 
 # Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations).
 #torpor and post-ovx data only
@@ -1655,6 +1658,12 @@ data<-sumdf%>%
   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,unit_id_id, unit_id),all.x=T)%>%
   group_by(unit_id_id)%>%
   mutate(session_time_minutes = as.duration(telem_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
+# data<-male_df%>%
+#   filter(!is.na(df_f0), session_type=="male_interaction")%>%
+#   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc, unit_id_id, unit_id), all.x=T)%>%
+#   group_by(unit_id_id)%>%
+#   mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
+
 male_entry_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_entry_minutes=min(session_time_minutes))
 data<-data%>%merge(male_entry_minutes,all.x=T)%>%
   mutate(time_bin = case_when(male_interaction==0 & session_time_minutes<10 ~ "Pre-male",
