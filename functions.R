@@ -934,6 +934,40 @@ predict.moving_avg <- function(object, newdata, se.fit = FALSE, ...) {
   }
 }
 
+moving_avg_trail <- function(formula, data, window = 1, ...) {
+  structure(list(data = data, window = window), class = "moving_avg_trail")
+}
+
+predict.moving_avg_trail <- function(object, newdata, se.fit = FALSE, ...) {
+  x <- object$data$x
+  y <- object$data$y
+  w <- object$window
+  
+  results <- lapply(newdata$x, function(xi) {
+    in_window <- x >= (xi - w) & x <= (xi)
+    yvals <- y[in_window]
+    n <- sum(!is.na(yvals))
+    m <- mean(yvals, na.rm = TRUE)
+    s <- sd(yvals, na.rm = TRUE)
+    sem <- if (n > 1) s / sqrt(n) else NA_real_
+    list(fit = m, sem = sem)
+  })
+  
+  fit <- sapply(results, `[[`, "fit")
+  sem <- sapply(results, `[[`, "sem")
+  
+  if (se.fit) {
+    fit_matrix <- cbind(
+      fit = fit,
+      lwr = fit - sem,   # mean - 1 SEM
+      upr = fit + sem    # mean + 1 SEM
+    )
+    list(fit = fit_matrix, se.fit = sem)
+  } else {
+    fit
+  }
+}
+
 colors<-c("#000000", "#E69F00", "#56B4E9", "#009E73","#F0E442", "#0072B2", "#D55E00", "#CC79A7") #http://bconnelly.net/posts/creating_colorblind-friendly_figures/
 
 ##Misc
