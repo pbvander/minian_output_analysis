@@ -850,6 +850,10 @@ save_plot("temp-temp_change1 relationship during torpor by session_id",w=7,h=6)
 temp_tempchange_lm<-lm_analysis(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
 temp_tempchange_lm$lm_df
 
+# Temp and act relationship
+ggplot(t_df%>%filter(aligned_time%>%between(0,48)), aes(x=temp,y=act))+xy_point2(alpha=0.05)+ms+scale_x_continuous(breaks=seq(0,50,1))+labs(x="Core body temperature (Deg. C)",y="Gross locomotor activity (AU)")
+save_plot("body temperature and activity relationship",w=12,h=8)
+
 # Correlation coefficient by gonad/E2 state or pellet
 p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=group_gonad, y=temp_cor_torpor))+
   geom_violin(aes(fill=group_gonad))+
