@@ -2437,27 +2437,28 @@ save_plot("example session re-feeding response",plot=p1+p4+p2+plot_spacer()+p3+p
 #compiled data
 data<-event_df%>%
   filter(event_aligned_time_seconds%>%between(-60,60))%>%
-  mutate(event_time_bin = cut(event_aligned_time_seconds, seq(-60,60,1), labels=seq(-60,59,1))%>%as.character()%>%as.numeric())%>%
-  group_by(unit_id_id, event, event_time_bin)%>%
-  summarize(mean_scaled_YrA = mean(scaled_YrA))%>%
-  merge(unit_df, all.x=T)%>%
-  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
+  merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)), unit_id_id, session_id, male_interaction_auc_sig_nobin), all.x=T)%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
+         male_interaction_auc_sig_nobin=factor(male_interaction_auc_sig_nobin,levels=c("neutral","activated","suppressed")))
 
 for (.event in unique(data$event)){
   print(.event)
-  d<-data%>%filter(event==.event)
   .title<-case_when(.event=="male_removed" ~ "Male removed",
                     .event=="male_added" ~ "Male added",
                     .event=="fed" ~ "Re-feeding",
                     .event=="first_bite" ~ "First bite",
                     .event=="first_interaction" ~ "First interaction",
                     T ~ .event)
+  var<-case_when(.event %in% c("male_removed","male_added","first_interaction") ~ "male_interaction_auc_sig_nobin",
+                 .event %in% c("fed","first_bite") ~ "temp_cor_sig_torpor",
+                 .event %in% c("sham_injection","veh_injection","E2_injection") ~ "injection")
+  d<-data%>%filter(event==.event, !is.na(.data[[var]]))
   
-  p<-ggplot(d, aes(x=event_time_bin,y=mean_scaled_YrA,color=temp_cor_sig_torpor))+ms+
-    continuous_errorbar()+
-    continuous_line()+
-    labs(y="F / max(F)", x="Time (seconds)",title=.title)+
+  p<-ggplot(d, aes(x=event_aligned_time_seconds,y=df_f0,color=.data[[var]], fill=.data[[var]]))+ms+
+    geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=1)+
+    labs(y="dF/F0", x="Time (seconds)",title=.title)+
     scale_color_manual(values=cell_type_scale)+
+    scale_fill_manual(values=cell_type_scale)+
     geom_vline(xintercept=0,linewidth=1,alpha=0.5)+
     theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")),
           legend.position = "right")
@@ -2467,7 +2468,7 @@ for (.event in unique(data$event)){
   save_plot(paste(.event, "summary intact"),w=3.5,h=2.5)
   p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
   save_plot(paste(.event, "summary ovx"), w=4.5,h=2.5)
-  p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(temp_cor_sig_torpor),axes="all")+aes(color=pellet)+scale_color_manual(values=post_ovx_scale)
+  p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(.data[[var]]),axes="all",scales="free_y")+aes(color=pellet,fill=pellet)+scale_color_manual(values=post_ovx_scale)+scale_fill_manual(values=post_ovx_scale)
   save_plot(paste(.event, "summary ovx by pellet"), w=6,h=2.5)
 }
 
