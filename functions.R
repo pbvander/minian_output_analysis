@@ -734,7 +734,7 @@ save_plot<- function(name, plot=last_plot(), direc="./output/",w=NA,h=NA,units="
   # print("Saving pdf...")
   ggsave(filename = paste0(direc,name,".pdf"), plot = plot, width=w, height=h, units=units, ...)
   # print("Saving svg...")
-  ggsave(filename = paste0(direc,name,".svg"), plot = plot, width=w, height=h, units=units, ...)
+  # ggsave(filename = paste0(direc,name,".svg"), plot = plot, width=w, height=h, units=units, ...)
   # print("Saving png...")
   ggsave(filename = paste0(direc,name,".png"), plot = plot, width=w, height=h, units=units, ...)
   # print("Saving RDS...")
