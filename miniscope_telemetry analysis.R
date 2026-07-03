@@ -1910,6 +1910,32 @@ p<-ggplot(unit_df%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_
 p
 save_plot("male interaction volcano plot",w=5,h=3)
 
+##Visualize events per animal
+data<-male_df%>%
+  merge(unit_df%>%select(unit_id_id, session_id, male_interaction_auc_sig_nobin, male_interaction_auc_sig), all.x=T)%>%
+  group_by(session_id)%>%
+  mutate(male_added_time_seconds = as.duration(miniscope_ts - male_added)%>%as.numeric(),
+         male_interaction_auc_sig_nobin = factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed")))
+
+interaction_vlines<-data%>%group_by(session_id)%>%summarize(first_interaction_male_added_time_seconds = male_added_time_seconds[which.min(abs(first_interaction - miniscope_ts))])%>%merge(lm_df,all.x=T)
+mouse_levels<-unit_df%>%distinct(mouse,pellet)%>%arrange(pellet)%>%filter(pellet!="pre-OVX")%>%pull(mouse)%>%unique()
+
+p<-ggplot(data%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(x=male_added_time_seconds, y=df_f0))+
+  coord_cartesian(xlim=c(-30,90))+
+  scale_x_continuous(breaks=seq(-30,90,30))+
+  geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1, aes(color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
+  geom_vline(data=interaction_vlines%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(xintercept=first_interaction_male_added_time_seconds,linetype=pellet), linewidth=1,alpha=0.5)+
+  geom_vline(linewidth=1,alpha=0.5,aes(xintercept=0,linetype=pellet))+
+  labs(y="dF/F0", x="Time from male added (seconds)")+
+  scale_color_manual(values=cell_type_scale)+
+  scale_fill_manual(values=cell_type_scale)+
+  theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")),
+        legend.position = "right")+
+  ms+
+  facet_wrap(vars(mouse),scales="free_y",axes="all")
+p
+save_plot("male interaction male added and first interaction", w=10,h=16)
+
 ##Cell type frequencies
 data<-transform_data_piegraph(unit_df, animal_var="pellet",cell_var="male_interaction_auc_sig")%>%
   mutate(male_interaction_auc_sig = factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"),labels=c("Neutral","Activated","Suppressed")))
