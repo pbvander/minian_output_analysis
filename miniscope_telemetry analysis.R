@@ -1656,17 +1656,14 @@ for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_i
 }
 
 ### dF/F0 - male social stimulus relationship ----
-##plot all cells on one graph summarized by timepoint bin
+###plot all cells on one graph
+##1-minute binned data
+#heatmap
 data<-sumdf%>%
   filter(!is.na(df_f0_bin), session_type=="male_interaction")%>%
   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,unit_id_id, unit_id),all.x=T)%>%
   group_by(unit_id_id)%>%
   mutate(session_time_minutes = as.duration(telem_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
-# data<-male_df%>%
-#   filter(!is.na(df_f0), session_type=="male_interaction")%>%
-#   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc, unit_id_id, unit_id), all.x=T)%>%
-#   group_by(unit_id_id)%>%
-#   mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
 
 male_entry_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_entry_minutes=min(session_time_minutes))
 data<-data%>%merge(male_entry_minutes,all.x=T)%>%
@@ -1735,6 +1732,100 @@ p+(p$data)%>%filter(gonad=="intact")
 save_plot("df_f0 male_interaction cell type as lines intact", w=2.3,h=2)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
 save_plot("df_f0 male_interaction cell type as lines ovx", w=3.5,h=2.4)
+
+#as lines, plotted by other stimuli
+other_targets<-target_cols_binary[target_cols_binary != "male_interaction_auc_sig"]
+for (target in other_targets){
+  title=case_when(grepl("male",target) ~ "Social",
+                  grepl("ambient",target) ~ "T-Amb",
+                  grepl("torpor",target) ~ "T-Core")
+  if (target=="ambient_temp_interpolated_cor_sig_ambient"){data<-data%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient,levels=c("neutral","negative","positive")))}
+  if (target=="temp_cor_sig_torpor"){data<-data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))}
+  p1<-p+data%>%filter(!is.na(!!sym(target)))+aes(color=!!sym(target), fill=!!sym(target))+labs(title=title)+theme(legend.position = "none",plot.title=element_text(size=12,margin=margin(0,0,3,0,"pt")))
+  p1
+  save_plot(paste("df_f0 male_interaction as lines colored by",target), w=4, h=4)
+  p1+(p1$data)%>%filter(gonad=="intact")
+  save_plot(paste("df_f0 male_interaction as lines colored by",target,"intact"), w=2.3, h=2)
+  p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(!!sym(target)))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
+  save_plot(paste("df_f0 male_interaction as lines colored by",target,"ovx by pellet"), w=3, h=2)
+}
+
+##un-binned data (raw, frame-wise miniscope data)
+#heatmap
+data<-male_df%>%
+  filter(!is.na(df_f0), session_type=="male_interaction")%>%
+  merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,male_interaction_auc_nobin, male_interaction_auc_sig_nobin,male_interaction_fc_nobin, unit_id_id, unit_id), all.x=T)%>%
+  group_by(unit_id_id)%>%
+  mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60,
+         rescaled_YrA = scales::rescale(YrA))
+
+male_entry_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_entry_minutes=min(session_time_minutes))
+data<-data%>%merge(male_entry_minutes,all.x=T)%>%
+  mutate(time_bin = case_when(male_interaction==0 & session_time_minutes<10 ~ "Pre-male",
+                              male_interaction==0 & session_time_minutes>10 ~ "Post-male",
+                              male_interaction==1 & session_time_minutes < male_entry_minutes+1.1 ~ "0-1 min.",
+                              male_interaction==1 & session_time_minutes < male_entry_minutes+6 ~ "1-5 min.",
+                              male_interaction==1 & session_time_minutes ~ "5-10 min.")%>%
+           factor(levels=c("Pre-male","0-1 min.","1-5 min.","5-10 min.","Post-male")),
+         unit_id_id = factor(unit_id_id, levels=data%>%arrange(desc(pellet),male_interaction_auc_nobin)%>%pull(unit_id_id)%>%unique()))
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=0, r=0, "inches")))
+rect_label_set<-list(geom_tile(aes(fill=male_interaction_auc_sig_nobin)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+rect_label_pellet<-list(geom_tile(aes(fill=pellet)),
+                        scale_fill_manual(values=post_ovx_scale2),
+                        theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
+
+p<-ggplot(data%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
+  labs(x=element_blank(), y=element_blank())+
+  geom_tile(aes(fill=rescaled_YrA))+
+  scale_y_discrete(breaks=c(),expand=c(0,0))+
+  scale_x_discrete(expand=c(0,0))+
+  scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
+  ms+
+  theme(panel.background = element_rect(fill="black"),
+        # legend.title = element_text(),
+        # legend.text = element_text(size=12,face="bold"),
+        axis.title.y=element_text(margin=margin(r=3,unit="pt")),
+        axis.title.x = element_text(size=12,margin=margin(t=4,l=-25,unit="pt")),
+        axis.text.x = element_text(angle = 270, hjust = 0.5, vjust = 0),
+        legend.text = element_blank(),
+        legend.position = "top",
+        legend.key.width = unit(0.2,"inches"),
+        legend.justification = 0,
+        legend.box.spacing = unit(6,"pt"),
+        axis.line.y = element_blank())
+p+labels_intact+plot_layout(widths = c(15,1))
+save_plot("df_f0 by male interaction time bin all intact cells no bin",w=1.8,h=3.4)
+p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
+save_plot("df_f0 by male interaction time bin all ovx cells no bin",w=1.8,h=4.5)
+
+#as lines
+p<-ggplot(data%>%mutate(male_interaction_auc_sig_nobin=factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed"))),
+          aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=df_f0, color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
+  geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1)+
+  scale_color_manual(values=cell_type_scale)+
+  geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
+  geom_vline(xintercept=c(0,10),linetype="dotdash",linewidth=0.5)+
+  scale_fill_manual(values=cell_type_scale)+
+  labs(x="Time from male\nentry (minutes)", y=expression(bold(Delta * F / F[0])))+
+  scale_x_continuous(breaks=seq(-5,15,5))+
+  ms+theme(legend.position = "none",
+           axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")))
+p
+save_plot("df_f0 male_interaction cell type as lines no bin", w=3,h=3)
+p+(p$data)%>%filter(gonad=="intact")
+save_plot("df_f0 male_interaction cell type as lines intact no bin", w=2.3,h=2)
+p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
+save_plot("df_f0 male_interaction cell type as lines ovx no bin", w=3.5,h=2.4)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "male_interaction_auc_sig"]
