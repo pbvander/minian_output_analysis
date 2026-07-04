@@ -678,17 +678,17 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
     merge(unit_df%>%select(unit_id_id,session_id,temp_cor_torpor,temp_cor_sig_torpor), all.x=T)%>%
     mutate(unit_id = factor(unit_id, levels = unit_df%>%filter(session_id==id)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
   
-  p<-ggplot(data, aes(x=temp, y=df_f0_bin))+
+  p<-ggplot(data, aes(x=temp, y=z_bin))+
     regression_line(aes(color=temp_cor_sig_torpor),linewidth = 0.9)+
     xy_point2(alpha=0.2,size=1,stroke = 0.7)+
     scale_color_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3]))+
     scale_y_continuous(expand=c(0.2,0.2))+
     ms+
-    labs(y="dF/F0", title="Cell ID", x="Core temperature (Deg. C)")+
+    labs(y="Z-scored dF", title="Cell ID", x="Core temperature (Deg. C)")+
     theme(legend.position = "none")+
     facet_wrap(vars(unit_id),scales="free_y",axes="all")#+theme(strip.text.x = element_blank())
-  save_plot(paste("df_f0 by body temperature",id),plot=p, w=15,h=12)
-  save_plot(paste("df_f0 by body temperature no color",id),plot=p+scale_color_manual(values=c("black","black","black")),w=15,h=12)
+  save_plot(paste("z-scored df by body temperature",id),plot=p, w=15,h=12)
+  save_plot(paste("z-scored df by body temperature no color",id),plot=p+scale_color_manual(values=c("black","black","black")),w=15,h=12)
   
   #graph example cells
   if (id == "MT29_2025_05_22_session1"){
@@ -703,7 +703,7 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
             axis.title.y = element_text(margin=margin(t=0,b=0,l=2,r=2,unit="pt")),
             axis.title.x = element_text(margin=margin(t=6,b=0,l=0,r=0,unit="pt")))+
       facet_wrap(vars(unit_id),scales="free_y",axes="all",ncol=2)
-    save_plot("df_f0 by body temperature example cells", plot=p, w=3.24,h=4)
+    save_plot("z-scored df by body temperature example cells", plot=p, w=2.36,h=3.9)
   }
 }
 
@@ -763,21 +763,23 @@ save_plot("df_f0 by temperature all ovx cells",w=2.3,h=4)
 
 #as lines
 p<-ggplot(data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive"))),
-          aes(x=temp, y=df_f0_bin, color=temp_cor_sig_torpor, fill=temp_cor_sig_torpor))+
+          aes(x=temp, y=z_bin, color=temp_cor_sig_torpor, fill=temp_cor_sig_torpor))+
   geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=1)+
   scale_color_manual(values=cell_type_scale)+
   geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
   scale_fill_manual(values=cell_type_scale)+
-  labs(x="T-Core (Deg. C)", y=expression(bold(Delta * F / F[0])))+
+  labs(x="T-Core (Deg. C)", y=expression(bold("Z-scored " * Delta * F)))+
   ms+theme(legend.position = "none",
            axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")),
            axis.title.x=element_text(margin=margin(t=3)))
 p
-save_plot("df_f0 by temperature and cell type as lines", w=3,h=3)
-p+(p$data)%>%filter(gonad=="intact")
-save_plot("df_f0 by temperature and cell type as lines intact", w=2.3,h=2)
+save_plot("z-scored df by temperature and cell type as lines", w=3,h=3)
+p+(p$data)%>%filter(gonad=="intact")+coord_cartesian(ylim=c(-1,NA))
+save_plot("z-scored df by temperature and cell type as lines intact", w=2.5,h=2)
+p+(p$data)%>%filter(gonad=="intact")+aes(color=NULL, fill=NULL)+geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=0.85,color="black",fill="grey10")
+save_plot("z-scored df by temperature as lines intact", w=2.3, h=2)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-save_plot("df_f0 by temperature and cell type as lines ovx", w=3.5,h=2.4)
+save_plot("z-scored df by temperature and cell type as lines ovx", w=3.5,h=2.4)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "temp_cor_sig_torpor"]
@@ -1378,21 +1380,21 @@ save_plot("df_f0 by ambient temperature all ovx cells",w=2.3,h=4.4)
 
 #as lines
 p<-ggplot(data%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive"))),
-          aes(x=ambient_temp_interpolated, y=df_f0_bin, color=ambient_temp_interpolated_cor_sig_ambient, fill=ambient_temp_interpolated_cor_sig_ambient))+
-  geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=1)+
+          aes(x=ambient_temp_interpolated, y=z_bin, color=ambient_temp_interpolated_cor_sig_ambient, fill=ambient_temp_interpolated_cor_sig_ambient))+
+  geom_smooth(method=moving_avg, method.args=list(window=8), se=TRUE, linewidth=1)+
   scale_color_manual(values=cell_type_scale)+
   geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
   scale_fill_manual(values=cell_type_scale)+
-  labs(x="T-Amb (Deg. C)", y=expression(bold(Delta * F / F[0])))+
+  labs(x="T-Amb (Deg. C)", y=expression(bold("Z-scored " * Delta * F)))+
   scale_x_continuous(breaks=seq(5,37,8))+
   ms+theme(legend.position = "none",
            axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")))
 p
-save_plot("df_f0 by t-amb and cell type as lines", w=3,h=3)
+save_plot("z-scored df by t-amb and cell type as lines", w=3,h=3)
 p+(p$data)%>%filter(gonad=="intact")
-save_plot("df_f0 by t-amb and cell type as lines intact", w=2.3,h=2)
+save_plot("z-scored df by t-amb and cell type as lines intact", w=2.3,h=2)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-save_plot("df_f0 by t-amb and cell type as lines ovx", w=3.5,h=2.4)
+save_plot("z-scored df by t-amb and cell type as lines ovx", w=3.5,h=2.4)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "ambient_temp_interpolated_cor_sig_ambient"]
@@ -1727,22 +1729,22 @@ save_plot("df_f0 by male interaction time bin all ovx cells",w=1.8,h=4.5)
 
 #as lines
 p<-ggplot(data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed"))),
-          aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=df_f0_bin, color=male_interaction_auc_sig, fill=male_interaction_auc_sig))+
+          aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=z_bin, color=male_interaction_auc_sig, fill=male_interaction_auc_sig))+
   geom_smooth(method=moving_avg, method.args=list(window=2), se=TRUE, linewidth=1)+
   scale_color_manual(values=cell_type_scale)+
   geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
   geom_vline(xintercept=c(0,10),linetype="dotdash",linewidth=0.5)+
   scale_fill_manual(values=cell_type_scale)+
-  labs(x="Time from male\nentry (minutes)", y=expression(bold(Delta * F / F[0])))+
+  labs(x="Time from male\nentry (minutes)", y=expression(bold("Z-scored " * Delta * F)))+
   scale_x_continuous(breaks=seq(-5,15,5))+
   ms+theme(legend.position = "none",
            axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")))
 p
-save_plot("df_f0 male_interaction cell type as lines", w=3,h=3)
+save_plot("z-scored df male_interaction cell type as lines", w=3,h=3)
 p+(p$data)%>%filter(gonad=="intact")
-save_plot("df_f0 male_interaction cell type as lines intact", w=2.3,h=2)
+save_plot("z-scored df male_interaction cell type as lines intact", w=2.3,h=2)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-save_plot("df_f0 male_interaction cell type as lines ovx", w=3.5,h=2.4)
+save_plot("z-scored df male_interaction cell type as lines ovx", w=3.5,h=2.4)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "male_interaction_auc_sig"]
