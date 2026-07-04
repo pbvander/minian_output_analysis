@@ -190,7 +190,7 @@ correlation_analysis <- function(data, response, .session_type, predictor="df_f0
       #Calculate real correlation
       d<-data%>%filter(unit_id_id==id)
       cor<-cor(d$pred, d$r, method=method)
-      slope<-coef(lm(d$r ~ d$pred))[[2]]
+      slope<-coef(lm(d$pred ~ d$r))[[2]]
       
       #Calculate shuffled correlations
       shuf_cor<-c()
