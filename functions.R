@@ -868,8 +868,8 @@ line_pair <- function(..., color="grey",seed=123,position=position_jitter(width=
   geom_path(color=color,position=position,size=size,alpha=alpha,...)
 }
 
-draw_pvalue <- function(..., data,label.size=6,bracket.size=1){
-  stat_pvalue_manual(data=data,label.size=label.size,bracket.size=bracket.size,...)
+draw_pvalue <- function(..., data,label.size=12/.pt,bracket.size=1, fontface="bold"){
+  stat_pvalue_manual(data=data,label.size=label.size,fontface=fontface,bracket.size=bracket.size,...)
 }
 
 annotate_pvalue <- function(..., geom="text",hjust=0,x=0,y=0,p,size=4.7,fontface="bold"){ #set p equal to cell in t_test where p-value is located!
@@ -899,6 +899,48 @@ get_torpor_y <- function(data){
   return(torpor_y)
 }
 
+weighted_moving_avg <- function(formula, data, window = 1, sigma = window / 4, ...) { #weighted moving average with gaussian weights
+  structure(list(data = data, window = window, sigma = sigma), class = "weighted_moving_avg")
+}
+
+predict.weighted_moving_avg <- function(object, newdata, se.fit = FALSE, ...) {
+  x <- object$data$x
+  y <- object$data$y
+  w <- object$window
+  sigma <- object$sigma
+  
+  results <- lapply(newdata$x, function(xi) {
+    in_window <- x >= (xi - w/2) & x <= (xi + w/2)
+    vals <- y[in_window]
+    weights <- dnorm(x[in_window], mean = xi, sd = sigma)
+    valid <- !is.na(vals)
+    vals <- vals[valid]; weights <- weights[valid]
+    n <- length(vals)
+    if (n > 1) {
+      wm    <- weighted.mean(vals, weights)
+      n_eff <- sum(weights)^2 / sum(weights^2)
+      wvar  <- sum(weights * (vals - wm)^2) / (sum(weights) * (1 - 1/n_eff))
+      wsem  <- sqrt(wvar / n_eff)
+      list(fit = wm, sem = wsem)
+    } else {
+      list(fit = ifelse(n == 1, vals, NA_real_), sem = NA_real_)
+    }
+  })
+  
+  fit <- sapply(results, `[[`, "fit")
+  sem <- sapply(results, `[[`, "sem")
+  
+  if (se.fit) {
+    fit_matrix <- cbind(
+      fit = fit,
+      lwr = fit - sem,
+      upr = fit + sem
+    )
+    list(fit = fit_matrix, se.fit = sem)
+  } else {
+    fit
+  }
+}
 
 moving_avg <- function(formula, data, window = 1, ...) {
   structure(list(data = data, window = window), class = "moving_avg")
