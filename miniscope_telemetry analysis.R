@@ -721,6 +721,11 @@ data<-sumdf%>%
   merge(unit_df%>%select(unit_id_id, session_id, all_of(c(target_cols, target_cols_binary))))%>%
   mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
+data_ds_labels<-sumdf%>%
+  filter(!is.na(df_f0_bin), session_type=="torpor")%>%
+  merge(unit_df_torpor_ovx_ds_sum%>%select(unit_id_id, session_id, any_of(c(target_cols, target_cols_binary))))%>%
+  mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
+         unit_id_id=factor(unit_id_id, levels=unit_df_torpor_ovx_ds_sum%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
 
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
@@ -735,7 +740,9 @@ rect_label_pellet<-list(geom_tile(aes(fill=pellet)),
 
 labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
 labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+labels_ovx_ds<-ggplot(data_ds_labels%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
 pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
+pellet_label_ovx_ds<-ggplot(data_ds_labels%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
 
 p<-ggplot(data%>%filter(gonad=="intact"), aes(x=temp_bin1, y=unit_id_id))+
   labs(x="T-Core (Deg. C)", y=element_blank())+
@@ -760,11 +767,13 @@ p+labels_intact+plot_layout(widths = c(15,1))
 save_plot("df_f0 by temperature all intact cells",w=2.3,h=4.3)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by temperature all ovx cells",w=2.3,h=4)
+p+data_ds_labels%>%filter(gonad=="ovx")+labels_ovx_ds+pellet_label_ovx_ds+plot_layout(widths = c(20,1,1))
+save_plot("df_f0 by temperature all ovx cells downsample labels and sort",w=2.3,h=4)
 
 #as lines
 p<-ggplot(data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive"))),
           aes(x=temp, y=z_bin, color=temp_cor_sig_torpor, fill=temp_cor_sig_torpor))+
-  geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=1)+
+  geom_smooth(method=moving_avg, method.args=list(window=3), se=TRUE, linewidth=1)+
   scale_color_manual(values=cell_type_scale)+
   geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
   scale_fill_manual(values=cell_type_scale)+
@@ -778,8 +787,16 @@ p+(p$data)%>%filter(gonad=="intact")+coord_cartesian(ylim=c(-1,NA))
 save_plot("z-scored df by temperature and cell type as lines intact", w=2.5,h=2)
 p+(p$data)%>%filter(gonad=="intact")+aes(color=NULL, fill=NULL)+geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=0.85,color="black",fill="grey10")
 save_plot("z-scored df by temperature as lines intact", w=2.3, h=2)
-p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-save_plot("z-scored df by temperature and cell type as lines ovx", w=3.5,h=2.4)
+p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
+save_plot("z-scored df by temperature and cell type as lines ovx", w=4,h=2)
+p+
+  data_ds_labels%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive")))+
+  aes(color=pellet,fill=pellet)+
+  facet_wrap(vars(temp_cor_sig_torpor))+
+  scale_fill_manual(values = post_ovx_scale)+
+  scale_color_manual(values=post_ovx_scale)+
+  theme(legend.position = "none")
+save_plot("z-scored df by temperature as line ovx downsample labels",w=4,h=2)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "temp_cor_sig_torpor"]
@@ -902,8 +919,8 @@ p1+unit_df%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral")+aes(y=abs(temp_c
 save_plot("torpor temperature correlation coefficient by cell type and pellet torpor timepoints only",w=12,h=8)
 p1+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral")+aes(y=abs(temp_cor_torpor_TempBelow34))+facet_wrap(vars(temp_cor_sig_torpor_TempBelow34))+scale_fill_manual(values=post_ovx_scale)
 save_plot("torpor temperature correlation coefficient by cell type and pellet ovx downsample torpor timepoints only",w=12,h=8)
-p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+scale_fill_manual(values=post_ovx_scale)
-save_plot("torpor temperature correlation coefficient by cell type and pellet ovx",w=4,h=3)
+p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+save_plot("torpor temperature correlation coefficient by cell type and pellet ovx",w=3.2,h=2)
 p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=3.2,h=2)
 
@@ -964,8 +981,9 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
   theme(legend.position = "none",
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
+        panel.spacing = unit(2,"pt"),
         legend.text = element_text(size=12,face="bold"),
-        plot.title = element_text(size=12,margin=margin(b=3,unit="pt"),hjust=0))+
+        plot.title = element_text(size=12,margin=margin(b=6,unit="pt"),hjust=0.1))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Core body temperature (T-Core) correlation")+
   coord_polar("y", start=0)+
@@ -975,16 +993,18 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
   facet_wrap(vars(pellet))
 pie
 save_plot("torpor temperature correlation types by pellet",w=8,h=5)
+pie+data%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title="Treatment ****")+theme(strip.text.x = element_text(margin=margin(t=0,b=0)))
+save_plot("torpor tempertaure correlation types ovx", w=3,h=2)
 pie+data_group_gonad+facet_wrap(vars(group_gonad))
 save_plot("torpor temperature correlation types by group_gonad",w=3,h=3)
-pie+data%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())
+pie+data%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())+labs(title=element_blank())
 save_plot("torpor temperature correlation types pre-OVX",w=1.8,h=1.8)
 pie+data_torpor_only
 save_plot("torpor temperature correlation types by pellet torpor only",w=8,h=5)
 pie+data_torpor_only_ds
 save_plot("torpor temperature correlation types ovx by pellet downsample torpor only",w=8,h=5)
-pie+data_downsampled%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title="Treatment ****")
-save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3,h=1.8)
+pie+data_downsampled%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title="Treatment ****")+theme(strip.text.x = element_text(margin=margin(t=0,b=0)))
+save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3,h=2)
 get_legend(pie+theme(legend.position="top"))%>%as_ggplot()
 save_plot("torpor cell type legend",w=4,h=2)
 
@@ -1006,7 +1026,6 @@ pie
 save_plot("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
 #Slope by gonad/E2 state
-t_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
@@ -1014,7 +1033,6 @@ for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_
   print(anov)
 }
 
-t_test(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_slope ~ pellet)
 for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
   if (cell_type=="neutral"){next}
   print(cell_type)
@@ -1052,6 +1070,8 @@ p1+unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="intact")+labs(x=eleme
 save_plot("torpor temperature slope by cell type intact",w=1.8,h=1.6)
 p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature slope by cell type and pellet downsampled",w=3.2,h=2)
+p+(p$data)%>%filter(gonad=="ovx")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment: Negative Positive")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+save_plot("torpor temperature slope by cell type ovx", w=3.2, h=2)
 
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
@@ -1199,6 +1219,8 @@ p
 save_plot("lm correlation coefficient by pellet",w=6,h=6)
 p+lm_df%>%filter(temp_cor_sig_torpor_=="significant",gonad=="intact")
 save_plot("lm correlation coefficient intact",w=2,h=2)
+p+(p$data)%>%filter(pellet!="pre-OVX")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ***",subtitle="All cells")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"))
+save_plot("lm correlation coefficient ovx", w=2.7, h=2)
 p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns",subtitle="All cells")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"))
 save_plot("lm correlation coefficient by pellet downsample", w=2.7,h=2)
 
