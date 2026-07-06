@@ -326,15 +326,15 @@ for (dir in direcs){
               
               # Combine across cells to get pseudo-fiber data
               bulk_d<-df%>%
-                filter(!is.na(df_f0))%>%
+                filter(!is.na(z))%>%
                 group_by(session_id, frame)%>%
-                mutate(bulk_df_f0 = mean(df_f0))%>%
+                mutate(bulk_z = mean(z))%>%
                 distinct(session_id, frame, .keep_all = T)
               bulk_df<-rbind(bulk_df, bulk_d)
               
               # Extract and compile male_interaction data
               male_d<-df%>%
-                filter(!is.na(df_f0), session_type=="male_interaction")
+                filter(!is.na(z), session_type=="male_interaction")
               male_df<-rbind(male_d, male_df)
               
               ## Graph full data for all sessions
@@ -408,8 +408,8 @@ bulk_df<-read_rds("./output/bulk_df.rds")
 male_df<-read_rds("./output/male_df.rds")
 
 ##### Single-cell analysis
-unit_df<-unit_analysis(sumdf%>%filter(!is.na(df_f0_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
-male_unit_df<-roc_analysis(male_df%>%filter(!is.na(df_f0), session_type=="male_interaction"), session_type = "male_interaction", predictor="df_f0", shuf_iters = shuffle_iterations)%>%
+unit_df<-unit_analysis(sumdf%>%filter(!is.na(z_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
+male_unit_df<-roc_analysis(male_df%>%filter(!is.na(z), session_type=="male_interaction"), session_type = "male_interaction", predictor="z", shuf_iters = shuffle_iterations)%>%
   rename(male_interaction_auc_nobin = male_interaction_auc, male_interaction_fc_nobin = male_interaction_fc, male_interaction_auc_sig_nobin = male_interaction_auc_sig)
 unit_df<-merge(unit_df,male_unit_df,all.x=T)
 
@@ -419,7 +419,7 @@ unit_df_torpor_ovx_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
 for (i in 1:shuffle_iterations){
   d<-sumdf%>%
-    filter(!is.na(df_f0_bin),session_type=="torpor",gonad=="ovx")%>%
+    filter(!is.na(z_bin),session_type=="torpor",gonad=="ovx")%>%
     equalize_data_temporal(verbose=F)%>%
     unit_analysis(roc_session_type = c("torpor"), shuf_iters = shuffle_iterations, verbose=F)%>%
     mutate(iteration=i)
@@ -435,13 +435,13 @@ unit_df_torpor_ovx_ds_sum<-unit_df_torpor_ovx_ds%>%
 
 ##### Population-level analysis
 ### Linear model
-torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
-torpor_w_tempchange1_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", additional_x_var = "temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
-ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(df_f0_bin)), id_col="ambient_ts", .session_type = c("heat","cold"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations)
+torpor_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(z_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=5, shuf_iters=shuffle_iterations)
+torpor_w_tempchange1_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(z_bin)), id_col="telem_ts", .session_type = "torpor", response="temp", additional_x_var = "temp_change1", cv_folds=5, shuf_iters=shuffle_iterations)
+ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(z_bin)), id_col="ambient_ts", .session_type = c("heat","cold"), response="ambient_temp_interpolated", cv_folds=5, shuf_iters=shuffle_iterations)
 
 #Cross-training entries/arousals
 sessions<-sumdf%>%group_by(session_id,torpor_status)%>%summarize(n=n_distinct(telem_ts))%>%filter(torpor_status %in% c("entry","arousal"),n>=4)%>%group_by(session_id)%>%count()%>%filter(n==2)%>%pull(session_id) #session_ids with both arousal and entry timepoints
-torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(df_f0_bin)), session_id %in% sessions, torpor_status %in% c("entry","arousal")), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=c("entry","arousal"), partition_type="entry_arousal", partition_col="torpor_status", shuf_iters=shuffle_iterations)
+torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(z_bin)), session_id %in% sessions, torpor_status %in% c("entry","arousal")), id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=c("entry","arousal"), partition_type="entry_arousal", partition_col="torpor_status", shuf_iters=shuffle_iterations)
 
 #combine data
 lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_df, all=T)%>% #combine data
@@ -451,13 +451,13 @@ unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(
 
 # Gonad-intact different cell types
 #torpor
-data<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,temp_cor_torpor, temp_cor_sig_torpor), all.x=T)
+data<-sumdf%>%filter(!is.na(z_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,temp_cor_torpor, temp_cor_sig_torpor), all.x=T)
 
 cell_type_lm_df<-tibble()
 cell_type_predict_df<-tibble()
 for (cell_type in unique(data$temp_cor_sig_torpor)){
   print(cell_type)
-  lm<-lm_analysis(data%>%filter(temp_cor_sig_torpor==cell_type), id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
+  lm<-lm_analysis(data%>%filter(temp_cor_sig_torpor==cell_type), id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
   cell_type_predict_df<-rbind(cell_type_predict_df,(lm$predict_df)%>%mutate(temp_cor_sig_torpor=cell_type))
   cell_type_lm_df<-rbind(cell_type_lm_df, (lm$lm_df)%>%mutate(temp_cor_sig_torpor=cell_type))
 }
@@ -469,13 +469,13 @@ temporal_lm_df<-(temporal_lm_ls$temporal_session_df)%>%merge(lm_df,all.x=T) #add
 unit_df<-merge(unit_df, temporal_lm_ls$temporal_unit_df, all.x=T)
 
 #ambient
-data<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,ambient_temp_interpolated_cor_ambient, ambient_temp_interpolated_cor_sig_ambient), all.x=T)
+data<-sumdf%>%filter(!is.na(z_bin),gonad=="intact")%>%merge(unit_df%>%select(unit_id_id, session_id,mouse,ambient_temp_interpolated_cor_ambient, ambient_temp_interpolated_cor_sig_ambient), all.x=T)
 
 ambient_cell_type_lm_df<-tibble()
 ambient_cell_type_predict_df<-tibble()
 for (cell_type in data%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
   print(cell_type)
-  lm<-lm_analysis(data%>%filter(ambient_temp_interpolated_cor_sig_ambient==cell_type), id_col="telem_ts", .session_type = c("cold","heat"), response="ambient_temp_interpolated", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
+  lm<-lm_analysis(data%>%filter(ambient_temp_interpolated_cor_sig_ambient==cell_type), id_col="telem_ts", .session_type = c("cold","heat"), response="ambient_temp_interpolated", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
   ambient_cell_type_predict_df<-rbind(ambient_cell_type_predict_df,(lm$predict_df)%>%mutate(ambient_temp_interpolated_cor_sig_ambient=cell_type))
   ambient_cell_type_lm_df<-rbind(ambient_cell_type_lm_df, (lm$lm_df)%>%mutate(ambient_temp_interpolated_cor_sig_ambient=cell_type))
 }
@@ -488,9 +488,9 @@ lm_coef_df_torpor_ovx_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
 for (i in 1:shuffle_iterations){
   #Run analysis
-  lm_ls<-sumdf%>%filter(!is.na(df_f0_bin),gonad=="ovx")%>%
+  lm_ls<-sumdf%>%filter(!is.na(z_bin),gonad=="ovx")%>%
     equalize_data_temporal(verbose=F)%>%
-    lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", predictor="df_f0_bin", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
+    lm_analysis(id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=5, shuf_iters=shuffle_iterations,verbose=F)
   
   #Add to dataframes
   lm_df_torpor_ovx_ds<-rbind(lm_df_torpor_ovx_ds, (lm_ls$lm_df)%>%mutate(iteration=i))
@@ -518,7 +518,7 @@ lm_coef_df_torpor_ovx_ds_sum<-lm_coef_df_torpor_ovx_ds%>%
 unit_df<-merge(unit_df,lm_coef_df_torpor_ovx_ds_sum, all=T)
 
 ### PCA
-pca_ls<-pca(sumdf%>%filter(!is.na(df_f0_bin)), predictor = "df_f0_bin", dims=c("unit_id_id","telem_ts"))
+pca_ls<-pca(sumdf%>%filter(!is.na(z_bin)), dims=c("unit_id_id","telem_ts"))
 pca_time<-merge(pca_ls$telem_ts%>%select(-session_id_type)%>%mutate(telem_ts=ymd_hms(telem_ts)), sumdf%>%ungroup()%>%distinct(telem_ts,session_id,.keep_all = T), all.x=T)
 pca_cell<-merge(pca_ls$unit_id_id, unit_df%>%select(-session_id,-session_id_type), all.x=T)
 
@@ -598,7 +598,7 @@ p+coord_cartesian(xlim=c(-1,0.9)) +
 save_plot("torpor session timing schematic split plots", w=12,h=1.1)
 
 ### Number of cells per group/session
-counts<-sumdf%>%filter(!is.na(df_f0_bin))%>%ungroup()%>%distinct(unit_id_id,.keep_all = T)%>%group_by(session_id,pellet)%>%count()
+counts<-sumdf%>%filter(!is.na(z_bin))%>%ungroup()%>%distinct(unit_id_id,.keep_all = T)%>%group_by(session_id,pellet)%>%count()
 t_test(counts%>%ungroup()%>%mutate(pellet=as.character(pellet))%>%filter(pellet!="pre-OVX"), n~pellet)
 
 p<-ggplot(counts, aes(x=pellet,y=n))+
@@ -682,7 +682,7 @@ save_plot("torpor timepoints per mouse by temp and pellet downsampled", w=3.2,h=
 # Graph all sessions
 for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
   print(id)
-  data<-sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor", session_id==id)%>%
+  data<-sumdf%>%filter(!is.na(z_bin), session_type=="torpor", session_id==id)%>%
     merge(unit_df%>%select(unit_id_id,session_id,temp_cor_torpor,temp_cor_sig_torpor), all.x=T)%>%
     mutate(unit_id = factor(unit_id, levels = unit_df%>%filter(session_id==id)%>%arrange(temp_cor_torpor)%>%pull(unit_id)))
   
@@ -715,22 +715,22 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
   }
 }
 
-p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"), aes(x=temp, y=df_f0_bin))+
+p<-ggplot(sumdf%>%filter(!is.na(z_bin), session_type=="torpor"), aes(x=temp, y=z_bin))+
   xy_point2(alpha=0.2)+
   regression_line()+
   ms+
-  labs(y="dF/F0", title=paste0("All cells, all sessions (Slope = ",(lm(temp~df_f0_bin, sumdf%>%filter(!is.na(df_f0_bin), session_type=="torpor"))$coefficients[[2]])%>%round(digits=4),")"), x="Core temperature (Deg. C)")+
+  labs(y="z-scored ΔF", title=paste0("All cells, all sessions (Slope = ",(lm(temp~z_bin, sumdf%>%filter(!is.na(z_bin), session_type=="torpor"))$coefficients[[2]])%>%round(digits=4),")"), x="Core temperature (Deg. C)")+
   theme(text = element_text(size=24))
 save_plot("df_f0 by body temperature all cells all sessions",plot=p,w=10,h=10)
 
 # Graph all cells on one graph summarized per temp_bin1
 data<-sumdf%>%
-  filter(!is.na(df_f0_bin), session_type=="torpor")%>%
+  filter(!is.na(z_bin), session_type=="torpor")%>%
   merge(unit_df%>%select(unit_id_id, session_id, all_of(c(target_cols, target_cols_binary))))%>%
   mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
 data_ds_labels<-sumdf%>%
-  filter(!is.na(df_f0_bin), session_type=="torpor")%>%
+  filter(!is.na(z_bin), session_type=="torpor")%>%
   merge(unit_df_torpor_ovx_ds_sum%>%select(unit_id_id, session_id, any_of(c(target_cols, target_cols_binary))))%>%
   mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df_torpor_ovx_ds_sum%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
@@ -1152,15 +1152,15 @@ set<-list(geom_violin(aes(fill=torpor_status)),
           point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123)),
           scale_fill_manual(values=colors),
           facet_wrap(vars(unit_id_id),scales="free_y",axes="all"),
-          labs(x=element_blank(),y="dF/F0"),
+          labs(x=element_blank(),y="z-scored ΔF"),
           scale_x_discrete(breaks=c()))
 
-p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin), torpor_status %in% c("deep_torpor","non-torpor")), aes(x=torpor_status,y=df_f0_bin))+ms+set
+p<-ggplot(sumdf%>%filter(!is.na(z_bin), torpor_status %in% c("deep_torpor","non-torpor")), aes(x=torpor_status,y=z_bin))+ms+set
 p
 save_plot("df_f0 non-torpor vs deep torpor",w=40,h=30)
 
 # All torpor status bins
-p<-ggplot(sumdf%>%filter(!is.na(df_f0_bin)), aes(x=torpor_status,y=df_f0_bin))+ms+set
+p<-ggplot(sumdf%>%filter(!is.na(z_bin)), aes(x=torpor_status,y=z_bin))+ms+set
 p
 save_plot("df_f0 by torpor status",w=40,h=30)
 
@@ -1436,9 +1436,9 @@ save_plot("ambient temp timepoints per mouse by temp and pellet", w=7,h=5)
 
 # Graph all cells on one graph summarized per ambient_temp_interpolated_bin1
 data<-sumdf%>%
-  filter(!is.na(df_f0_bin), session_type %in% c("heat","cold"))%>%
+  filter(!is.na(z_bin), session_type %in% c("heat","cold"))%>%
   group_by(unit_id_id)%>%
-  mutate(scaled_df_f0_bin = scales::rescale(df_f0_bin))%>%
+  mutate(scaled_z_bin = scales::rescale(z_bin))%>%
   ungroup()%>%
   merge(unit_df%>%select(unit_id_id,session_id, all_of(c(target_cols, target_cols_binary))))%>%
   mutate(ambient_temp_interpolated_bin1=cut(ambient_temp_interpolated,breaks=c(c(3.9,6.1),seq(8,34,2),c(36.1,38.1)), labels = seq(5,37,2)),
@@ -1461,7 +1461,7 @@ pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+
 
 p<-ggplot(data%>%filter(gonad=="intact"), aes(x=ambient_temp_interpolated_bin1, y=unit_id_id))+
   labs(x="T-Amb (Deg. C)", y=element_blank())+
-  geom_tile(aes(fill=scaled_df_f0_bin))+
+  geom_tile(aes(fill=scaled_z_bin))+
   scale_y_discrete(breaks=c(),expand=c(0,0))+
   scale_x_discrete(expand=c(0,0),breaks= ~ ., labels= ~ ifelse((as.numeric(as.character(.x))-1) %% 4 == 0, .x, ""))+
   scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
@@ -1573,13 +1573,13 @@ save_plot("example session subset data ambient fewer cells",plot=p1+p4+p2+plot_s
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
   print(id)
-  data<-sumdf%>%filter(!is.na(df_f0_bin), !is.na(ambient_temp_interpolated), session_id==id)
+  data<-sumdf%>%filter(!is.na(z_bin), !is.na(ambient_temp_interpolated), session_id==id)
   data<-data%>%mutate(unit_id_id = factor(unit_id_id, levels = unit_df%>%arrange(ambient_temp_interpolated_cor_ambient)%>%pull(unit_id_id)))
-  p<-ggplot(data, aes(x=ambient_temp_interpolated, y=df_f0_bin))+
+  p<-ggplot(data, aes(x=ambient_temp_interpolated, y=z_bin))+
     xy_point2(alpha=0.5)+
     regression_line()+
     ms+
-    labs(y="dF/F0", title="Cell ID", x="Ambient temperature (Deg. C)")+
+    labs(y="z-score dF", title="Cell ID", x="Ambient temperature (Deg. C)")+
     theme(text = element_text(size=24))+
     facet_wrap(vars(unit_id_id), axes="all",scales="free_y")#+theme(strip.text.x = element_blank())
   p
@@ -1590,10 +1590,10 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
             point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123)),
             scale_fill_manual(values=c(ambient_temp_bin_scale)),
             facet_wrap(vars(unit_id_id),scales="free_y",axes="all"),
-            labs(x=element_blank(),y="dF/F0"),
+            labs(x=element_blank(),y="z-scored ΔF"),
             scale_x_discrete(breaks=c()))
   
-  p<-ggplot(data%>%filter(ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=df_f0_bin))+ms+set
+  p<-ggplot(data%>%filter(ambient_temp_bin!="NA"), aes(x=ambient_temp_bin, y=z_bin))+ms+set
   p
   save_plot(paste("df_f0 by ambient temperature bin",id),w=20,h=15)
 }
@@ -1777,7 +1777,7 @@ for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_i
 ##1-minute binned data
 #heatmap
 data<-sumdf%>%
-  filter(!is.na(df_f0_bin), session_type=="male_interaction")%>%
+  filter(!is.na(z_bin), session_type=="male_interaction")%>%
   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,unit_id_id, unit_id),all.x=T)%>%
   group_by(unit_id_id)%>%
   mutate(session_time_minutes = as.duration(telem_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
@@ -1870,7 +1870,7 @@ for (target in other_targets){
 ##un-binned data (raw, frame-wise miniscope data)
 #heatmap
 data<-male_df%>%
-  filter(!is.na(df_f0), session_type=="male_interaction")%>%
+  filter(!is.na(z), session_type=="male_interaction")%>%
   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,male_interaction_auc_nobin, male_interaction_auc_sig_nobin,male_interaction_fc_nobin, unit_id_id, unit_id), all.x=T)%>%
   group_by(unit_id_id)%>%
   mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60,
@@ -1927,7 +1927,7 @@ save_plot("df_f0 by male interaction time bin all ovx cells no bin",w=1.8,h=4.5)
 
 #as lines
 p<-ggplot(data%>%mutate(male_interaction_auc_sig_nobin=factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed"))),
-          aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=df_f0, color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
+          aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=z, color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
   geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1)+
   scale_color_manual(values=cell_type_scale)+
   geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
@@ -2009,7 +2009,7 @@ save_plot("example session subset data male_interaction fewer cells",plot=p1+p4+
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
   print(id)
   data<-sumdf%>%filter(!is.na(male_interaction), session_id==id)%>%mutate(male_interaction=factor(male_interaction))
-  p<-ggplot(data, aes(x=male_interaction,y=df_f0_bin))+
+  p<-ggplot(data, aes(x=male_interaction,y=z_bin))+
     geom_violin(aes(fill=male_interaction))+
     point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123))+
     scale_fill_manual(values=male_interaction_scale)+
@@ -2043,7 +2043,7 @@ p<-ggplot(data%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_l
   geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1, aes(color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
   geom_vline(data=interaction_vlines%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(xintercept=first_interaction_male_added_time_seconds,linetype=pellet), linewidth=1,alpha=0.5)+
   geom_vline(linewidth=1,alpha=0.5,aes(xintercept=0,linetype=pellet))+
-  labs(y="dF/F0", x="Time from male added (seconds)")+
+  labs(y="z-scored ΔF", x="Time from male added (seconds)")+
   scale_color_manual(values=cell_type_scale)+
   scale_fill_manual(values=cell_type_scale)+
   theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")),
@@ -2146,7 +2146,7 @@ p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig)
 save_plot("male log2fc by cell type and pellet ovx",w=3.2,h=2)
 
 ##Logistic regression
-data<-event_df%>%filter(!is.na(df_f0),event=="male_added",!is.na(male_interaction))
+data<-event_df%>%filter(!is.na(z),event=="male_added",!is.na(male_interaction))
 
 auc_df<-tibble()
 for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(male_interaction_auc_sig)%>%unique(),"all")){
@@ -2156,8 +2156,8 @@ for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(ma
   for (sid in unique(data$session_id)){
     print(sid)
     d<-data%>%filter(session_id==sid,unit_id_id %in% cells)%>%
-      select(unit_id_id, frame, male_interaction, df_f0)%>%
-      pivot_wider(values_from = df_f0, names_from = unit_id_id)%>%
+      select(unit_id_id, frame, male_interaction, z)%>%
+      pivot_wider(values_from = z, names_from = unit_id_id)%>%
       select(-frame)
     if(nrow(d)==0){
       print("No data, skipping")
@@ -2692,9 +2692,9 @@ for (.event in unique(data$event)){
                  .event %in% c("sham_injection","veh_injection","E2_injection") ~ "injection")
   d<-data%>%filter(event==.event, !is.na(.data[[var]]))
   
-  p<-ggplot(d, aes(x=event_aligned_time_seconds,y=df_f0,color=.data[[var]], fill=.data[[var]]))+ms+
+  p<-ggplot(d, aes(x=event_aligned_time_seconds,y=z,color=.data[[var]], fill=.data[[var]]))+ms+
     geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=1)+
-    labs(y="dF/F0", x="Time (seconds)",title=.title)+
+    labs(y="z-scored ΔF", x="Time (seconds)",title=.title)+
     scale_color_manual(values=cell_type_scale)+
     scale_fill_manual(values=cell_type_scale)+
     geom_vline(xintercept=0,linewidth=1,alpha=0.5)+

@@ -100,7 +100,7 @@ equalize_data_temporal <- function(data, response="temp", grouping_variable="pel
 }
 
 ##Single cell analysis
-unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", lag_window=seq(-5,5,1), shuf_iters=1000, verbose=T){
+unit_analysis <- function(data, roc_session_type, .predictor="z_bin", lag_window=seq(-5,5,1), shuf_iters=1000, verbose=T){
   ##ROC analysis with binned Y variables
   if (verbose){print("Performing ROC analysis with binned response variables")}
   roc_df<-roc_analysis(data, session_type=roc_session_type, predictor=.predictor, shuf_iters=shuf_iters)
@@ -122,7 +122,7 @@ unit_analysis <- function(data, roc_session_type, .predictor="df_f0_bin", lag_wi
   return(d)
 }
 
-roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1000){
+roc_analysis <- function(data, session_type, predictor="z_bin", shuf_iters=1000){
   ##This function performs ROC analysis as in https://github.com/hongw-lab/Code_for_2024_ZhangM/blob/main/ROC.m (from https://www.nature.com/articles/s41586-023-06973-x#Sec9 paper)
   ii=1
   for (type in session_type){
@@ -171,7 +171,7 @@ roc_analysis <- function(data, session_type, predictor="df_f0_bin", shuf_iters=1
   return(compiled_df)
 }
 
-correlation_analysis <- function(data, response, .session_type, predictor="df_f0_bin", shuf_iters=1000, method="pearson",verbose=T){
+correlation_analysis <- function(data, response, .session_type, predictor="z_bin", shuf_iters=1000, method="pearson",verbose=T){
   type<-case_when(.session_type == "torpor" ~ "torpor",
                   "cold" %in% .session_type & "heat" %in% .session_type ~ "ambient")[1]
   if(verbose){print(paste0("Session type = ",type, ", Response = ",paste(response,collapse = ", ")))}
@@ -212,7 +212,7 @@ correlation_analysis <- function(data, response, .session_type, predictor="df_f0
   return(compiled_df)
 }
 
-unit_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_session_type="torpor", predictor="df_f0_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
+unit_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_session_type="torpor", predictor="z_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
   ##Generate lagged telemetry data
   if(verbose){print("Creating lagged telemetry data")}
   i=1
@@ -256,7 +256,7 @@ unit_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_s
   return(max_cor_df)
 }
 
-population_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_session_type="torpor", predictor="df_f0_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
+population_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_session_type="torpor", predictor="z_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
   ##Generate lagged telemetry data
   if(verbose){print("Creating lagged telemetry data")}
   i=1
@@ -350,7 +350,7 @@ partition_data <- function(d, id_col, partition_type, partition_col, response, c
 
 safe_var <- function(x) paste0("`", x, "`")
 
-lm_analysis <- function(data, .session_type, id_col, predictor = "df_f0_bin", partition_col=NULL, partition_type="standard", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
+lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partition_col=NULL, partition_type="standard", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
   if (partition_type=="standard"){folds<-1:cv_folds}
   if (partition_type=="entry_arousal"){folds<-cv_folds}
   lm_df<-tibble()
@@ -523,7 +523,7 @@ plot_pca_var <- function(pca, .name){
   return(pcvardf)
 }
 
-pca <- function(data, predictor = "df_f0_bin", dims){
+pca <- function(data, predictor = "z_bin", dims){
   if (length(dims)>2){stop("Length of dims exceeds 2")}
   pca_ls<-list()
   for (i in 1:length(dims)){
