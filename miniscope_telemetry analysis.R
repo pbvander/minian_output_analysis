@@ -621,7 +621,7 @@ timepoints_per_pellet_per_mouse<-merge(timepoints_per_pellet,mice_per_pellet,all
 
 #downsampled
 data_downsampled<-sumdf%>%filter(session_type == "torpor",gonad=="ovx")%>%equalize_data_temporal()
-timepoints_per_pellet_ds<-data_downsampled%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%mutate(pellet=droplevels(pellet))%>%group_by(pellet,temp_bin1)%>%summarize(timepoints_per_pellet=n())
+timepoints_per_pellet_ds<-data_downsampled%>%ungroup()%>%distinct(telem_ts, mouse,.keep_all = T)%>%mutate(pellet=droplevels(pellet))%>%group_by(pellet,temp_bin1,.drop=F)%>%summarize(timepoints_per_pellet=n())
 mice_per_pellet_ds<-data_downsampled%>%ungroup()%>%distinct(mouse,pellet,.keep_all = T)%>%group_by(pellet)%>%summarize(mice_per_pellet=n())
 timepoints_per_pellet_per_mouse_ds<-merge(timepoints_per_pellet_ds,mice_per_pellet_ds,all=T)%>%mutate(timepoints_per_mouse=timepoints_per_pellet/mice_per_pellet)
 
@@ -639,12 +639,12 @@ p+data_downsampled
 save_plot("torpor observations by temp and pellet downsampled", w=7,h=5)
 
 #Number of timepoints
-p<-ggplot(timepoints_per_pellet, aes(x=temp_bin1, y=timepoints_per_pellet))+
+p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_pellet))+
   geom_col(aes(fill=pellet),position = position_dodge())+
   scale_y_continuous(expand=c(0,0),limits=c(0,max(timepoints_per_pellet$timepoints_per_pellet)*1.1))+
   scale_x_discrete(limits=c(levels(data$temp_bin1[1]),levels(data$temp_bin1)[length(levels(data$temp_bin1))]), labels = function(x) ifelse(as.numeric(substr(x, 2, 3)) %% 2 == 0, substr(x,2,3), ""))+
   labs(x="T-Core (Deg. C)",y="Timepoints")+
-  scale_fill_manual(values=post_ovx_scale)+
+  scale_fill_manual(values=post_ovx_scale,name="Treatment group")+
   ms+
   theme(legend.position = "none",plot.title = element_text(size=12,margin=margin(b=3,unit="pt")))
 p
@@ -653,8 +653,16 @@ save_plot("torpor timepoint by temp and pellet", w=2.4,h=2)
 p+timepoints_per_pellet_per_mouse_ds+labs(title="Downsampled")
 save_plot("torpor timepoints by temp and pellet downsampled", w=2.4,h=2)
 as_ggplot(get_legend(p+(p$data)%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+
-                       theme(legend.position = "top",legend.direction = "vertical", legend.text = element_text(size=12,face="bold"))))
-save_plot("pellet legend",w=4,h=0.5)
+                       theme(legend.position = "top",
+                             legend.direction = "vertical", 
+                             legend.title = element_text(size=12,face="bold",hjust=0),
+                             legend.text = element_text(size=12,face="bold"))))
+save_plot("pellet legend",w=2,h=1)
+
+facet_data<-rbind(timepoints_per_pellet%>%mutate(data="Observed"), timepoints_per_pellet_per_mouse_ds%>%mutate(data="Downsampled"))%>%mutate(data=factor(data,levels=c("Observed","Downsampled")))
+
+p+facet_data+facet_wrap(vars(data),axes="all")
+save_plot("torpor timepoint by temp and pellet facet",w=5,h=2.2)
 
 #Number of timepoints per mouse
 p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
@@ -888,16 +896,28 @@ p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=group_gonad, y=te
 p
 save_plot("torpor temperature correlation coefficient by cell type and group_gonad", w=12,h=8)
 
+stats<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
+  
   anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
   print(anov_ds)
+  anov_ds$var = rownames(anov_ds)
+  anov_ds<-anov_ds%>%mutate(data_type="downsampled",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
+  
   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_cor_torpor ~ pellet, random=~1|mouse))
   print(anov)
+  anov$var = rownames(anov)
+  anov<-anov%>%mutate(data_type="observed",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
+  
   anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_cor_torpor_TempBelow34 ~ pellet, random=~1|mouse))
   print(anov_torpor_only)
+  
+  stats<-rbind(anov, anov_ds)%>%rbind(stats)
 }
+stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="bonferroni")%>%add_significance()
+
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_cor_torpor), fill=pellet))+
   geom_violin(aes())+
@@ -919,9 +939,19 @@ p1+unit_df%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral")+aes(y=abs(temp_c
 save_plot("torpor temperature correlation coefficient by cell type and pellet torpor timepoints only",w=12,h=8)
 p1+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral")+aes(y=abs(temp_cor_torpor_TempBelow34))+facet_wrap(vars(temp_cor_sig_torpor_TempBelow34))+scale_fill_manual(values=post_ovx_scale)
 save_plot("torpor temperature correlation coefficient by cell type and pellet ovx downsample torpor timepoints only",w=12,h=8)
-p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+p+(unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="ovx"))+
+  scale_fill_manual(values=post_ovx_scale)+
+  draw_pvalue(data=stats%>%filter(data_type=="observed"),label="p.adj.signif",inherit.aes=F, vjust=-0.1)+
+  coord_cartesian(ylim=c(0,1.27))+
+  scale_y_continuous(breaks=seq(0,1,0.25))+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature correlation coefficient by cell type and pellet ovx",w=3.2,h=2)
-p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+
+  scale_fill_manual(values=post_ovx_scale)+
+  draw_pvalue(data=stats%>%filter(data_type=="observed"),label="p.adj.signif",inherit.aes=F, vjust=-0.1)+
+  coord_cartesian(ylim=c(0,1.27))+
+  scale_y_continuous(breaks=seq(0,1,0.25))+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=3.2,h=2)
 
 # Correlation type frequencies
@@ -1007,6 +1037,12 @@ pie+data_downsampled%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),
 save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3,h=2)
 get_legend(pie+theme(legend.position="top"))%>%as_ggplot()
 save_plot("torpor cell type legend",w=4,h=2)
+get_legend(pie+
+             theme(legend.position="top",
+                   legend.direction = "vertical",
+                   legend.title=element_text(hjust=0))+
+             scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="T-Core correlation"))%>%as_ggplot()
+save_plot("torpor cell type legend vertical",w=2,h=2)
 
 #Grouped by mouse and pellet
 mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "temp_cor_sig_torpor")%>%
@@ -1026,26 +1062,44 @@ pie
 save_plot("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
 #Slope by gonad/E2 state
+# for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
+#   if (cell_type=="neutral"){next}
+#   print(cell_type)
+#   anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+#   print(anov_ds)
+#   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+#   print(anov)
+#   anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
+#   print(anov_torpor_only)
+#   anov_torpor_only_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
+#   print(anov_torpor_only_ds)
+# }
+# (unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor)))%>%group_by(temp_cor_sig_torpor)%>%wilcox_test(mean_slope ~ pellet)%>%adjust_pvalue()
+
+stats<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
-  print(anov)
-}
-
-for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
-  if (cell_type=="neutral"){next}
-  print(cell_type)
+  
   anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
   print(anov_ds)
+  anov_ds$var = rownames(anov_ds)
+  anov_ds<-anov_ds%>%mutate(data_type="downsampled",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
+  
   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
   print(anov)
+  anov$var = rownames(anov)
+  anov<-anov%>%mutate(data_type="observed",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
+  
   anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
   print(anov_torpor_only)
-  anov_torpor_only_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
-  print(anov_torpor_only_ds)
+  
+  stats<-rbind(anov, anov_ds)%>%rbind(stats)
 }
-(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor)))%>%group_by(temp_cor_sig_torpor)%>%wilcox_test(mean_slope ~ pellet)%>%adjust_pvalue()
+y_ds<-unit_df_torpor_ovx_ds_sum%>%group_by(temp_cor_sig_torpor)%>%summarize(y.position=1.2*max(abs(temp_slope_torpor)))%>%mutate(data_type="downsampled")
+y<-unit_df%>%group_by(temp_cor_sig_torpor)%>%summarize(y.position=1.15*max(abs(temp_slope_torpor)))%>%mutate(data_type="observed")%>%filter(!is.na(y.position))
+stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_slope_torpor", group1="OVX+Veh",group2="OVX+E2",xmin=1,xmax=2)%>%adjust_pvalue(method="bonferroni")%>%add_significance()%>%mutate(vjust=ifelse(p.adj.signif=="ns",-0.1,0.25))%>%
+  merge(rbind(y,y_ds),all.x=T)
 
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_slope_torpor),fill=pellet))+
@@ -1068,9 +1122,17 @@ p1+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_TempBelow34!="neutral"
 save_plot("torpor temperature slope by cell type and pellet torpor only downsample",w=12,h=8)
 p1+unit_df%>%filter(temp_cor_sig_torpor!="neutral",gonad=="intact")+labs(x=element_blank())+scale_x_discrete(labels=c("Negative","Positive"))+scale_fill_manual(values=cell_type_scale[2:3])+aes(x=temp_cor_sig_torpor,fill=temp_cor_sig_torpor)+scale_x_discrete(labels=c("Neg.","Pos."))
 save_plot("torpor temperature slope by cell type intact",w=1.8,h=1.6)
-p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+p+unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")+
+  scale_fill_manual(values=post_ovx_scale)+
+  draw_pvalue(data=stats%>%filter(data_type=="downsampled"), label="p.adj.signif", inherit.aes=F, vjust=-0.1)+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.25)))+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature slope by cell type and pellet downsampled",w=3.2,h=2)
-p+(p$data)%>%filter(gonad=="ovx")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment: Negative Positive")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+p+(p$data)%>%filter(gonad=="ovx")+
+  scale_fill_manual(values=post_ovx_scale)+
+  draw_pvalue(data=stats%>%filter(data_type=="observed"), label="p.adj.signif", inherit.aes=F,vjust=-0.1)+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.25)))+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature slope by cell type ovx", w=3.2, h=2)
 
 ## Torpor vs non-torpor bins
@@ -1200,9 +1262,15 @@ save_plot("lm correlation significance by pellet downsample",w=4,h=5)
 lm_anova<-anova(lme(data=lm_df%>%filter(temp_cor_sig_torpor_=="significant"),
                     fixed=temp_mean_cor_torpor_ ~ pellet,
                     random=~1|mouse))
+lm_anova$var <- rownames(lm_anova)
+lm_anova<-lm_anova%>%mutate(data_type="full")%>%as_tibble()%>%filter(var=="pellet")
 lm_anova_ds<-anova(lme(data=lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant"),
                        fixed=temp_mean_cor_torpor_ ~ pellet,
                        random=~1|mouse))
+lm_anova_ds$var <- rownames(lm_anova_ds)
+lm_anova_ds<-lm_anova_ds%>%mutate(data_type="downsampled")%>%as_tibble()%>%filter(var=="pellet")
+
+stats<-rbind(lm_anova, lm_anova_ds)%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_mean_cor_torpor_", y.position=1.18, xmin=1, xmax=2)%>%adjust_pvalue(method="bonferroni")%>%add_significance()
 
 p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=temp_mean_cor_torpor_))+
   geom_violin(aes(fill=pellet))+
@@ -1213,16 +1281,28 @@ p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=te
   ms+
   coord_cartesian(ylim=c(0,1))+
   theme(legend.position = "none",
+        axis.title.y=element_text(margin=margin(r=3)),
         plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")),
         plot.subtitle = element_text(size=12,hjust=0.5,margin=margin(t=3,b=3,unit="pt")))
 p
 save_plot("lm correlation coefficient by pellet",w=6,h=6)
 p+lm_df%>%filter(temp_cor_sig_torpor_=="significant",gonad=="intact")
 save_plot("lm correlation coefficient intact",w=2,h=2)
-p+(p$data)%>%filter(pellet!="pre-OVX")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ***",subtitle="All cells")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"))
-save_plot("lm correlation coefficient ovx", w=2.7, h=2)
-p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns",subtitle="All cells")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"))
-save_plot("lm correlation coefficient by pellet downsample", w=2.7,h=2)
+p+(p$data)%>%filter(pellet!="pre-OVX")+
+  scale_fill_manual(values=post_ovx_scale)+
+  labs(title=element_blank(),subtitle="All cells")+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"), guide = guide_axis(n.dodge=2))+
+  draw_pvalue(data=stats%>%filter(data_type=="full"), label="p.adj.signif",tip.length=0.06,vjust=0.25)+
+  scale_y_continuous(breaks=seq(0,1,0.25))+
+  coord_cartesian(ylim=c(0,1.25))
+save_plot("lm correlation coefficient ovx", w=2.2, h=2)
+p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+
+  scale_fill_manual(values=post_ovx_scale)+labs(title=element_blank(),subtitle="All cells")+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"), guide = guide_axis(n.dodge=2))+
+  draw_pvalue(data=stats%>%filter(data_type=="downsampled"), label="p.adj.signif",tip.length=0.045, vjust=-0.1)+
+  scale_y_continuous(breaks=seq(0,1,0.25))+
+  coord_cartesian(ylim=c(0,1.28))
+save_plot("lm correlation coefficient by pellet downsample", w=2.2,h=2)
 
 data<-cell_type_lm_df%>%
   merge(lm_df%>%select(session_id,mouse),all.x=T)%>%
@@ -1955,7 +2035,7 @@ data<-male_df%>%
 interaction_vlines<-data%>%group_by(session_id)%>%summarize(first_interaction_male_added_time_seconds = male_added_time_seconds[which.min(abs(first_interaction - miniscope_ts))])%>%merge(lm_df,all.x=T)
 mouse_levels<-unit_df%>%distinct(mouse,pellet)%>%arrange(pellet)%>%filter(pellet!="pre-OVX")%>%pull(mouse)%>%unique()
 
-p<-ggplot(data%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(x=male_added_time_seconds, y=df_f0))+
+p<-ggplot(data%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(x=male_added_time_seconds, y=z))+
   coord_cartesian(xlim=c(-30,90))+
   scale_x_continuous(breaks=seq(-30,90,30))+
   geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1, aes(color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
