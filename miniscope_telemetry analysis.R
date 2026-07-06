@@ -1134,6 +1134,8 @@ p+(p$data)%>%filter(gonad=="ovx")+
   scale_y_continuous(expand=expansion(mult = c(0.05, 0.25)))+
   scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature slope by cell type ovx", w=3.2, h=2)
+last_plot()+coord_cartesian(ylim=c(0,1.5))
+save_plot("torpor temperature slope by cell type ovx zoom y",w=3.2,h=2)
 
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
