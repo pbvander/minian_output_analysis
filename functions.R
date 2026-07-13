@@ -5,6 +5,7 @@ read_csv_minian <- function(file){
                 mouse=mouse,
                 start_date=start_date,
                 session=session)
+  if ("A" %in% colnames(d)){d<-d%>%filter(A>0)} #greatly improves speed of code to remove zero entries
   if ("unit_id" %in% colnames(d)){
     d<-d%>%filter(unit_id %nin% bad_cells)%>% #remove cells labeled as bad in CScreener
       mutate(init_unit_id = unit_id, #preserve original unit_id labels

@@ -173,7 +173,7 @@ for (dir in direcs){
             print(paste0("Reading ", path))
             exp<-strsplit(strsplit(dir,separator)[[1]][1],"_")[[1]][1]
             bad_cells<-read_cell_label(paste(path,"minian","cell_label.csv", sep=separator))
-            A<-read_csv_minian(paste(path,"minian","A.csv", sep=separator))%>%filter(A>0)
+            A<-read_csv_minian(paste(path,"minian","A.csv", sep=separator))
             C<-read_csv_minian(paste(path,"minian","C.csv", sep=separator))
             S<-read_csv_minian(paste(path,"minian","S.csv", sep=separator))
             YrA<-read_csv_minian(paste(path,"minian","YrA.csv", sep=separator))
