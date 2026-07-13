@@ -1,5 +1,5 @@
 ##Reading and processing Miniscope data
-read_csv_minian <- function(file){
+read_csv_minian <- function(file, cross_reg=T, verbose=T){
   d<-read_csv(file, show_col_types = F)
   d<-d%>%mutate(experiment=exp,
                 mouse=mouse,
@@ -10,7 +10,22 @@ read_csv_minian <- function(file){
     d<-d%>%filter(unit_id %nin% bad_cells)%>% #remove cells labeled as bad in CScreener
       mutate(init_unit_id = unit_id, #preserve original unit_id labels
              unit_id = factor(unit_id)%>%as.numeric()%>%factor()) #renumbers unit_id starting from 1
+    if (cross_reg){
+      #rename appropriate column to merge with data
+      if (i==1){
+        cr<-cellreg%>%rename(init_unit_id = init_unit_id_day1,
+                             init_unit_id_other_day = init_unit_id_day2)
+        if(verbose){print("day 1")}}
+      if (i==2){
+        cr<-cellreg%>%rename(init_unit_id = init_unit_id_day2,
+                             init_unit_id_other_day = init_unit_id_day1)
+        if(verbose){print("day 2")}}
+      
+      #merge data
+      d<-merge(d,cr, all.x=T)
     }
+  }
+  
   return(d)
 }
 
@@ -18,6 +33,18 @@ read_cell_label <- function(file){
   cell_label<-read_csv(file,show_col_types = F,col_names="label")
   cell_label$unit_id<-0:(nrow(cell_label)-1)
   bad_cells<-cell_label%>%filter(label==0)%>%pull(unit_id)
+}
+
+read_cellreg <- function(file, verbose=T){
+  dates = list.dirs(paste(dir,mouse,sep=separator),full.names=F,recursive=F)[2:3]
+  if(verbose){print(dates)}
+  d<-read_csv(file, show_col_types = F, col_names=c("init_unit_id_day1", "init_unit_id_day2"))%>%
+    mutate(init_unit_id_day1 = init_unit_id_day1 - 1, #lines up 1-base indexing of cellReg with 0-base indexing of Minian
+           init_unit_id_day2 = init_unit_id_day2 - 1,
+           cr_init_unit_id = paste0(init_unit_id_day1,"_",init_unit_id_day2))%>%
+    filter(init_unit_id_day1 >= 0 & init_unit_id_day2 >= 0)
+  
+  return(d)
 }
 
 read_timestamps <- function(file){
@@ -898,6 +925,29 @@ get_torpor_y <- function(data){
                                 T ~ 5)
   torpor_y<-if(torpor_y_increment %in% c(1,2,3,4,6)){scale_y_continuous(breaks=seq(19,43,torpor_y_increment),expand=c(0.1,0.1))}else{scale_y_continuous(breaks=seq(16,46,torpor_y_increment),expand=c(0.1,0.1))}
   return(torpor_y)
+}
+
+plot_cross_registration <- function(){
+  data<-transform_data_piegraph(A_all, animal_var="session_id", cell_var="cr")%>%mutate(cr=factor(cr, levels=c(TRUE,FALSE), labels=c("Yes","No")))
+  data_all<-transform_data_piegraph(A_all, animal_var=NULL, cell_var="cr")%>%mutate(cr=factor(cr, levels=c(TRUE,FALSE), labels=c("Yes","No")))
+  
+  p<-ggplot(data, aes(x="", y=percent, fill=cr))+ms+theme_pie+
+    theme(legend.position = "right",
+          legend.title = element_text(hjust=0,margin=margin(t=0,b=3,l=0,r=0)),
+          legend.title.position = "top",
+          panel.spacing = unit(2,"pt"),
+          legend.text = element_text(size=12,face="bold"),
+          plot.title = element_text(size=12,margin=margin(b=6,unit="pt"),hjust=0.1))+
+    geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+    scale_fill_manual(values=c("green","grey70"), labels=tools::toTitleCase,name="Cross-registered?")+
+    coord_polar("y", start=0)+
+    geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=cr,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+    scale_color_manual(values=c("black","black","black"))+
+    guides(color="none")
+  p+facet_wrap(vars(session_id))
+  save_plot("cross registration efficiency by session", w=15,h=15)
+  p+data_all
+  save_plot("cross registration efficiency all", w=4,h=3)
 }
 
 weighted_moving_avg <- function(formula, data, window = 1, sigma = window / 4, ...) { #weighted moving average with gaussian weights

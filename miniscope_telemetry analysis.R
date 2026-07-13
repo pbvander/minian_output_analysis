@@ -41,7 +41,8 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
 )
 
 #Parameters
-shuffle_iterations<-500
+shuffle_iterations<-1000
+cross_reg<-"cross_reg_only"
 
 #Misc
 lon<-7 #clock time in hours at ZT0 when lights come on
@@ -161,6 +162,8 @@ for (dir in direcs){
   # print(paste0(".",dir))
   for (mouse in list.dirs(dir, full.names=F,recursive=F)){
     # print(paste0("..",mouse))
+    cellreg<-read_cellreg(paste(dir,mouse,"cellreg_cell_to_index_map.csv", sep=separator))
+    i=1
     for (start_date in list.dirs(paste(dir,mouse,sep=separator),full.names=F,recursive=F)){
       # print(paste0("...",start_date))
       for (session in list.dirs(paste(dir,mouse,start_date,sep=separator),full.names=F,recursive=F)){
@@ -169,6 +172,7 @@ for (dir in direcs){
           if ("A.csv" %in% list.files(paste(dir,mouse,start_date,session, start_time, "minian",sep=separator))){
             # #Read data
             path <- paste(dir,mouse,start_date,session,start_time,sep=separator)
+            timepoint<- strsplit(dir, "/")[[1]][2]
             msrun_dir <- grep("msRun",list.files(path),value = T)
             print(paste0("Reading ", path))
             exp<-strsplit(strsplit(dir,separator)[[1]][1],"_")[[1]][1]
@@ -181,6 +185,7 @@ for (dir in direcs){
             ts<-read_timestamps(paste(path,"My_V4_Miniscope","timeStamps.csv", sep=separator))
             bad_frames[[path]]<-setdiff(unique(motion$frame), unique(C$frame)) ##Detects frame in motion, but not C. This should be equal to bad_frames set in minian
             motion<-motion%>%filter(frame %nin% bad_frames[[path]])
+            i=i+1
             
             #Convert to one dataframe
             df<-merge(C,S)%>%
@@ -190,11 +195,15 @@ for (dir in direcs){
               mutate(start_ts = ymd_hms(paste(start_date, start_time)),
                      miniscope_ts = (start_ts + milliseconds(time_ms)))%>%
               mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
-                     session_id = paste0(mouse,"_",start_date,"_",session))%>%
+                     session_id = paste0(mouse,"_",start_date,"_",session),
+                     cr_unit_id_id = paste0(mouse,"_",timepoint,"_",cr_init_unit_id),
+                     cr_session_id = paste0(mouse,"_",timepoint))%>%
               scale_temporal()
             
             A<-A%>%mutate(unit_id_id = paste0(mouse,"_",start_date,"_",session,"_",unit_id),
-                          session_id = paste0(mouse,"_",start_date,"_",session))
+                          session_id = paste0(mouse,"_",start_date,"_",session),
+                          cr_unit_id_id = paste0(mouse,"_",timepoint,"_",cr_init_unit_id),
+                          cr_session_id = paste0(mouse,"_",timepoint))
             
             # Clean up variables and memory
             rm(C,S,YrA,ts,motion)
@@ -388,6 +397,27 @@ for (dir in direcs){
     }
   }
 }
+### Cross registration processing
+cr_cells<-A_all%>%distinct(unit_id_id,.keep_all = T)%>%group_by(cr_unit_id_id)%>%count()%>%filter(n==2)%>%pull(cr_unit_id_id)
+
+sumdf<-sumdf%>%mutate(cr = cr_unit_id_id %in% cr_cells)
+A_all<-A_all%>%mutate(cr = cr_unit_id_id %in% cr_cells)
+event_df<-event_df%>%mutate(cr = cr_unit_id_id %in% cr_cells)
+bulk_df<-bulk_df%>%mutate(cr = cr_unit_id_id %in% cr_cells)
+male_df<-male_df%>%mutate(cr = cr_unit_id_id %in% cr_cells)
+
+setwd(output_dir)
+plot_cross_registration()
+setwd(exp_direc)
+
+if (cross_reg == "cross_reg_only"){
+  sumdf<-sumdf%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  A_all<-A_all%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  event_df<-event_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  bulk_df<-bulk_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  male_df<-male_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+}
+
 ###Checkpoint 3 ----
 #Write
 setwd(output_dir)
@@ -2709,6 +2739,19 @@ for (.event in unique(data$event)){
   p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(.data[[var]]),axes="all",scales="free_y")+aes(color=pellet,fill=pellet)+scale_color_manual(values=post_ovx_scale)+scale_fill_manual(values=post_ovx_scale)
   save_plot(paste(.event, "summary ovx by pellet"), w=6,h=2.5)
 }
+
+##Validate cross registration
+p<-ggplot(A_all%>%filter(A>0.5, mouse=="MT29", start_date %in% c("2025_05_22", "2025_05_23")), aes(x=width, y=600-height,color=cr))+
+  scale_color_manual(values=c("grey70","green"))+
+  coord_cartesian(ylim=c(100,500),xlim=c(100,500))+
+  geom_point(aes(alpha=A))+
+  theme(legend.position = "none")+
+  facet_wrap(vars(start_date),axes="all")+
+  ms
+p
+save_plot("MT29 pre-OVX CellReg validation", w=4,h=4)
+p+(p$data)%>%filter(cr)+aes(color=cr_unit_id_id)+scale_color_discrete()+theme(legend.position = "none")
+save_plot("MT29 pre-OVX CellReg validation cr cells",w=4,h=4)
 
 ####Write final outputs
 write_sessioninfo()
