@@ -128,7 +128,7 @@ equalize_data_temporal <- function(data, response="temp", grouping_variable="pel
 }
 
 ##Single cell analysis
-unit_analysis <- function(data, roc_session_type, .predictor="z_bin", lag_window=seq(-5,5,1), shuf_iters=1000, verbose=T){
+unit_analysis <- function(data, roc_session_type, .predictor="z_bin", lag_window=seq(-1,1,1), shuf_iters=1000, verbose=T){
   ##ROC analysis with binned Y variables
   if (verbose){print("Performing ROC analysis with binned response variables")}
   roc_df<-roc_analysis(data, session_type=roc_session_type, predictor=.predictor, shuf_iters=shuf_iters)
@@ -284,7 +284,7 @@ unit_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_s
   return(max_cor_df)
 }
 
-population_lag_analysis <- function(telem_data, miniscope_data, window, response,lag_session_type="torpor", predictor="z_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
+population_lag_analysis <- function(telem_data, miniscope_data, window=seq(-1,1,1), response,lag_session_type="torpor", predictor="z_bin", animal_var="mouse", timepoint_var="telem_ts", cor_method="pearson", verbose=T, shuf_iters=1000){
   ##Generate lagged telemetry data
   if(verbose){print("Creating lagged telemetry data")}
   i=1

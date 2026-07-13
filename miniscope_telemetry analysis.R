@@ -493,7 +493,7 @@ for (cell_type in unique(data$temp_cor_sig_torpor)){
 }
 
 #population temporal tuning analysis
-temporal_lm_ls<-population_lag_analysis(telem_data = t_df, miniscope_data = sumdf%>%filter(session_type=="torpor"), window=seq(-5,5,1), response="temp", verbose=F, shuf_iters = 10)
+temporal_lm_ls<-population_lag_analysis(telem_data = t_df, miniscope_data = sumdf%>%filter(session_type=="torpor"), response="temp", verbose=F, shuf_iters = 10)
 
 temporal_lm_df<-(temporal_lm_ls$temporal_session_df)%>%merge(lm_df,all.x=T) #add metadata
 unit_df<-merge(unit_df, temporal_lm_ls$temporal_unit_df, all.x=T)
