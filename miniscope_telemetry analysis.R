@@ -42,7 +42,7 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
 
 #Parameters
 shuffle_iterations<-1000
-cross_reg<-"cross_reg_only"
+cross_reg<-TRUE
 
 #Misc
 lon<-7 #clock time in hours at ZT0 when lights come on
@@ -410,13 +410,18 @@ setwd(output_dir)
 plot_cross_registration()
 setwd(exp_direc)
 
-if (cross_reg == "cross_reg_only"){
+if (cross_reg){
   print("Filtering to cross registered cells only")
-  sumdf<-sumdf%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
-  A_all<-A_all%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id)
-  event_df<-event_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
-  bulk_df<-bulk_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
-  male_df<-male_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  sumdf<-sumdf%>%filter(cr)%>%mutate(noncr_unit_id_id = unit_id_id, noncr_session_id = session_id, noncr_session_id_type = session_id_type,
+                                     unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  A_all<-A_all%>%filter(cr)%>%mutate(noncr_unit_id_id = unit_id_id, noncr_session_id = session_id,
+                                     unit_id_id = cr_unit_id_id, session_id = cr_session_id)
+  event_df<-event_df%>%filter(cr)%>%mutate(noncr_unit_id_id = unit_id_id, noncr_session_id = session_id, noncr_session_id_type = session_id_type,
+                                           unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  bulk_df<-bulk_df%>%filter(cr)%>%mutate(noncr_unit_id_id = unit_id_id, noncr_session_id = session_id, noncr_session_id_type = session_id_type,
+                                         unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  male_df<-male_df%>%filter(cr)%>%mutate(noncr_unit_id_id = unit_id_id, noncr_session_id = session_id, noncr_session_id_type = session_id_type,
+                                         unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
 }
 
 ###Checkpoint 3 ----
