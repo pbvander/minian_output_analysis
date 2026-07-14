@@ -15,11 +15,11 @@ read_csv_minian <- function(file, cross_reg=T, verbose=T){
       if (i==1){
         cr<-cellreg%>%rename(init_unit_id = init_unit_id_day1,
                              init_unit_id_other_day = init_unit_id_day2)
-        if(verbose){print("day 1")}}
+        if(verbose & "A" %in% colnames(d)){print("day 1")}}
       if (i==2){
         cr<-cellreg%>%rename(init_unit_id = init_unit_id_day2,
                              init_unit_id_other_day = init_unit_id_day1)
-        if(verbose){print("day 2")}}
+        if(verbose & "A" %in% colnames(d)){print("day 2")}}
       
       #merge data
       d<-merge(d,cr, all.x=T)

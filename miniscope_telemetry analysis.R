@@ -37,7 +37,7 @@ single_session<-"MT29_2025_05_22_session1_torpor" #best session for creating fig
 
 #Exclusions:
 session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20_session1_cold", "MT35_2026_03_07_session1_cold", # These animals do not have data from the full ambient temperature challenge (some issue arose during heat and/or cold exposure that led to exclusion of one "arm" of the ambient temperature challenge). They have been excluded so that all mice represented in the analysis have the same stimuli exposure
-                              "MT30_2025_05_23_session1_torpor", "MT34_2025_11_25_session1_torpor" #sessions where torpor was very shallow and/or infrequent (min temp >33C AND <10 timepoints where temp <34). Can re-include these if cross-registration is implemented, since there was torpor on other torpor recording day for these
+                              "MT30_2025_05_23_session1_torpor", "MT34_2025_11_25_session1_torpor" #sessions where torpor was very shallow and/or infrequent (min temp >33C AND <10 timepoints where temp <34). Can re-include these if cross-registration is implemented, since there was torpor on other torpor recording day for these. Decided to keep excluded even after cross-registration since the data will not be very useful without torpor.
 )
 
 #Parameters
@@ -411,8 +411,9 @@ plot_cross_registration()
 setwd(exp_direc)
 
 if (cross_reg == "cross_reg_only"){
+  print("Filtering to cross registered cells only")
   sumdf<-sumdf%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
-  A_all<-A_all%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
+  A_all<-A_all%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id)
   event_df<-event_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
   bulk_df<-bulk_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
   male_df<-male_df%>%filter(cr)%>%mutate(unit_id_id = cr_unit_id_id, session_id = cr_session_id, session_id_type = paste0(cr_session_id,"_",session_type))
