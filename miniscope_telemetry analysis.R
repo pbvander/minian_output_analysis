@@ -211,8 +211,8 @@ for (dir in direcs){
             
             #Write intermediate output (Checkpoint 1)
             setwd(output_dir)
-            if ("./output/intermediate" %nin% list.dirs()){dir.create("./output/intermediate")} #create directory if it doesn't exist
-            write_output_rds(df, direc="./output/intermediate/", name=paste0("1_",gsub(separator,"-",path)))
+            if ("./output/int" %nin% list.dirs()){dir.create("./output/int")} #create directory if it doesn't exist
+            write_output_rds(df, direc="./output/int/", name=paste0("1_",gsub(separator,"-",path)))
             setwd(exp_direc)
             
             # Add metadata on session type
@@ -316,7 +316,7 @@ for (dir in direcs){
               
               ##### Checkpoint 2
               setwd(output_dir)
-              write_output_rds(df, direc="./output/intermediate/", name=paste0("2_",gsub(separator,"-",path)))
+              write_output_rds(df, direc="./output/int/", name=paste0("2_",gsub(separator,"-",path)))
               setwd(exp_direc)
               
               # Create 1-minute bins in miniscope data
@@ -860,7 +860,7 @@ set<-list(theme(text=element_text(size=12),
                 plot.margin = margin(t=0, b=0, l=3, r=0, "pt")))
 
 #all data
-d<-read_rds("./output/intermediate/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_22-session1-concatenated.rds")%>%
+d<-read_rds("./output/int/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_22-session1-concatenated.rds")%>%
   filter(!is.na(scaled_YrA))%>%
   merge(unit_df%>%select(temp_cor_sig_torpor,temp_cor_torpor, unit_id_id,session_id,unit_id), all.x=T)
 data<-d%>%mutate(unit_id = factor(unit_id, levels=d%>%arrange(desc(temp_cor_torpor))%>%pull(unit_id)%>%unique()))
@@ -1555,7 +1555,7 @@ set<-list(theme(text=element_text(size=12),
                 panel.spacing = unit(0.05,"inches")))
 
 #all data
-d<-read_rds("./output/intermediate/2_251013_circulating_E2_torpor_miniscope-pre-ovx_torpor-MT31-2025_11_23-session1-concatenated.rds")%>%
+d<-read_rds("./output/int/2_251013_circulating_E2_torpor_miniscope-pre-ovx_torpor-MT31-2025_11_23-session1-concatenated.rds")%>%
   filter(!is.na(scaled_YrA), session_type %in% c("cold","heat"))%>%
   group_by(unit_id_id)%>%
   mutate(scaled_df_f0 = scaled_YrA)%>%
@@ -2000,7 +2000,7 @@ set<-list(theme(text=element_text(size=12),
                 axis.title.y=element_text(margin=margin(r=-35,unit="pt"))))
 
 #all data
-d<-read_rds("./output/intermediate/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_23-session1-concatenated.rds")%>%
+d<-read_rds("./output/int/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_23-session1-concatenated.rds")%>%
   filter(session_type=="male_interaction", !is.na(scaled_YrA))%>%
   ungroup()%>%
   mutate(session_time_minutes = session_time_minutes-min(session_time_minutes))%>%
