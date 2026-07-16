@@ -2759,6 +2759,50 @@ save_plot("MT29 pre-OVX CellReg validation", w=4,h=4)
 p+(p$data)%>%filter(cr)+aes(color=cr_unit_id_id)+scale_color_discrete()+theme(legend.position = "none")
 save_plot("MT29 pre-OVX CellReg validation cr cells",w=4,h=4)
 
+##Torpor stability analysis
+data<-unit_df%>%
+  filter(cr_unit_id_id %in% cr_cells)%>%
+  group_by(cr_unit_id_id, pellet)%>%
+  mutate(rep=row_number(), temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"), labels = c("Neutral", "Negative","Positive")))%>%
+  ungroup()%>%
+  pivot_wider(
+    id_cols = c(cr_unit_id_id,pellet),
+    names_from = rep,
+    values_from = temp_cor_sig_torpor,
+    names_prefix = "temp_cor_sig_torpor")%>%
+  drop_na()
+
+flow_data <- data %>%
+  mutate(status = ifelse(temp_cor_sig_torpor1 == temp_cor_sig_torpor2, "Same", "Changed")) %>%
+  count(temp_cor_sig_torpor1, temp_cor_sig_torpor2, status, name = "n")
+
+flow_data_pellet <- data %>%
+  group_by(pellet)%>%
+  mutate(status = ifelse(temp_cor_sig_torpor1 == temp_cor_sig_torpor2, "Same", "Changed")) %>%
+  count(temp_cor_sig_torpor1, temp_cor_sig_torpor2, status, name = "n")
+
+p<-ggplot(flow_data, aes(axis1 = temp_cor_sig_torpor1, axis2 = temp_cor_sig_torpor2, y = n)) +
+  geom_alluvium(aes(fill = temp_cor_sig_torpor1), width = 1/3) +
+  scale_x_discrete(limits = c("Day 1", "Day 2"), expand = c(0.18, 0.18)) +
+  scale_y_continuous(expand=c(0,0),breaks=c())+
+  geom_stratum(width = 1/3, fill = "grey90", color = "grey30") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)), size=12/.pt, fontface="bold") +
+  geom_text(stat = "alluvium", aes(label = ifelse(after_stat(x) == 1, after_stat(count), "")),nudge_x = 0.2, hjust = 0, size=12/.pt, fontface="bold")+
+  geom_text(stat = "stratum", aes(label = ifelse(after_stat(x) == 1, after_stat(count), "")), nudge_x=-0.3, size=12/.pt, fontface="bold") +
+  geom_text(stat = "stratum", aes(label = ifelse(after_stat(x) == 2, after_stat(count), "")), nudge_x=0.3, size=12/.pt, fontface="bold") +
+  scale_fill_manual(values = cell_type_scale) +
+  labs(y = element_blank(), fill = NULL) +
+  ms+
+  theme(legend.position = "none",
+        text=element_text(size=12,face="bold"),
+        axis.line.y = element_blank())
+p
+save_plot("torpor stability by day all", w=4,h=3)
+p+flow_data_pellet+facet_wrap(vars(pellet))
+save_plot("torpor stability by day by pellet", w=12,h=3)
+p+flow_data_pellet%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
+save_plot("torpor stability by day by pellet ovx", w=8,h=3)
+
 ####Write final outputs
 write_sessioninfo()
 
