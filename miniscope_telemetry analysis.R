@@ -1793,7 +1793,7 @@ p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_i
   scale_fill_manual(values=c("black",cell_type_scale))+
   scale_y_continuous(breaks=seq(0,1,0.5),labels=seq(0,1,0.5))+
   ms+
-  coord_cartesian(ylim=c(0,1))+
+  coord_cartesian(ylim=c(-0.2,1.1))+
   theme(legend.position = "none",
         axis.title.y = element_text(margin = margin(r=3, unit="pt")))
 p
@@ -2249,7 +2249,8 @@ t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%muta
 p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interaction_auc_sig))+ms+
   geom_violin(scale = "width",width=0.9)+
   point_mouse()+
-  coord_cartesian(ylim=c(0,1))+
+  coord_cartesian(ylim=c(0,1.1))+
+  scale_y_continuous(breaks=seq(0,1,0.5))+
   scale_fill_manual(values=c("black",cell_type_scale))+
   labs(x=element_blank(),y="AUROC")+
   scale_x_discrete(labels=c("All","Neutral","Act.","Supp."),guide=guide_axis(n.dodge=2))+
