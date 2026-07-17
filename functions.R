@@ -836,6 +836,14 @@ stat_save<- function(data, name=NA, direc="./output/"){
     data$groups<-as.character(data$groups)}
   write_csv(x=data, file=paste0(direc,ifelse(is.na(name),deparse(substitute(data)),name),".csv"))}
 
+p_to_stars <- function(p){
+  stars<-case_when(p>0.05 ~ "ns",
+                   p<0.0001 ~ "****",
+                   p<0.001 ~ "***",
+                   p<0.01 ~ "**",
+                   p<0.05 ~ "*")
+}
+
 write_output<-function(data, direc="./output/", name = NA){
   saveRDS(object=data, file=paste0(direc,ifelse(is.na(name),deparse(substitute(data)),name),".rds"))
   write_csv(x=data, file=paste0(direc,ifelse(is.na(name),deparse(substitute(data)),name),".csv"))}
