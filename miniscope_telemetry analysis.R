@@ -2776,6 +2776,7 @@ p+(p$data)%>%filter(cr)+aes(color=cr_unit_id_id)+scale_color_discrete()+theme(le
 save_plot("MT29 pre-OVX CellReg validation cr cells",w=4,h=4)
 
 ##Torpor stability analysis
+#subgroup identity
 data<-unit_df%>%
   filter(cr_unit_id_id %in% cr_cells)%>%
   group_by(cr_unit_id_id, pellet)%>%
@@ -2820,6 +2821,90 @@ p+flow_data_pellet%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
 save_plot("torpor stability by day by pellet ovx", w=8,h=3)
 p+flow_data_pellet%>%filter(pellet=="pre-OVX")
 save_plot("torpor stability by day by pellet intact", w=4,h=3)
+
+#correlation coefficient
+data<-unit_df%>%
+  filter(cr_unit_id_id %in% cr_cells, !is.na(temp_cor_torpor))%>%
+  group_by(cr_unit_id_id, pellet)%>%
+  mutate(day=row_number(),temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive")))
+
+p<-ggplot(data, aes(x = day, y = temp_cor_torpor)) +
+  line_pair(aes(group=cr_unit_id_id),alpha=0.2, size = 0.3, position=position_jitter(width=0.1,height=0,seed=123))+
+  geom_point(aes(group=cr_unit_id_id, fill=temp_cor_sig_torpor),alpha=0.5,size=1.5,position=position_jitter(width=0.1,height=0,seed=123),shape=21,color="grey20")+
+  scale_fill_manual(values=cell_type_scale)+
+  scale_x_continuous(breaks=c(1,2))+
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,0.5))+
+  labs(x="Day",y="r")+
+  ms+
+  theme(legend.position = "none")
+p
+save_plot("torpor r stability by day all", w=3,h=3)
+p+facet_wrap(vars(pellet))
+save_plot("torpor r stability by day by pellet", w=9,h=3)
+p+data%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
+save_plot("torpor r stability by day by pellet ovx", w=6,h=3)
+p+data%>%filter(pellet=="pre-OVX")
+save_plot("torpor r stability by day by pellet intact", w=3,h=3)
+
+#plot example data (traces)
+data<-rbind(read_rds("./output/int/2_251013_circulating_E2_torpor_miniscope-pre-ovx_torpor-MT33-2025_11_22-session1-concatenated.rds")%>%filter((start_time=="01_57_11" & time_ms<7*60*1000)| 
+                                                                                                                                                  (start_time=="06_09_26" & time_ms<7*60*1000)),
+            read_rds("./output/int/2_251013_circulating_E2_torpor_miniscope-pre-ovx_torpor-MT33-2025_11_23-session1-concatenated.rds")%>%filter((start_time=="01_57_00" & time_ms<7*60*1000) | 
+                                                                                                                                                  (start_time=="07_00_50" & time_ms<7*60*1000)))%>%
+  filter(unit_id_id == "MT33_2025_11_22_session1_1" | unit_id_id == "MT33_2025_11_23_session1_2")%>%
+  mutate(day=factor(start_date), day=paste("Day",as.numeric(day)))%>%
+  group_by(day)%>%
+  mutate(scaled_YrA = scales::rescale(scaled_YrA))%>%
+  merge(unit_df%>%select(unit_id_id, cr_unit_id_id, temp_cor_torpor,temp_cor_sig_torpor),all.x=T)
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=0, r=0, "inches")))
+rect_label_set<-list(geom_tile(aes(fill=temp_cor_sig_torpor)),
+                     scale_x_discrete(expand=c(0,0)),
+                     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3])),
+                     theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+rect_label_pellet<-list(geom_tile(aes(fill=pellet)),
+                        scale_fill_manual(values=post_ovx_scale2),
+                        theme(axis.line=element_blank(),axis.text = element_blank(),legend.position = "none",axis.ticks = element_blank(),axis.title = element_blank()))
+
+labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
+
+set<-list(theme(text=element_text(size=12),
+                plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
+                plot.margin = margin(t=0, b=0, l=3.6, r=0, "pt"),
+                axis.title.y = element_text(margin=margin(t=0,b=0,l=0,r=3,unit="pt"))))
+
+p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+theme(axis.line.x=element_blank(),legend.position = "none")+labs(subtitle="Selected cell (F / max F)", y=element_blank())
+p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=c(25,31,37),expand = c(0.25,0.25),limits=c(25,37))+scale_x_continuous(expand=c(0,0),breaks=seq(0,10000,3))
+p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_id))+ms+set+rect_label_set+labs(y=element_blank())
+(p1+data%>%filter(day=="Day 1")+labs(title="Day 1"))+
+  (p3+data%>%filter(day=="Day 1")+scale_fill_manual(values=cell_type_scale[3]))+
+  (p2+data%>%filter(day=="Day 1"))+
+  plot_layout(heights=c(1.8,1),widths=c(20,1),ncol=2)
+save_plot("unstable cell day 1",w=3,h=2.5)
+(p1+data%>%filter(day=="Day 2")+labs(title="Day 2"))+
+  (p3+data%>%filter(day=="Day 2")+scale_fill_manual(values=cell_type_scale[2]))+
+  (p2+data%>%filter(day=="Day 2"))+
+  plot_layout(heights=c(1.8,1),widths=c(20,1),ncol=2)
+save_plot("unstable cell day 2",w=3,h=2.5)
+
+#plot example data (binned)
+data<-sumdf%>%filter(unit_id_id == "MT33_2025_11_22_session1_1" | unit_id_id == "MT33_2025_11_23_session1_2")%>%
+  mutate(day=factor(start_date), day=paste("Day",as.numeric(day)))%>%
+  merge(unit_df%>%select(unit_id_id, cr_unit_id_id, temp_cor_torpor, temp_cor_sig_torpor))
+
+p<-ggplot(data, aes(x=temp, y=z_bin))+
+  regression_line(aes(color=temp_cor_sig_torpor), linewidth = 1.3)+
+  xy_point2(alpha=0.2, size=1.5, stroke=1)+
+  scale_color_manual(values=cell_type_scale[2:3])+
+  scale_x_continuous(limits=c(25,37),breaks=seq(25,37,4))+
+  labs(x="T-Core (Deg. C)",y=expression(bold("Z-scored " *Delta * F)))+
+  ms+
+  theme(legend.position = "none",
+        panel.spacing = unit(12,"pt"))
+p+facet_wrap(vars(day),scale="free_y")
+save_plot("unstable cell z scored df by body temperature", w=4,h=2.5)
 
 ####Write final outputs
 write_sessioninfo()
