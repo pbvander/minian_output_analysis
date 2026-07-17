@@ -443,6 +443,8 @@ A_all<-read_rds("./output/A_all.rds")
 event_df<-read_rds("./output/event_df.rds")
 bulk_df<-read_rds("./output/bulk_df.rds")
 male_df<-read_rds("./output/male_df.rds")
+cr_cells<-A_all%>%distinct(unit_id_id,.keep_all = T)%>%group_by(cr_unit_id_id)%>%count()%>%filter(n==2)%>%pull(cr_unit_id_id)
+
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(z_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
@@ -600,6 +602,7 @@ pca_time<-read_rds("./output/pca_time.rds")
 pca_cell<-read_rds("./output/pca_cell.rds")
 t_df<-read_rds("./output/t_df.rds")
 A_all<-read_rds("./output/A_all.rds")
+cr_cells<-A_all%>%distinct(unit_id_id,.keep_all = T)%>%group_by(cr_unit_id_id)%>%count()%>%filter(n==2)%>%pull(cr_unit_id_id)
 ambient_cell_type_lm_df<-read_rds("./output/ambient_cell_type_lm_df.rds")
 ambient_cell_type_predict_df<-read_rds("./output/ambient_cell_type_predict_df.rds")
 temporal_lm_ls<-read_rds("./output/temporal_lm_ls.rds")
