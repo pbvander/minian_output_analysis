@@ -173,7 +173,7 @@ for (dir in direcs){
           if ("A.csv" %in% list.files(paste(dir,mouse,start_date,session, start_time, "minian",sep=separator))){
             # #Read data
             path <- paste(dir,mouse,start_date,session,start_time,sep=separator)
-            timepoint<- strsplit(dir, "/")[[1]][2]
+            timepoint<- gsub("-","_",strsplit(dir, "/")[[1]][2])
             msrun_dir <- grep("msRun",list.files(path),value = T)
             print(paste0("Reading ", path))
             exp<-strsplit(strsplit(dir,separator)[[1]][1],"_")[[1]][1]
