@@ -482,10 +482,31 @@ ambient_lm_ls<-lm_analysis(sumdf%>%filter(!is.na(z_bin)), id_col="ambient_ts", .
 sessions<-sumdf%>%group_by(session_id,torpor_status)%>%summarize(n=n_distinct(telem_ts))%>%filter(torpor_status %in% c("entry","arousal"),n>=4)%>%group_by(session_id)%>%count()%>%filter(n==2)%>%pull(session_id) #session_ids with both arousal and entry timepoints
 torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(z_bin)), session_id %in% sessions, torpor_status %in% c("entry","arousal")), id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=c("entry","arousal"), partition_type="entry_arousal", partition_col="torpor_status", shuf_iters=shuffle_iterations)
 
+#Cross-training days
+data<-sumdf%>%separate_wider_delim(cr_session_id, delim = "_", names=c(NA,"timepoint",NA), cols_remove = F)%>%
+  mutate(timepoint = tolower(timepoint), unit_id_id=cr_unit_id_id, session_id=cr_session_id)%>%
+  group_by(mouse,timepoint)%>%
+  mutate(day=paste0("day",dense_rank(start_date))%>%factor())%>%
+  filter(!is.na(z_bin), unit_id_id %in% cr_cells, session_type=="torpor")
+one_day_sessions<-data%>%group_by(session_id,day)%>%count()%>%group_by(session_id)%>%count()%>%filter(n!=2)%>%pull(session_id)
+data<-data%>%filter(session_id %nin% one_day_sessions)
+
+cross_day_lm_ls<-lm_analysis(data, id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=c("day1","day2"), partition_type="day1_day2", partition_col = "day", shuf_iters=shuffle_iterations)
+cross_day_lm_ls$lm_df<-(cross_day_lm_ls$lm_df)%>%rename(cr_session_id = session_id)
+cross_day_lm_ls$predict_df<-(cross_day_lm_ls$predict_df)%>%rename(cr_session_id = session_id)
+cross_day_lm_ls$lm_coef_df<-(cross_day_lm_ls$lm_coef_df)%>%rename(cr_unit_id_id = unit_id_id)
+
 #combine data
-lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_df, all=T)%>% #combine data
+lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%
+  merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%
+  merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>%
+  merge(torpor_arousal_entry_lm_ls$lm_df, all=T)%>% #combine data
+  merge(cross_day_lm_ls$lm_df, all=T)%>%
   merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
-unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
+unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%
+  merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%
+  merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
+  merge(cross_day_lm_ls$lm_coef_df, all=T)%>%
   merge(unit_df,all=T) #add coefficients from population model to unit_df
 
 # Gonad-intact different cell types
@@ -2439,6 +2460,7 @@ p<-ggplot(data, aes(x=var, y=cor))+
 p
 save_plot("Tcore vs Tcore with change correlation analysis", w=4.5,h=4.5)
 
+#Cross-training entry vs arousal
 data<-lm_df%>%select(temp_mean_cor_EntryArousal_torpor__entry,temp_mean_shuf_cor_EntryArousal_torpor__entry,session_id)%>%
   pivot_longer(cols=c(temp_mean_cor_EntryArousal_torpor__entry,temp_mean_shuf_cor_EntryArousal_torpor__entry), names_to = "var",values_to = "cor")%>%
   mutate(var = factor(var,levels=c("temp_mean_shuf_cor_EntryArousal_torpor__entry","temp_mean_cor_EntryArousal_torpor__entry"),labels=c("Train + test = mixed","Train = entry only, test = arousal only")),
@@ -2462,6 +2484,42 @@ anova(lme(data=data, fixed = cor ~ var, random=~1|mouse))
 p<-p+data
 p
 facet(p,"pellet")
+
+#Cross-day training
+data<-lm_df%>%group_by(cr_session_id)%>%
+  summarize(day1_train = mean(temp_mean_cor_Day1Day2_torpor__day1),
+            day2_train = mean(temp_mean_cor_Day1Day2_torpor__day2),
+            mixed_day1_train = mean(temp_mean_shuf_cor_Day1Day2_torpor__day1),
+            mixed_day2_train = mean(temp_mean_shuf_cor_Day1Day2_torpor__day2))%>%
+  drop_na()%>%
+  merge(lm_df%>%select(pellet,cr_session_id)%>%distinct(cr_session_id,.keep_all = T))%>%
+  pivot_longer(cols = c(day1_train, day2_train, mixed_day1_train, mixed_day2_train), names_to="var", values_to = "cor")%>%
+  mutate(type = ifelse(grepl("mixed",var), "mixed","cross-day"))%>%
+  group_by(cr_session_id, type)%>%
+  mutate(cor = mean(cor), type=factor(type, levels=c("mixed","cross-day"),labels=c("Mixed","Cross-day")))%>%
+  distinct(cr_session_id, type, .keep_all = T)
+  
+cross_day_lm_ttest<-t_test(data%>%filter(pellet=="pre-OVX")%>%ungroup(), cor ~ type)%>%add_significance()%>%add_xy_position()
+cross_day_lm_anova_ovx <- anova_test(data%>%filter(pellet!="pre-OVX")%>%ungroup(), cor ~ type * pellet)
+
+p<-ggplot(data, aes(x=type,y=cor))+
+  point_errorbar(width=0.7)+
+  point_summary()+
+  point_indiv()+
+  coord_cartesian(ylim=c(0,1.15))+
+  scale_y_continuous(breaks=seq(0,1,0.5))+
+  labs(x=element_blank(), y="r", title="All cells")+
+  ms+
+  theme(plot.title=element_text(size=12, hjust=0.5, margin=margin(t=0,b=3,l=0,r=0)))
+p
+save_plot("cross day training results all", w=2.4,h=2)
+p+data%>%filter(pellet=="pre-OVX")+draw_pvalue(data=cross_day_lm_ttest, label="p.signif", bracket.nudge.y=0.15)
+save_plot("cross day training results intact", w=2.4,h=2)
+p+data%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")+theme(plot.title=element_text(size=12,hjust=0, margin=margin(t=0,b=3,l=0,r=0)))+
+  labs(title=paste0("Model type ", ((cross_day_lm_anova_ovx%>%pull(p))[1])%>%p_to_stars(),
+                    " , Treatment ", ((cross_day_lm_anova_ovx%>%pull(p))[2])%>%p_to_stars(),
+                    " ,\nInteraction ", ((cross_day_lm_anova_ovx%>%pull(p))[3])%>%p_to_stars()))
+save_plot("cross-day training results ovx", w=3.6,h=2)
 
 ##Stdev of F0 signal across stimuli and pellets ----
 data<-sumdf%>%filter(!is.na(sd_f0_bin))%>%group_by(unit_id_id, session_id_type)%>%summarize(mean_sd_f0_bin=mean(sd_f0_bin))%>%

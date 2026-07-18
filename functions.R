@@ -370,7 +370,7 @@ partition_data <- function(d, id_col, partition_type, partition_col, response, c
     } 
   }
   
-  if (partition_type=="entry_arousal"){
+  if (partition_type %in% c("entry_arousal","day1_day2")){
     pcs<-partition_factor_cv(d, coords=colnames(d),fac=d%>%pull({{partition_col}})%>%droplevels(), nfold=2)
   }
   return(pcs)
@@ -381,6 +381,7 @@ safe_var <- function(x) paste0("`", x, "`")
 lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partition_col=NULL, partition_type="standard", additional_x_var=NULL, response, cv_folds=5, shuf_iters=1000, verbose=T){
   if (partition_type=="standard"){folds<-1:cv_folds}
   if (partition_type=="entry_arousal"){folds<-cv_folds}
+  if (partition_type=="day1_day2"){folds<-cv_folds}
   lm_df<-tibble()
   lm_coef_df<-tibble()
   lm_add_x_var_coef_df<-tibble()
@@ -402,6 +403,12 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
       coef_col<-paste0(response,"_MeanLmCoef_EntryArousal_",type,additional_x_var)
       shuf_cor_col=paste0(response,"_mean_shuf_cor_EntryArousal_",type,"_",additional_x_var)
     }
+    if(partition_type=="day1_day2"){
+      cor_col=paste0(response,"_mean_cor_Day1Day2_",type,"_",additional_x_var)
+      sig_col=paste0(response,"_cor_sig_Day1Day2_",type,"_",additional_x_var)
+      coef_col<-paste0(response,"_MeanLmCoef_Day1Day2_",type,additional_x_var)
+      shuf_cor_col=paste0(response,"_mean_shuf_cor_Day1Day2_",type,"_",additional_x_var)
+    }
     if(verbose){print(paste(sid, type, additional_x_var))}
     
     ##Format and pivot data
@@ -411,7 +418,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
     if (sum(is.na(d))>0)(warning(paste("NAs present in dataset",sid)))
     
     ##Partition data for cross-validation
-    if (partition_type %nin% c("standard","entry_arousal")){stop("Partition type not recognized/supported")}
+    if (partition_type %nin% c("standard","entry_arousal","day1_day2")){stop("Partition type not recognized/supported")}
     pcs<-partition_data(d, id_col = id_col, response=response, partition_type=partition_type, partition_col=partition_col, cv_folds=cv_folds, verbose=verbose)
     
     ##Make models with observed data for each cv fold
@@ -425,7 +432,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
         idx = pcs[["1"]][[fold]]
         train = d[idx$train,]
         test = d[idx$test,]}
-      if(partition_type=="entry_arousal"){
+      if(partition_type %in% c("entry_arousal","day1_day2")){
         train=d%>%filter(.data[[partition_col]] == fold)%>%select(-{{partition_col}})
         test=d%>%filter(.data[[partition_col]] != fold)%>%select(-{{partition_col}})}
       
@@ -453,7 +460,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
           train = (d[idx$train,])
           shuf_train = train%>%mutate("{response}":=sample(train%>%pull({{response}}),length(train%>%pull({{response}}))))
           test = d[idx$test,]}
-        if(partition_type=="entry_arousal"){
+        if(partition_type %in% c("entry_arousal","day1_day2")){
           shuf_d = d%>%mutate("{partition_col}":=sample(d%>%pull({{partition_col}}), length(d%>%pull({{partition_col}}))))
           shuf_train = shuf_d%>%filter(.data[[partition_col]] == fold)%>%select(-{{partition_col}})
           test = shuf_d%>%filter(.data[[partition_col]] != fold)%>%select(-{{partition_col}})
@@ -468,7 +475,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
         shuf_add_x_var_coef_df<-rbind(shuf_add_x_var_coef_df, shuf_add_x_var_coef_d)
       }
       if (partition_type=="standard"){shuf_cor_df<-rbind(shuf_cor_df, tibble("cor"=mean(shuf_cor_d$cor)))}
-      if (partition_type=="entry_arousal"){shuf_cor_df<-rbind(shuf_cor_df, shuf_cor_d)}
+      if (partition_type %in% c("entry_arousal","day1_day2")){shuf_cor_df<-rbind(shuf_cor_df, shuf_cor_d)}
     }
     
     if (partition_type=="standard"){
@@ -483,7 +490,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
       lm_coef_d<-coef_df%>%group_by(unit_id_id)%>%summarize("{coef_col}":=mean(coefficient))
       lm_coef_df<-rbind(lm_coef_df,lm_coef_d)
     }
-    if (partition_type=="entry_arousal"){
+    if (partition_type%in% c("entry_arousal","day1_day2")){
       for (.fold in folds){
         ##Get rank of observed data within shuffled data
         mean_cor<-cor_df%>%filter(fold==.fold)%>%pull(cor)
@@ -515,7 +522,7 @@ lm_analysis <- function(data, .session_type, id_col, predictor = "z_bin", partit
       lm_add_x_var_coef_df<-rbind(lm_add_x_var_coef_df,lm_add_x_var_coef_d)
     }
   }
-  if (partition_type=="entry_arousal"){
+  if (partition_type %in% c("entry_arousal","day1_day2")){
     lm_df<-lm_df%>%pivot_wider(id_cols=session_id, names_from=train,values_from=c(cor_col,shuf_cor_col,sig_col,rank))
     lm_coef_df<-lm_coef_df%>%pivot_wider(id_cols=unit_id_id,names_from=fold,values_from=coef_col)
     }
