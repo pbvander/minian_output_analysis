@@ -2736,31 +2736,44 @@ for (sid in unique(pca_time$session_id)){
 }
 
 ## Spatial analysis ----
-d<-A_all%>%merge(unit_df, all.x=T)
+d<-A_all%>%merge(unit_df, all.x=T)%>%group_by(session_id)%>%mutate(x0=range(width)%>%mean(),
+                                                                   y0=range(height)%>%mean(),
+                                                                   dist_from_center=((width-x0)^2 + (height-y0)^2)^0.5)
+sidt_meta<-sumdf%>%ungroup()%>%distinct(session_id_type,session_id,session_type)
 
 for (sid in unique(d$session_id)){
+  print(sid)
   data<-d%>%filter(session_id==sid)
-  data<-data%>%mutate(x0=range(width)%>%mean(),
-                      y0=range(height)%>%mean(),
-                      dist_from_center=((width-x0)^2 + (height-y0)^2)^0.5)
   
   p<-ggplot(data, aes(x=width,y=height, color=temp_cor_sig_torpor))+
     geom_point(aes(alpha=A),shape=15,size=0.0001)+
-    geom_mark_hull(aes(group=unit_id_id), expand=unit(0,"pt"),radius=unit(0,"pt"),concavity=4,color="black",linewidth=0.2)+
-    scale_color_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3]))+
+    geom_mark_hull(aes(group=unit_id_id), expand=unit(0,"pt"),radius=unit(0.5,"pt"),concavity=4,color="black",linewidth=0.2)+
+    scale_color_manual(values=c("neutral" = cell_type_scale[1], "negative" = cell_type_scale[2],"positive" = cell_type_scale[3]))+
     # geom_point(x = range(data$width)%>%mean(), y = range(data$height)%>%mean(), size = max(range(data$width)%>%diff(), range(data$height)%>%diff())/4.5, shape = 21, fill = NA,color="black")+
-    geom_circle(aes(x0=x0,y0=y0,r=max(dist_from_center)*1.05),color="black",linewidth=0.7,n=720)+
-    labs(x=element_blank(),y=element_blank())+
+    geom_circle(aes(x0=x0,y0=y0,r=max(dist_from_center)*1.05),color="black",linewidth=0.7,n=200)+
+    labs(x=element_blank(),y=element_blank(),title="T-Core")+
     scale_x_continuous(breaks=c())+
     scale_y_continuous(breaks=c())+
     ms+
     theme(legend.position = "none",
-          axis.line = element_blank()
+          axis.line = element_blank(),
+          plot.title=element_text(size=12,margin=margin(b=2,t=0,l=0,r=0))
           # panel.border = element_rect(colour = "black", fill = NA)
           # axis.title.y=element_text(margin=margin(r=3,unit = "pt")),
           # axis.title.x = element_text(margin=margin(t=3,unit="pt"))
     )
-  save_plot(paste0("A by temp_cor_sig_torpor ",sid),plot=p, w=2.1,h=2)
+  print("saving plots")
+  save_plot(paste0("A by temp_cor_sig_torpor ",sid),plot=p, w=2.1,h=2.3)
+  if ("heat" %in% (sidt_meta%>%filter(session_id==sid)%>%pull(session_type))){
+    print("saving heat plot")
+    save_plot(paste0("A by ambient_cor_sig_ambient ",sid), plot=p+aes(color=ambient_temp_interpolated_cor_sig_ambient)+labs(title="T-Amb"), w=2.1,h=2.3)
+    }
+  if ("male_interaction" %in% (sidt_meta%>%filter(session_id==sid)%>%pull(session_type))){
+    print("saving male plot")
+    save_plot(paste0("A by male_interaction_auc_sig_nobin ",sid), plot=p+aes(color=male_interaction_auc_sig_nobin)+scale_color_manual(values=c("neutral" = cell_type_scale[1],
+                                                                                                                                               "activated" = cell_type_scale[2],
+                                                                                                                                               "suppressed" = cell_type_scale[3]))+labs(title="Social"), w=2.1,h=2.3)
+    }
   if (sid=="MT29_2025_05_22_session1"){
     as_ggplot(get_legend(p+theme(legend.position = "right")))
     save_plot("A by temp_cor_sig_torpor legend",w=2,h=2)
@@ -2771,6 +2784,8 @@ for (sid in unique(d$session_id)){
 spatial_test_obs<-tibble()
 spatial_test_null<-tibble()
 pie_data<-tibble()
+test_obs2<-tibble()
+pie_data2<-tibble()
 for (col in target_cols_binary){
   print(col)
   test<-spatial_test(d, col,shuf_iters = shuffle_iterations)
@@ -2778,8 +2793,11 @@ for (col in target_cols_binary){
   test_null<-(test$null)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))%>%merge(sumdf%>%ungroup()%>%distinct(session_id, .keep_all = T), all.x=T)
   spatial_test_obs<-rbind(spatial_test_obs,test_obs)
   spatial_test_null<-rbind(spatial_test_null, test_null)
+  test_obs2<-rbind(test_obs2,test_obs%>%group_by(session_id)%>%summarize(sig_cell_type_count = sum(p.adj <0.05))%>%mutate(var=col))
   pie_data<-rbind(pie_data,
                   transform_data_piegraph(test_obs%>%merge(unit_df,all.x=T),animal_var="pellet",cell_var="sig")%>%mutate(var=col))
+  pie_data2<-rbind(pie_data2, 
+                   transform_data_piegraph(test_obs2%>%merge(unit_df%>%select(session_id,pellet)), animal_var="pellet",cell_var="sig_cell_type_count")%>%mutate(var=col))
 }
 
 ##plot observed vs null
@@ -2793,10 +2811,12 @@ p
 save_plot("example observed vs null spatial distance",w=5,h=3)
 
 ##plot piegraph of frequencies
-pie<-ggplot(pie_data%>%mutate(var=factor(var,levels=target_cols_binary, labels=c("T-Core","T-Amb","Male"))), aes(x="", y=percent, fill=sig))+ms+theme_pie+
-  theme(legend.position = "right",
+pie<-ggplot(pie_data%>%mutate(var=factor(var,levels=target_cols_binary, labels=c("T-Core","T-Amb","Social"))), aes(x="", y=percent, fill=sig))+ms+theme_pie+
+  theme(legend.position = "top",
+        legend.box.margin = margin(t=0,b=-15, l=0, r=0,unit="pt"),
         legend.title = element_text(hjust=0.5,margin=margin(t=0,b=3,l=0,r=0)),
         legend.title.position = "top",
+        strip.text.x = element_text(size=12, margin=margin(t=1,b=0,l=0,r=0)),
         legend.text = element_text(size=12,face="bold"))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
   scale_fill_manual(values=c("grey50","red"), name="Spatial enrichment")+
@@ -2806,10 +2826,16 @@ pie<-ggplot(pie_data%>%mutate(var=factor(var,levels=target_cols_binary, labels=c
   guides(color="none")
 pie+facet_grid(vars(pellet),vars(var))
 save_plot("spatial analysis torpor by pellet and var",w=4,h=4)
-pie+(pie$data)%>%filter(pellet=="pre-OVX")+facet_wrap(vars(var),nrow=1)+theme(legend.position = "top",legend.box.margin = margin(t=0,b=-15, l=0, r=0,unit="pt"))
+pie+(pie$data)%>%filter(pellet=="pre-OVX")+facet_wrap(vars(var),nrow=1)
 save_plot("spatial analysis torpor intact",w=3,h=2)
-pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_grid(vars(pellet),vars(var),switch = "y")+theme(legend.position = "top",legend.box.margin = margin(t=0,b=-15, l=0, r=0,unit="pt"))
+pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_grid(vars(pellet),vars(var),switch = "y")
 save_plot("spatial analysis torpor ovx",w=3,h=3)
+pie2<-pie+
+  pie_data2%>%mutate(sig=as.character(sig_cell_type_count))%>%mutate(var=factor(var,levels=target_cols_binary, labels=c("T-Core","T-Amb","Social")))+
+  scale_fill_manual(values=c("grey50","red"), name="# of cell types with spatial\nenrichment (adjusted p < 0.05)")
+pie2+facet_grid(vars(var),vars(pellet))
+pie2+(pie2$data)%>%filter(pellet=="pre-OVX")+facet_wrap(vars(var))
+save_plot("spatial analysis by number of cell types sig intact", w=4,h=3)
 
 ####Plot events ----
 #example
