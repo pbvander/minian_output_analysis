@@ -51,9 +51,9 @@ ftime<-10 #clock time in hours when fasting was started
 
 #Settings for tuning analyses
 target_cols<-c("temp_cor_torpor", 
-               "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
+               "ambient_temp_interpolated_cor_ambient","male_interaction_auc_nobin")
 target_cols_binary<-c("temp_cor_sig_torpor",
-                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
+                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig_nobin")
 labs<-c("T-Core",
         "T-Amb", "Social")
 
@@ -1904,6 +1904,16 @@ for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_i
 }
 
 ### dF/F0 - male social stimulus relationship ----
+##Schematic of timing
+data<-tibble("minutes"=c(seq(0,20,1),4.99,14.99), "male_social_stimulus" = c(rep("-",5),rep("+",10),rep("-",6),"-","+"), "mouse"="simulated")
+
+ggplot(data, aes(x=minutes, y=male_social_stimulus))+
+  geom_line(aes(group=mouse), linewidth = lw)+
+  labs(x="Time (minutes)", y="Male social\nstimulus")+
+  scale_x_continuous(expand=c(0,0))+
+  ms
+save_plot("male social schematic",w=4.4,h=1.44)
+
 ###plot all cells on one graph
 ##1-minute binned data
 #heatmap
@@ -2004,8 +2014,7 @@ data<-male_df%>%
   filter(!is.na(z), session_type=="male_interaction")%>%
   merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,male_interaction_auc_nobin, male_interaction_auc_sig_nobin,male_interaction_fc_nobin, unit_id_id, unit_id), all.x=T)%>%
   group_by(unit_id_id)%>%
-  mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60,
-         rescaled_YrA = scales::rescale(YrA))
+  mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
 
 male_entry_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_entry_minutes=min(session_time_minutes))
 data<-data%>%merge(male_entry_minutes,all.x=T)%>%
@@ -2015,7 +2024,10 @@ data<-data%>%merge(male_entry_minutes,all.x=T)%>%
                               male_interaction==1 & session_time_minutes < male_entry_minutes+6 ~ "1-5 min.",
                               male_interaction==1 & session_time_minutes ~ "5-10 min.")%>%
            factor(levels=c("Pre-male","0-1 min.","1-5 min.","5-10 min.","Post-male")),
-         unit_id_id = factor(unit_id_id, levels=data%>%arrange(desc(pellet),male_interaction_auc_nobin)%>%pull(unit_id_id)%>%unique()))
+         unit_id_id = factor(unit_id_id, levels=data%>%arrange(desc(pellet),male_interaction_auc_nobin)%>%pull(unit_id_id)%>%unique()))%>%
+  group_by(time_bin,unit_id_id)%>%
+  mutate(binned_scaled_YrA = mean(scaled_YrA),
+         rescaled_YrA = scales::rescale(binned_scaled_YrA))
 
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
@@ -2350,7 +2362,8 @@ save_plot("male interaction auc ovx all cells by pellet zoom y",plot=last_plot()
 t=1
 for (target in target_cols){
   heatmap_df_all<-unit_df%>%
-    mutate(male_interaction_auc = 2 * (male_interaction_auc-0.5))%>%
+    mutate(male_interaction_auc = 2 * (male_interaction_auc-0.5),
+           male_interaction_auc_nobin = 2 * (male_interaction_auc_nobin-0.5))%>%
     filter(!if_any(target_cols,is.na))%>%
     pivot_longer(cols=target_cols,names_to = "var",values_to = "val")%>%
     mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(!!sym(target_cols[t]))%>%pull(unit_id_id)%>%unique()),
@@ -2358,7 +2371,8 @@ for (target in target_cols){
   
   heatmap_df_intact<-unit_df%>%
     filter(pellet=="pre-OVX")%>%
-    mutate(male_interaction_auc = 2 * (male_interaction_auc-0.5))%>%
+    mutate(male_interaction_auc = 2 * (male_interaction_auc-0.5),
+           male_interaction_auc_nobin = 2 * (male_interaction_auc_nobin-0.5))%>%
     filter(!if_any(target_cols,is.na))%>%
     pivot_longer(cols=target_cols,names_to = "var",values_to = "val")%>%
     mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(!!sym(target_cols[t]))%>%pull(unit_id_id)%>%unique()),
@@ -2366,7 +2380,8 @@ for (target in target_cols){
   
   heatmap_df_ovx<-unit_df%>%
     filter(pellet!="pre-OVX")%>%
-    mutate(male_interaction_auc = 2 * (male_interaction_auc-0.5))%>%
+    mutate(male_interaction_auc = 2 * (male_interaction_auc-0.5),
+           male_interaction_auc_nobin = 2 * (male_interaction_auc_nobin-0.5))%>%
     filter(!if_any(target_cols,is.na))%>%
     pivot_longer(cols=target_cols,names_to = "var",values_to = "val")%>%
     mutate(unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(!!sym(target_cols[t]))%>%pull(unit_id_id)%>%unique()),
