@@ -2193,18 +2193,29 @@ save_plot("example session subset data male_interaction fewer cells",plot=p1+p4+
 ##plot values by male_interaction for each session
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
   print(id)
-  data<-sumdf%>%filter(!is.na(male_interaction), session_id==id)%>%mutate(male_interaction=factor(male_interaction))
+  data<-sumdf%>%filter(!is.na(male_interaction), session_id==id, telem_ts < male_added + minutes(10))%>%
+    mutate(male_interaction=factor(male_interaction))%>%
+    merge(unit_df%>%select(male_interaction_auc_sig,male_interaction_auc,unit_id_id),all.x=T)
+  data<-data%>%mutate(unit_id=factor(unit_id, levels=data%>%arrange(desc(male_interaction_auc))%>%pull(unit_id)%>%unique()))
   p<-ggplot(data, aes(x=male_interaction,y=z_bin))+
-    geom_violin(aes(fill=male_interaction))+
-    point_indiv(alpha=0.25,size=2, position=position_jitter(width=0.25,height=0,seed=123))+
-    scale_fill_manual(values=male_interaction_scale)+
-    facet_wrap(vars(unit_id_id),axes="all",scales="free_y")+
-    ms
+    geom_violin(aes(fill=male_interaction_auc_sig))+
+    point_indiv()+
+    scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3]))+
+    facet_wrap(vars(unit_id),axes="all",scales="free_y",ncol=2)+
+    labs(x=element_blank(), y=expression(bold("Z-scored " *Delta * F)),title="Cell ID")+
+    scale_x_discrete(labels=c("Pre-male","+ male"))+
+    ms+
+    theme(legend.position = "none",
+          plot.title = element_text(size=12, hjust=0.5, margin=margin(t=0,b=3,l=0,r=0)),
+          strip.text.x = element_text(margin=margin(t=0,b=3,l=0,r=0)),
+          axis.title.y=element_text(margin=margin(r=3)),
+          axis.title.x=element_text(margin=margin(t=3)))
   p
   save_plot(paste("df_f0 by male interaction",id),w=20,h=15)
   
   if(id == "MT29_2025_05_23_session1"){
-    p+data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))
+    p+data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))%>%mutate(unit_id=factor(unit_id,levels=c(35,2,9,20,11,10)))
+    save_plot("z by male interaction example cells", w=3,h=3)
   }
 }
 
