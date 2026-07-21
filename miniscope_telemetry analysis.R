@@ -81,7 +81,7 @@ temp_set<-list(geom_line(linewidth = lw),
 ambient_temp_set<-list(geom_line(linewidth = lw),
                        labs(y=element_blank(),title="T-Amb (Deg. C)",x=element_blank()))
 male_interaction_set<-list(geom_line(linewidth = lw),
-                           labs(y="",title="Male social stimulus",x=element_blank()),
+                           labs(y="",title="Male social partner",x=element_blank()),
                            scale_y_continuous(breaks=c(0,1)))
 fed_set<-list(geom_line(linewidth=lw),
               labs(y="",x=element_blank(),title="Fed/fasted status"))
@@ -1947,7 +1947,7 @@ data<-tibble("minutes"=c(seq(0,20,1),4.99,14.99), "male_social_stimulus" = c(rep
 
 ggplot(data, aes(x=minutes, y=male_social_stimulus))+
   geom_line(aes(group=mouse), linewidth = lw)+
-  labs(x="Time (minutes)", y="Male social\nstimulus")+
+  labs(x="Time (minutes)", y="Male social\npartner")+
   scale_x_continuous(expand=c(0,0))+
   ms
 save_plot("male social schematic",w=4.4,h=1.44)
@@ -1969,7 +1969,9 @@ data<-data%>%merge(male_entry_minutes,all.x=T)%>%
                               male_interaction==1 & session_time_minutes < male_entry_minutes+6 ~ "1-5 min.",
                               male_interaction==1 & session_time_minutes ~ "5-10 min.")%>%
            factor(levels=c("Pre-male","0-1 min.","1-5 min.","5-10 min.","Post-male")),
-         unit_id_id = factor(unit_id_id, levels=data%>%arrange(desc(pellet),male_interaction_auc)%>%pull(unit_id_id)%>%unique()))
+         unit_id_id = factor(unit_id_id, levels=data%>%arrange(desc(pellet),male_interaction_auc)%>%pull(unit_id_id)%>%unique()))%>%
+  group_by(unit_id_id)%>%
+  mutate(rescaled_YrA_bin = scales::rescale(scaled_YrA_bin))
 
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
@@ -1988,7 +1990,7 @@ pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+
 
 p<-ggplot(data%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
   labs(x=element_blank(), y=element_blank())+
-  geom_tile(aes(fill=scaled_YrA_bin))+
+  geom_tile(aes(fill=rescaled_YrA_bin))+
   scale_y_discrete(breaks=c(),expand=c(0,0))+
   scale_x_discrete(expand=c(0,0))+
   scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
@@ -2055,7 +2057,7 @@ data<-male_df%>%
   mutate(session_time_minutes = as.duration(miniscope_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
 
 male_entry_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_entry_minutes=min(session_time_minutes))
-data<-data%>%merge(male_entry_minutes,all.x=T)%>%
+sdata<-data%>%merge(male_entry_minutes,all.x=T)%>%
   mutate(time_bin = case_when(male_interaction==0 & session_time_minutes<10 ~ "Pre-male",
                               male_interaction==0 & session_time_minutes>10 ~ "Post-male",
                               male_interaction==1 & session_time_minutes < male_entry_minutes+1.1 ~ "0-1 min.",
@@ -2063,9 +2065,11 @@ data<-data%>%merge(male_entry_minutes,all.x=T)%>%
                               male_interaction==1 & session_time_minutes ~ "5-10 min.")%>%
            factor(levels=c("Pre-male","0-1 min.","1-5 min.","5-10 min.","Post-male")),
          unit_id_id = factor(unit_id_id, levels=data%>%arrange(desc(pellet),male_interaction_auc_nobin)%>%pull(unit_id_id)%>%unique()))%>%
-  group_by(time_bin,unit_id_id)%>%
-  mutate(binned_scaled_YrA = mean(scaled_YrA),
-         rescaled_YrA = scales::rescale(binned_scaled_YrA))
+  group_by(time_bin,unit_id_id,pellet, gonad)%>%
+  summarize(binned_scaled_YrA = mean(scaled_YrA))%>%
+  group_by(unit_id_id)%>%
+  mutate(rescaled_YrA = scales::rescale(binned_scaled_YrA))
+         
 
 set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
@@ -2082,12 +2086,12 @@ labels_intact<-ggplot(data%>%filter(gonad=="intact"),aes(x="",y=unit_id_id))+ms+
 labels_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_set
 pellet_label_ovx<-ggplot(data%>%filter(gonad=="ovx"),aes(x="",y=unit_id_id))+ms+set+rect_label_pellet
 
-p<-ggplot(data%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
+p<-ggplot(sdata%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
   labs(x=element_blank(), y=element_blank())+
   geom_tile(aes(fill=rescaled_YrA))+
   scale_y_discrete(breaks=c(),expand=c(0,0))+
   scale_x_discrete(expand=c(0,0))+
-  scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="")+
+  scale_fill_continuous(type = "viridis", breaks = c(0, 1), labels = c("Min", "Max"),name="", limits=c(0,1))+
   ms+
   theme(panel.background = element_rect(fill="black"),
         # legend.title = element_text(),
@@ -2103,7 +2107,7 @@ p<-ggplot(data%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
         axis.line.y = element_blank())
 p+labels_intact+plot_layout(widths = c(15,1))
 save_plot("df_f0 by male interaction time bin all intact cells no bin",w=1.8,h=3.4)
-p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
+p+sdata%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by male interaction time bin all ovx cells no bin",w=1.8,h=4.5)
 
 #as lines
@@ -2147,7 +2151,7 @@ set<-list(theme(text=element_text(size=12),
                 plot.title = element_text(size=12,margin=margin(t=3,b=3,l=0,r=0,unit="pt")),
                 plot.margin = margin(t=0, b=0, l=-3, r=0, "pt"),
                 panel.spacing = unit(0.0375,"inches"),
-                axis.title.y=element_text(margin=margin(r=-35,unit="pt"))))
+                axis.title.y=element_text(margin=margin(r=2,unit="pt"))))
 
 #all data
 d<-read_rds("./output/int/2_250417_circulating_E2_torpor_miniscope-pre-OVX_torpor-MT29-2025_05_23-session1-concatenated.rds")%>%
@@ -2171,7 +2175,7 @@ save_plot("example session all data male_interaction",plot=p1+p4+p2+plot_spacer(
 #subset
 data<-data%>%filter(session_time_minutes<10.5)
 
-p1<-p1+data+theme(axis.line=element_blank(),legend.position = "none")+labs(title="Cells (F / max F)")
+p1<-p1+data+theme(axis.line.x=element_blank(),legend.position = "none")+labs(title="Selected cells (F / max F)",y="Cell ID")+scale_y_discrete()
 p2<-p2+data
 p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))+scale_x_continuous(breaks=seq(0,10,5),expand=c(0,0))
 p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
@@ -2180,7 +2184,7 @@ save_plot("example session subset data male_interaction",plot=p1+p4+p2+plot_spac
 #subset with fewer cells
 data<-data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))
 
-p1<-p1+data+theme(axis.line=element_blank(),legend.position = "none")+labs(title="Cells (F / max F)")
+p1<-p1+data
 p2<-p2+data
 p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))+scale_x_continuous(breaks=seq(0,10,5),expand=c(0,0))
 p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
@@ -2198,6 +2202,10 @@ for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>
     ms
   p
   save_plot(paste("df_f0 by male interaction",id),w=20,h=15)
+  
+  if(id == "MT29_2025_05_23_session1"){
+    p+data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))
+  }
 }
 
 
