@@ -876,7 +876,7 @@ for (target in other_targets){
                   grepl("torpor",target) ~ "Torpor")
   if (target=="male_interaction_auc_sig"){data<-data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig,levels=c("neutral","activated","suppressed")))}
   if (target=="ambient_temp_interpolated_cor_sig_ambient"){data<-data%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient,levels=c("neutral","negative","positive")))}
-  p1<-p+data%>%filter(!is.na(!!sym(target)))+aes(color=!!sym(target), fill=!!sym(target))+labs(title=title)+theme(legend.position = "none",plot.title=element_text(size=12,margin=margin(0,0,3,0,"pt")))+scale_x_continuous(breaks=seq(24,39,3),limits=c(24,NA),expand=c(0.02,0.02))
+  p1<-p+data%>%filter(!is.na(!!sym(target)))+aes(color=!!sym(target), fill=!!sym(target))+labs(title=title)+theme(legend.position = "none",plot.title=element_text(size=12,margin=margin(0,0,3,0,"pt")))+scale_x_continuous(breaks=seq(24,39,4),limits=c(24,NA),expand=c(0.02,0.02))
   p1
   save_plot(paste("df_f0 by temperature as lines colored by",target), w=4, h=4)
   p1+(p1$data)%>%filter(gonad=="intact")
@@ -1518,6 +1518,33 @@ p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=ambient_temp_bin1, y=timepoints
 p
 save_plot("ambient temp timepoints per mouse by temp and pellet", w=7,h=5)
 
+##Graph T-Core vs T-Amb correlation
+data<-sumdf%>%ungroup()%>%distinct(session_id,telem_ts,.keep_all = T)%>%filter(!is.na(ambient_temp_interpolated))
+r2<-cor(data$ambient_temp_interpolated, data$temp, method="pearson")^2
+
+p<-ggplot(data,aes(x=ambient_temp_interpolated,y=temp))+
+  regression_line()+
+  scale_x_continuous(breaks=seq(5,37,8))+
+  xy_point2(alpha=0.1, size=1,stroke=0.6)+
+  labs(x="T-Amb (Deg. C)", y="T-Core (Deg. C)",title=paste("R2 =",round(r2,3)))+
+  ms+
+  theme(plot.title = element_text(size=12,hjust=0,margin=margin(l=0,r=0,b=3,t=0)))
+p
+save_plot("T-core vs T-amb correlation",w=2,h=2)
+
+data<-data%>%filter(ambient_temp_interpolated%>%between(15,28))
+r2<-cor(data$ambient_temp_interpolated, data$temp, method="pearson")^2
+
+p<-ggplot(data,aes(x=ambient_temp_interpolated,y=temp))+
+  regression_line()+
+  scale_x_continuous(breaks=seq(5,37,8))+
+  xy_point2(alpha=0.1, size=1,stroke=0.6)+
+  labs(x="T-Amb (Deg. C)", y="T-Core (Deg. C)",title=paste("R2 =",round(r2,3)))+
+  ms+
+  theme(plot.title = element_text(size=12,hjust=0,margin=margin(l=0,r=0,b=3,t=0)))
+p
+save_plot("T-core vs T-amb correlation constrained T-Amb",w=2,h=2)
+
 # Graph all cells on one graph summarized per ambient_temp_interpolated_bin1
 data<-sumdf%>%
   filter(!is.na(z_bin), session_type %in% c("heat","cold"))%>%
@@ -1712,6 +1739,14 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
 ##Cell type frequencies
 data<-transform_data_piegraph(unit_df, animal_var="pellet",cell_var="ambient_temp_interpolated_cor_sig_ambient")%>%
   mutate(ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
+data_amb_stronger_only<-unit_df%>%
+  mutate(ambient_temp_interpolated_cor_sig_ambient = ifelse(ambient_temp_interpolated_cor_sig_ambient == "neutral",
+                                                            ambient_temp_interpolated_cor_sig_ambient,
+                                                            ifelse(abs(ambient_temp_interpolated_cor_ambient) > abs(temp_cor_ambient),
+                                                                   ambient_temp_interpolated_cor_sig_ambient,
+                                                                   "neutral")))%>%
+  transform_data_piegraph(animal_var="pellet",cell_var="ambient_temp_interpolated_cor_sig_ambient")%>%
+  mutate(ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
 
 chisq<-data%>%
   filter(pellet!="pre-OVX")%>%
@@ -1738,8 +1773,11 @@ pie<-ggplot(data, aes(x="", y=percent, fill=ambient_temp_interpolated_cor_sig_am
   facet_wrap(vars(pellet))
 pie
 save_plot("ambient temperature correlation types by pellet",w=4,h=2)
+pie+data_amb_stronger_only
 pie+data%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())
 save_plot("ambient tempertaure correlation types intact",w=1.5,h=1.5)
+pie+data_amb_stronger_only%>%filter(pellet=="pre-OVX")+theme(strip.text = element_blank())
+save_plot("ambient tempertaure correlation types intact t-amb stronger only",w=1.5,h=1.5)
 pie+data%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title=paste0("Treatment ", p_to_stars(chisq$p.value)))
 save_plot("ambient temperature correlation types by pellet ovx",w=3,h=1.8)
 
@@ -2493,28 +2531,78 @@ p<-ggplot(pie_data,aes(x=pellet,y=percent))+
   ms
 p
 
-i=1
-for (target in target_cols_binary){
-  data<-transform_data_piegraph(unit_df%>%drop_na(all_of(target)), "pellet",target)%>%mutate(target_ = .data[[target]], target_=case_when(target_=="positive"|target_=="negative"|target_=="neutral" ~ target_,
-                                                                                                                                          target_=="activated" ~ "positive",
-                                                                                                                                          target_=="suppressed" ~ "negative"),
-                                                                                             target_=factor(target_,levels=c("neutral","positive","negative")))
+# i=1
+# for (target in target_cols_binary){
+#   data<-transform_data_piegraph(unit_df%>%drop_na(all_of(target)), "pellet",target)%>%mutate(target_ = .data[[target]], target_=case_when(target_=="positive"|target_=="negative"|target_=="neutral" ~ target_,
+#                                                                                                                                           target_=="activated" ~ "positive",
+#                                                                                                                                           target_=="suppressed" ~ "negative"),
+#                                                                                              target_=factor(target_,levels=c("neutral","positive","negative")))
+#   
+#   pie<-ggplot(data, aes(x="", y=percent, fill=target_)) +
+#     theme_prism()+
+#     theme_pie+
+#     geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+#     scale_fill_manual(values=cell_type_scale)+
+#     coord_polar("y", start=0)+
+#     geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=target_,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
+#     scale_color_manual(values=c("grey90","black","black"))+
+#     guides(color="none")+
+#     labs(title=labs[i])+
+#     facet_wrap(vars(pellet))
+#   pie
+#   save_plot(paste("correlation significance by pellet",target),w=7,h=5)
+#   
+#   i=i+1
+# }
+
+##flow/ribbon plot
+data<-unit_df%>%filter(if_all(all_of(target_cols_binary), ~ !is.na(.)))%>%
+  mutate(temp_cor_sig_torpor = factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
+         ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
+         male_interaction_auc_sig_nobin = factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed"), labels=c("Neutral","Activated","Suppressed")))
+
+data_amb_stronger_only<-unit_df%>%filter(if_all(all_of(target_cols_binary), ~ !is.na(.)))%>%
+  mutate(ambient_temp_interpolated_cor_sig_ambient = ifelse(ambient_temp_interpolated_cor_sig_ambient == "neutral",
+                                                            ambient_temp_interpolated_cor_sig_ambient,
+                                                            ifelse(abs(ambient_temp_interpolated_cor_ambient) > abs(temp_cor_ambient),
+                                                                   ambient_temp_interpolated_cor_sig_ambient,
+                                                                   "neutral")))%>%
+  mutate(temp_cor_sig_torpor = factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
+         ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
+         male_interaction_auc_sig_nobin = factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed"), labels=c("Neutral","Activated","Suppressed")))
+
+perms_binary<-permutations(length(target_cols_binary), 2, target_cols_binary)
+for (i in 1:length(perms_binary[,1])){
+  d<-data%>%count(across(all_of(perms_binary[i,])))
   
-  pie<-ggplot(data, aes(x="", y=percent, fill=target_)) +
-    theme_prism()+
-    theme_pie+
-    geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
+  axis_args <- setNames(as.list(c(perms_binary[i,2],perms_binary[i,1])), paste0("axis", seq_along(perms_binary[i,])))
+  mapping   <- do.call(aes_string, c(axis_args, list(y = "n")))
+  
+  p<-ggplot(d, mapping) +
+    geom_alluvium(aes(fill = .data[[(perms_binary[i,2])]]), width = 0.6) +
+    geom_stratum(fill="grey90",width = 0.6, color = "grey30") +
+    geom_text(stat = "stratum", aes(label = after_stat(stratum)), size=12/.pt, fontface="bold") +
+    geom_text(stat = "alluvium", aes(label = ifelse(after_stat(x) == 1, after_stat(count), "")),nudge_x = 0.31, hjust = 0, size=12/.pt, fontface="bold")+
+    geom_text(stat = "stratum", aes(label = ifelse(after_stat(x) == 1, after_stat(count), "")), nudge_x=-0.38, size=12/.pt, fontface="bold") +
+    geom_text(stat = "stratum", aes(label = ifelse(after_stat(x) == 2, after_stat(count), "")), nudge_x=0.38, size=12/.pt, fontface="bold") +
+    scale_x_discrete(limits = c(perms_binary[i,2],perms_binary[i,1]),labels=set_names(labs,target_cols_binary), expand = c(0.25, 0.25)) +
+    scale_y_continuous(expand=expansion(mult=c(0,0.04)),breaks=c())+
     scale_fill_manual(values=cell_type_scale)+
-    coord_polar("y", start=0)+
-    geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=target_,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
-    scale_color_manual(values=c("grey90","black","black"))+
-    guides(color="none")+
-    labs(title=labs[i])+
-    facet_wrap(vars(pellet))
-  pie
-  save_plot(paste("correlation significance by pellet",target),w=7,h=5)
+    labs(y = element_blank(), fill = NULL) +
+    ms+
+    theme(legend.position = "none",
+          text=element_text(size=12,face="bold"),
+          axis.line.y = element_blank())
+  p
+  p+data%>%filter(pellet=="pre-OVX")%>%count(across(all_of(perms_binary[i,])))
+  save_plot(paste("ribbon plot intact",perms_binary[i,2],perms_binary[i,1]), w=5,h=3)
+  p+data%>%filter(pellet!="pre-OVX")%>%count(across(all_of(perms_binary[i,])),pellet)+facet_wrap(vars(pellet))
+  save_plot(paste("ribbon plot ovx",perms_binary[i,2],perms_binary[i,1]), w=5,h=3)
   
-  i=i+1
+  if("temp_cor_sig_torpor" %in% perms_binary[i,]){
+    p+data_amb_stronger_only%>%filter(pellet=="pre-OVX")%>%count(across(all_of(perms_binary[i,])))
+    save_plot("ribbin plot intact amb stronger only", w=5,h=3)
+  }
 }
 
 ## Compare lm results by variable ----
@@ -2573,13 +2661,14 @@ data<-lm_df%>%group_by(cr_session_id)%>%
   mutate(cor = mean(cor), type=factor(type, levels=c("mixed","cross-day"),labels=c("Mixed","Cross-day")))%>%
   distinct(cr_session_id, type, .keep_all = T)
   
-cross_day_lm_ttest<-t_test(data%>%filter(pellet=="pre-OVX")%>%ungroup(), cor ~ type)%>%add_significance()%>%add_xy_position()
+cross_day_lm_ttest<-t_test(data%>%filter(pellet=="pre-OVX")%>%ungroup()%>%arrange(cr_session_id), cor ~ type, paired=T)%>%add_significance()%>%add_xy_position()
 cross_day_lm_anova_ovx <- anova_test(data%>%filter(pellet!="pre-OVX")%>%ungroup(), cor ~ type * pellet)
 
 p<-ggplot(data, aes(x=type,y=cor))+
   point_errorbar(width=0.7)+
   point_summary()+
-  point_indiv()+
+  line_pair(aes(group=cr_session_id),alpha=0.5,linewidth=0.9)+
+  point_indiv(aes(group=cr_session_id))+
   coord_cartesian(ylim=c(0,1.15))+
   scale_y_continuous(breaks=seq(0,1,0.5))+
   labs(x=element_blank(), y="r", title="All cells")+
