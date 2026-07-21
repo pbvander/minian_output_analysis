@@ -51,9 +51,9 @@ ftime<-10 #clock time in hours when fasting was started
 
 #Settings for tuning analyses
 target_cols<-c("temp_cor_torpor", 
-               "ambient_temp_interpolated_cor_ambient","male_interaction_auc_nobin")
+               "ambient_temp_interpolated_cor_ambient","male_interaction_auc")
 target_cols_binary<-c("temp_cor_sig_torpor",
-                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig_nobin")
+                      "ambient_temp_interpolated_cor_sig_ambient","male_interaction_auc_sig")
 labs<-c("T-Core",
         "T-Amb", "Social")
 
@@ -1957,7 +1957,7 @@ save_plot("male social schematic",w=4.4,h=1.44)
 #heatmap
 data<-sumdf%>%
   filter(!is.na(z_bin), session_type=="male_interaction")%>%
-  merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_fc,unit_id_id, unit_id),all.x=T)%>%
+  merge(unit_df%>%select(all_of(c(target_cols,target_cols_binary)),male_interaction_auc, male_interaction_auc_sig, male_interaction_fc,unit_id_id, unit_id),all.x=T)%>%
   group_by(unit_id_id)%>%
   mutate(session_time_minutes = as.duration(telem_ts-ymd_hms(paste(start_date,start_time)))%>%as.numeric()/60)
 
@@ -2213,7 +2213,7 @@ data<-male_df%>%
   merge(unit_df%>%select(unit_id_id, session_id, male_interaction_auc_sig_nobin, male_interaction_auc_sig), all.x=T)%>%
   group_by(session_id)%>%
   mutate(male_added_time_seconds = as.duration(miniscope_ts - male_added)%>%as.numeric(),
-         male_interaction_auc_sig_nobin = factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed")))
+         male_interaction_auc_sig = factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed")))
 
 interaction_vlines<-data%>%group_by(session_id)%>%summarize(first_interaction_male_added_time_seconds = male_added_time_seconds[which.min(abs(first_interaction - miniscope_ts))])%>%merge(lm_df,all.x=T)
 mouse_levels<-unit_df%>%distinct(mouse,pellet)%>%arrange(pellet)%>%filter(pellet!="pre-OVX")%>%pull(mouse)%>%unique()
@@ -2221,7 +2221,7 @@ mouse_levels<-unit_df%>%distinct(mouse,pellet)%>%arrange(pellet)%>%filter(pellet
 p<-ggplot(data%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(x=male_added_time_seconds, y=z))+
   coord_cartesian(xlim=c(-30,90))+
   scale_x_continuous(breaks=seq(-30,90,30))+
-  geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1, aes(color=male_interaction_auc_sig_nobin, fill=male_interaction_auc_sig_nobin))+
+  geom_smooth(method=moving_avg, method.args=list(window=1), se=TRUE, linewidth=1, aes(color=male_interaction_auc_sig, fill=male_interaction_auc_sig))+
   geom_vline(data=interaction_vlines%>%filter(gonad=="ovx")%>%mutate(mouse=factor(mouse,levels=mouse_levels)), aes(xintercept=first_interaction_male_added_time_seconds,linetype=pellet), linewidth=1,alpha=0.5)+
   geom_vline(linewidth=1,alpha=0.5,aes(xintercept=0,linetype=pellet))+
   labs(y="z-scored ΔF", x="Time from male added (seconds)")+
