@@ -2319,31 +2319,31 @@ save_plot("male auc intact by cell type",w=1.6,h=1.6)
 p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge = 2))
 save_plot("male auc by cell type and pellet ovx",w=3.2,h=2)
 
-##fold-change
+##delta-Z
+t_test(data%>%filter(pellet!="pre-OVX")%>%group_by(mouse,pellet,male_interaction_auc_sig)%>%summarize(mean_fc = mean(male_interaction_fc))%>%ungroup()%>%mutate(pellet=droplevels(pellet))%>%group_by(male_interaction_auc_sig), mean_fc ~ pellet)
 for (cell_type in data%>%pull(male_interaction_auc_sig)%>%unique()){
   print(cell_type)
   anova<-anova(lme(data=data%>%filter(male_interaction_auc_sig==cell_type, !is.na(male_interaction_auc), pellet !="pre-OVX"), fixed = male_interaction_fc ~ pellet, random=~1|mouse))
   print(anova)
 }
 
-p<-ggplot(data, aes(x=pellet, y=abs(log2(male_interaction_fc)), fill=pellet))+
+p<-ggplot(data, aes(x=pellet, y=abs(male_interaction_fc), fill=pellet))+
   geom_violin()+
   point_mouse()+
   point_cell()+
-  labs(x=element_blank(),y=expression(bold("|"*log[2]*"FC|")))+
+  labs(x=element_blank(),y=expression(bold("|"*Delta*" Z|")))+
   scale_fill_manual(values=pellet_scale)+
   ms+
   theme(legend.position = "none",
         plot.title = element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
 p+facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free")
-save_plot("male log2fc auc by cell type and pellet", w=12,h=8)
+save_plot("male delta Z auc by cell type and pellet", w=12,h=8)
 p+(p$data)%>%filter(pellet=="pre-OVX")+
   aes(x=male_interaction_auc_sig, fill=male_interaction_auc_sig)+
-  scale_fill_manual(values=cell_type_scale[2:3])+
-  scale_x_discrete(labels=c("Act.","Supp."))
-save_plot("male log2fc by cell type intact",w=1.6,h=1.6)
-p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig),axes="all")+labs(title="Treatment ns (both cell types)")+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"), guide=guide_axis(n.dodge = 2))
-save_plot("male log2fc by cell type and pellet ovx",w=3.2,h=2)
+  scale_fill_manual(values=cell_type_scale[2:3])+scale_y_continuous(breaks=seq(0,10,2))
+save_plot("male delta Z by cell type intact",w=2,h=1.8)
+p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free_y")+labs(title="Treatment ns (both cell types)")+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"), guide=guide_axis(n.dodge = 2))
+save_plot("male delta Z by cell type and pellet ovx",w=3.2,h=2)
 
 ##Logistic regression
 data<-event_df%>%filter(!is.na(z),event=="male_added",!is.na(male_interaction))

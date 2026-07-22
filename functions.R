@@ -175,8 +175,7 @@ roc_analysis <- function(data, session_type, predictor="z_bin", shuf_iters=1000)
       if (length(unique(d$label)) != 2){next} #excludes sessions without both labels (will cause error in roc function)
       roc<-d%>%roc_("label",predictor, direction="<",levels=c(0,1))
       sum_roc<-d%>%group_by(label)%>%summarize(mean=mean(.data[[predictor]]))
-      fc<-1+
-          (sum_roc%>%filter(label==1)%>%pull(mean) - 
+      fc<-(sum_roc%>%filter(label==1)%>%pull(mean) -   #ignore the FC abbreviation, which typically means "fold change". This calculates delta[predictor].
            sum_roc%>%filter(label==0)%>%pull(mean))
       
       #Shuffled data
