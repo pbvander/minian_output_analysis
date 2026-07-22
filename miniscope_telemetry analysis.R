@@ -17,6 +17,7 @@ library(GGally)
 library(ggforce)
 library(ggalluvial)
 library(spatstat.geom)
+library(ggh4x)
 # summarize<-dplyr::summarize
 source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 # filter<-dplyr::filter
@@ -1609,8 +1610,8 @@ p
 save_plot("z-scored df by t-amb and cell type as lines", w=2.5,h=1.8)
 p+(p$data)%>%filter(gonad=="intact")
 save_plot("z-scored df by t-amb and cell type as lines intact", w=1.8,h=1.6)
-p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-save_plot("z-scored df by t-amb and cell type as lines ovx", w=3.5,h=2.4)
+p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+scale_x_continuous(breaks=c(5,21,37))
+save_plot("z-scored df by t-amb and cell type as lines ovx", w=3.2,h=2)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "ambient_temp_interpolated_cor_sig_ambient"]
@@ -1618,15 +1619,15 @@ for (target in other_targets){
   title=case_when(grepl("male",target) ~ "Social",
                   grepl("ambient",target) ~ "T-Amb",
                   grepl("torpor",target) ~ "T-Core")
-  if (target=="male_interaction_auc_sig"){data<-data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig,levels=c("neutral","activated","suppressed")))}
-  if (target=="temp_cor_sig_torpor"){data<-data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))}
+  if (target=="male_interaction_auc_sig"){data<-data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig,levels=c("neutral","activated","suppressed"),labels=c("Neutral","Activated","Suppressed")))}
+  if (target=="temp_cor_sig_torpor"){data<-data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))}
   p1<-p+data%>%filter(!is.na(!!sym(target)))+aes(color=!!sym(target), fill=!!sym(target))+labs(title=title)+theme(legend.position = "none",plot.title=element_text(size=12,margin=margin(0,0,3,0,"pt")))
   p1
   save_plot(paste("df_f0 by t-amb as lines colored by",target), w=4, h=4)
   p1+(p1$data)%>%filter(gonad=="intact")
   save_plot(paste("df_f0 by t-amb as lines colored by",target,"intact"), w=2.3, h=2)
-  p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(!!sym(target)))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-  save_plot(paste("df_f0 by t-amb as lines colored by",target,"ovx by pellet"), w=3, h=2)
+  p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(!!sym(target)))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+scale_x_continuous(breaks=c(5,21,37))
+  save_plot(paste("df_f0 by t-amb as lines colored by",target,"ovx by pellet"), w=3.2, h=2)
 }
 
 ## Plot an example session
@@ -1826,12 +1827,13 @@ p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")
   scale_fill_manual(values=cell_type_scale[2:3])+
   scale_x_discrete(breaks= ~., labels=tools::toTitleCase)+
   ms+
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
 p+facet_wrap(vars(pellet),axes="all")
 save_plot("ambient temperature slope by cell type and pellet", w=12,h=8)
 p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(labels=c("Neg.","Pos."))
 save_plot("ambient temeprature slope by cell type intact",w=1.7,h=1.4)
-p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",labeller = as_labeller(tools::toTitleCase))+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(guide=guide_axis(n.dodge=2))
+p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",labeller = as_labeller(tools::toTitleCase))+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(guide=guide_axis(n.dodge=2))+labs(title="Treatment ns (both cell types)")
 save_plot("ambient temperature slope by cell type and pellet ovx",w=3.2,h=2)
 
 ##ambient LM results ----
@@ -1871,7 +1873,7 @@ p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(breaks=c())
 save_plot("ambient lm correlation coefficient intact",w=1.4,h=2)
 p+(p$data)%>%filter(pellet!="pre-OVX")+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("ambient lm accuracy ovx",w=2.2,h=2)
-p+(p$data)%>%filter(pellet!="pre-OVX")+coord_cartesian(ylim=c(0.95,1))+labs(title="Treatment ns")+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge = 2))
+p+(p$data)%>%filter(pellet!="pre-OVX")+coord_cartesian(ylim=c(0.95,1))+labs(title="Treatment ns",y=element_blank())+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge = 2))
 save_plot("ambient lm accuracy ovx zoom y",w=2.2,h=2)
 
 #intact cell types
@@ -2008,13 +2010,13 @@ p<-ggplot(data%>%filter(gonad=="intact"), aes(x=time_bin, y=unit_id_id))+
         legend.box.spacing = unit(6,"pt"),
         axis.line.y = element_blank())
 p+labels_intact+plot_layout(widths = c(15,1))
-save_plot("df_f0 by male interactin time bin all intact cells",w=1.8,h=3.4)
+save_plot("df_f0 by male interactin time bin all intact cells",w=1.9,h=3.8)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by male interaction time bin all ovx cells",w=1.8,h=4.5)
 
 #as lines
-p<-ggplot(data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed"))),
-          aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=z_bin, color=male_interaction_auc_sig, fill=male_interaction_auc_sig))+
+data<-data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed")))
+p<-ggplot(data, aes(x=as.duration(miniscope_ts - male_added)%>%as.numeric()/60, y=z_bin, color=male_interaction_auc_sig, fill=male_interaction_auc_sig))+
   geom_smooth(method=moving_avg, method.args=list(window=2), se=TRUE, linewidth=1)+
   scale_color_manual(values=cell_type_scale)+
   geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
@@ -2023,13 +2025,14 @@ p<-ggplot(data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig
   labs(x="Time from male\nentry (minutes)", y=expression(bold("Z-scored " * Delta * F)))+
   scale_x_continuous(breaks=seq(-5,15,5))+
   ms+theme(legend.position = "none",
-           axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")))
+           axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")),
+           axis.title.x=element_text(margin=margin(t=4)))
 p
 save_plot("z-scored df male_interaction cell type as lines", w=3,h=3)
 p+(p$data)%>%filter(gonad=="intact")
-save_plot("z-scored df male_interaction cell type as lines intact", w=2.3,h=2)
-p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-save_plot("z-scored df male_interaction cell type as lines ovx", w=3.5,h=2.4)
+save_plot("z-scored df male_interaction cell type as lines intact", w=2.4,h=2)
+p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+labs(x="Time from male entry (minutes)")
+save_plot("z-scored df male_interaction cell type as lines ovx", w=3.8,h=2)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "male_interaction_auc_sig"]
@@ -2037,15 +2040,15 @@ for (target in other_targets){
   title=case_when(grepl("male",target) ~ "Social",
                   grepl("ambient",target) ~ "T-Amb",
                   grepl("torpor",target) ~ "T-Core")
-  if (target=="ambient_temp_interpolated_cor_sig_ambient"){data<-data%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient,levels=c("neutral","negative","positive")))}
-  if (target=="temp_cor_sig_torpor"){data<-data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))}
+  if (target=="ambient_temp_interpolated_cor_sig_ambient"){data<-data%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient,levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))}
+  if (target=="temp_cor_sig_torpor"){data<-data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))}
   p1<-p+data%>%filter(!is.na(!!sym(target)))+aes(color=!!sym(target), fill=!!sym(target))+labs(title=title)+theme(legend.position = "none",plot.title=element_text(size=12,margin=margin(0,0,3,0,"pt")))
   p1
   save_plot(paste("df_f0 male_interaction as lines colored by",target), w=4, h=4)
   p1+(p1$data)%>%filter(gonad=="intact")
   save_plot(paste("df_f0 male_interaction as lines colored by",target,"intact"), w=2.3, h=2)
-  p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(!!sym(target)))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-  save_plot(paste("df_f0 male_interaction as lines colored by",target,"ovx by pellet"), w=3, h=2)
+  p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(!!sym(target)))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+labs(x="Time from male entry (minutes)")
+  save_plot(paste("df_f0 male_interaction as lines colored by",target,"ovx by pellet"), w=3.8, h=2)
 }
 
 ##un-binned data (raw, frame-wise miniscope data)
@@ -2188,7 +2191,7 @@ p1<-p1+data
 p2<-p2+data
 p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))+scale_x_continuous(breaks=seq(0,10,5),expand=c(0,0))
 p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
-save_plot("example session subset data male_interaction fewer cells",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(5,1,1),widths=c(20,1),ncol=2),w=2.72,h=3.3)
+save_plot("example session subset data male_interaction fewer cells",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(5,1,1),widths=c(20,1),ncol=2),w=4,h=3.3)
 
 ##plot values by male_interaction for each session
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
@@ -2199,23 +2202,30 @@ for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>
   data<-data%>%mutate(unit_id=factor(unit_id, levels=data%>%arrange(desc(male_interaction_auc))%>%pull(unit_id)%>%unique()))
   p<-ggplot(data, aes(x=male_interaction,y=z_bin))+
     geom_violin(aes(fill=male_interaction_auc_sig))+
-    point_indiv()+
+    point_indiv(alpha=0.4,size=2)+
     scale_fill_manual(values=c(cell_type_scale[2],cell_type_scale[1],cell_type_scale[3]))+
-    facet_wrap(vars(unit_id),axes="all",scales="free_y",ncol=2)+
-    labs(x=element_blank(), y=expression(bold("Z-scored " *Delta * F)),title="Cell ID")+
-    scale_x_discrete(labels=c("Pre-male","+ male"))+
+    facet_wrap2(vars(unit_id),axes="all",scales="free_y",ncol=2, remove_labels = "x")+
+    labs(x="Male social partner", y=expression(bold("Z-scored " *Delta * F)),title="Cell ID")+
+    scale_x_discrete(labels=c("Pre","+"))+
     ms+
     theme(legend.position = "none",
+          panel.spacing = unit(4,"pt"),
           plot.title = element_text(size=12, hjust=0.5, margin=margin(t=0,b=3,l=0,r=0)),
           strip.text.x = element_text(margin=margin(t=0,b=3,l=0,r=0)),
-          axis.title.y=element_text(margin=margin(r=3)),
-          axis.title.x=element_text(margin=margin(t=3)))
+          axis.title.y=element_text(margin=margin(r=2)),
+          axis.title.x=element_text(margin=margin(t=6)))
   p
   save_plot(paste("df_f0 by male interaction",id),w=20,h=15)
   
   if(id == "MT29_2025_05_23_session1"){
-    p+data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))%>%mutate(unit_id=factor(unit_id,levels=c(35,2,9,20,11,10)))
-    save_plot("z by male interaction example cells", w=3,h=3)
+    p+data%>%filter(unit_id %in% c(2, 35, 10, 11, 9, 20))%>%mutate(unit_id=factor(unit_id,levels=c(35,2,9,20,11,10)))+
+      facetted_pos_scales(y=list(scale_y_continuous(breaks=seq(0,3,1)),
+                                 scale_y_continuous(breaks=seq(0,2,1)),
+                                 scale_y_continuous(breaks=seq(-1,3,0.5)),
+                                 scale_y_continuous(breaks=seq(-1,3,0.5)),
+                                 scale_y_continuous(breaks=seq(-2,3,0.5)),
+                                 scale_y_continuous(breaks=seq(-1.2,3,0.6))))
+    save_plot("z by male interaction example cells", w=2.6,h=3.7)
   }
 }
 
@@ -2308,14 +2318,15 @@ p<-ggplot(data, aes(x=pellet, y=2*abs(male_interaction_auc-0.5),fill=pellet))+
   scale_fill_manual(values=pellet_scale)+
   ms+
   theme(legend.position = "none",
-        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
+        plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")),
+        axis.title.y=element_text(margin=margin(r=3)))
 p+facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free")
 save_plot("male auc by cell type and pellet", w=12,h=8)
 p+(p$data)%>%filter(pellet=="pre-OVX")+
   aes(x=male_interaction_auc_sig,fill=male_interaction_auc_sig)+
   scale_fill_manual(values=cell_type_scale[2:3])+
-  scale_x_discrete(labels=c("Act.","Supp."))
-save_plot("male auc intact by cell type",w=1.6,h=1.6)
+  scale_x_discrete(guide = guide_axis(n.dodge = 2))
+save_plot("male auc intact by cell type",w=2,h=1.8)
 p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge = 2))
 save_plot("male auc by cell type and pellet ovx",w=3.2,h=2)
 
@@ -2334,8 +2345,10 @@ p<-ggplot(data, aes(x=pellet, y=abs(male_interaction_fc), fill=pellet))+
   labs(x=element_blank(),y=expression(bold("|"*Delta*" Z|")))+
   scale_fill_manual(values=pellet_scale)+
   ms+
+  scale_x_discrete(guide = guide_axis(n.dodge = 2))+
   theme(legend.position = "none",
-        plot.title = element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
+        plot.title = element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")),
+        axis.title.y=element_text(margin=margin(r=3)))
 p+facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free")
 save_plot("male delta Z auc by cell type and pellet", w=12,h=8)
 p+(p$data)%>%filter(pellet=="pre-OVX")+
@@ -2382,8 +2395,10 @@ for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(ma
           scale_y_continuous(breaks=c(0,0.5,1))+
           labs(x="Specificity",y="Sensitivity",title="All cells")+
           geom_abline(slope=1,intercept=1,color="grey50",alpha=0.8,linewidth=0.6,linetype="dashed")+
-          theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")))
-        save_plot(paste(sid,cell_type,"male interaction roc"),plot=p,w=1.6,h=1.4)
+          theme(plot.title = element_text(size=12,margin=margin(b=3,unit="pt")),
+                axis.title.x=element_text(margin=margin(t=3)),
+                axis.title.y=element_text(margin=margin(r=3)))
+        save_plot(paste(sid,cell_type,"male interaction roc"),plot=p,w=1.6,h=1.8)
       }
     }
     auc_df<-rbind(auc_df, tibble("session_id"=sid, "mouse"=strsplit(sid,"_")[[1]][1], "male_interaction_auc_sig"=cell_type, mean_auc=mean(auc_values)))
@@ -2402,16 +2417,18 @@ p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interactio
   scale_y_continuous(breaks=seq(0,1,0.5))+
   scale_fill_manual(values=c("black",cell_type_scale))+
   labs(x=element_blank(),y="AUROC")+
-  scale_x_discrete(labels=c("All","Neutral","Act.","Supp."),guide=guide_axis(n.dodge=2))+
+  scale_x_discrete(#labels=c("All","Neutral","Act.","Supp."),
+                   guide=guide_axis(n.dodge=2))+
   theme(legend.position = "none",
         plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
 p+auc_df%>%filter(pellet=="pre-OVX")
-save_plot("male interaction auc by cell type intact",w=2.4,h=1.4)
+save_plot("male interaction auc by cell type intact",w=3.1,h=1.8)
 p+auc_df%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
 save_plot("male interaction auc ovx by cell type and pellet",w=4.5,h=2.5)
 p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pellet,fill=pellet)+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide = guide_axis(n.dodge = 2))
 save_plot("male interaction auc ovx all cells by pellet",w=2.2,h=2)
-save_plot("male interaction auc ovx all cells by pellet zoom y",plot=last_plot()+coord_cartesian(ylim=c(0.98,1))+labs(title="Treatment ns"),w=2.2,h=2)
+last_plot()+coord_cartesian(ylim=c(0.99,1))+labs(title="Treatment ns",y=element_blank())+scale_y_continuous(breaks=seq(0.98,1,0.004))
+save_plot("male interaction auc ovx all cells by pellet zoom y",w=2.2,h=2)
 
 ####Comparison of tuning across stimuli ----
 # Heat map
@@ -2449,7 +2466,7 @@ for (target in target_cols){
     labs(x=element_blank(),y="Cell ID")+
     scale_y_discrete(breaks=NULL)+
     scale_x_discrete(expand=c(0,0))+
-    scale_fill_gradient2(high="red",low="blue",mid = "white",midpoint=0,name="Correlation / response")+
+    scale_fill_gradient2(high="blue",low="red",mid = "white",midpoint=0,name="Correlation / response",trans="reverse")+
     scale_color_manual(values=pellet_scale)+
     ms+
     theme(axis.line.y = element_blank(),
@@ -2578,7 +2595,7 @@ p
 data<-unit_df%>%filter(if_all(all_of(target_cols_binary), ~ !is.na(.)))%>%
   mutate(temp_cor_sig_torpor = factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
          ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
-         male_interaction_auc_sig_nobin = factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed"), labels=c("Neutral","Activated","Suppressed")))
+         male_interaction_auc_sig = factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"), labels=c("Neutral","Activated","Suppressed")))
 
 data_amb_stronger_only<-unit_df%>%filter(if_all(all_of(target_cols_binary), ~ !is.na(.)))%>%
   mutate(ambient_temp_interpolated_cor_sig_ambient = ifelse(ambient_temp_interpolated_cor_sig_ambient == "neutral",
@@ -2588,7 +2605,7 @@ data_amb_stronger_only<-unit_df%>%filter(if_all(all_of(target_cols_binary), ~ !i
                                                                    "neutral")))%>%
   mutate(temp_cor_sig_torpor = factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
          ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")),
-         male_interaction_auc_sig_nobin = factor(male_interaction_auc_sig_nobin, levels=c("neutral","activated","suppressed"), labels=c("Neutral","Activated","Suppressed")))
+         male_interaction_auc_sig = factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"), labels=c("Neutral","Activated","Suppressed")))
 
 perms_binary<-permutations(length(target_cols_binary), 2, target_cols_binary)
 for (i in 1:length(perms_binary[,1])){
@@ -2615,8 +2632,8 @@ for (i in 1:length(perms_binary[,1])){
   p
   p+data%>%filter(pellet=="pre-OVX")%>%count(across(all_of(perms_binary[i,])))
   save_plot(paste("ribbon plot intact",perms_binary[i,2],perms_binary[i,1]), w=5,h=3)
-  p+data%>%filter(pellet!="pre-OVX")%>%count(across(all_of(perms_binary[i,])),pellet)+facet_wrap(vars(pellet))
-  save_plot(paste("ribbon plot ovx",perms_binary[i,2],perms_binary[i,1]), w=5,h=3)
+  p+data%>%filter(pellet!="pre-OVX")%>%count(across(all_of(perms_binary[i,])),pellet)+facet_wrap(vars(pellet),scales="free_y")
+  save_plot(paste("ribbon plot ovx",perms_binary[i,2],perms_binary[i,1]), w=7,h=2.4)
   
   if("temp_cor_sig_torpor" %in% perms_binary[i,]){
     p+data_amb_stronger_only%>%filter(pellet=="pre-OVX")%>%count(across(all_of(perms_binary[i,])))
@@ -3084,10 +3101,27 @@ p
 save_plot("torpor stability by day all", w=4,h=3)
 p+flow_data_pellet+facet_wrap(vars(pellet))
 save_plot("torpor stability by day by pellet", w=12,h=3)
-p+flow_data_pellet%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))
-save_plot("torpor stability by day by pellet ovx", w=8,h=3)
 p+flow_data_pellet%>%filter(pellet=="pre-OVX")
 save_plot("torpor stability by day by pellet intact", w=4,h=3)
+
+
+p<-ggplot(flow_data, aes(axis1 = temp_cor_sig_torpor1, axis2 = temp_cor_sig_torpor2, y = n)) +
+  geom_alluvium(aes(fill = temp_cor_sig_torpor1), width = 0.45) +
+  scale_x_discrete(limits = c("Day 1", "Day 2"), expand = c(0.18, 0.18)) +
+  scale_y_continuous(expand=c(0,0),breaks=c())+
+  geom_stratum(width = 0.45, fill = "grey90", color = "grey30") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)), size=12/.pt, fontface="bold") +
+  geom_text(stat = "alluvium", aes(label = ifelse(after_stat(x) == 1, after_stat(count), "")),nudge_x = 0.25, hjust = 0, size=12/.pt, fontface="bold")+
+  geom_text(stat = "stratum", aes(label = ifelse(after_stat(x) == 1, after_stat(count), "")), nudge_x=-0.3, size=12/.pt, fontface="bold") +
+  geom_text(stat = "stratum", aes(label = ifelse(after_stat(x) == 2, after_stat(count), "")), nudge_x=0.3, size=12/.pt, fontface="bold") +
+  scale_fill_manual(values = cell_type_scale) +
+  labs(y = element_blank(), fill = NULL) +
+  ms+
+  theme(legend.position = "none",
+        text=element_text(size=12,face="bold"),
+        axis.line.y = element_blank())
+p+flow_data_pellet%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),scales="free_y")
+save_plot("torpor stability by day by pellet ovx", w=6.4,h=2.1)
 
 #correlation coefficient
 data<-unit_df%>%
