@@ -1109,6 +1109,18 @@ get_legend(pie+
                    legend.title=element_text(hjust=0))+
              scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="T-Core correlation"))%>%as_ggplot()
 save_plot("torpor cell type legend vertical",w=2,h=2)
+get_legend(pie+
+             theme(legend.position="top",
+                   legend.direction = "vertical",
+                   legend.title=element_text(hjust=0))+
+             scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="T-Amb correlation"))%>%as_ggplot()
+save_plot("ambient cell type legend vertical",w=2,h=2)
+get_legend(pie+data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,labels=c("Neutral","Activated","Suppressed")))+
+             theme(legend.position="top",
+                   legend.direction = "vertical",
+                   legend.title=element_text(hjust=0))+
+             scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Social response"))%>%as_ggplot()
+save_plot("male interaction cell type legend vertical",w=2,h=2)
 
 #Grouped by mouse and pellet
 mouse_data<-transform_data_piegraph(unit_df, animal_var = c("mouse","pellet"), cell_var = "temp_cor_sig_torpor")%>%
