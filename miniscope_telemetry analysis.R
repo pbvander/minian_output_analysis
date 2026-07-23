@@ -3176,6 +3176,41 @@ p<-ggplot(flow_data, aes(axis1 = temp_cor_sig_torpor1, axis2 = temp_cor_sig_torp
 p+flow_data_pellet%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),scales="free_y")
 save_plot("torpor stability by day by pellet ovx", w=6.4,h=2.1)
 
+#activity across T-Core as lines
+meta<-unit_df%>%
+  filter(cr_unit_id_id %in% cr_cells)%>%
+  group_by(cr_unit_id_id, pellet)%>%
+  mutate(day=paste0("day",row_number()))%>%
+  ungroup()%>%
+  select(day,unit_id_id)
+
+new_data<-sumdf%>%
+  filter(cr_unit_id_id %in% cr_cells)%>%
+  filter(session_type=="torpor")%>%
+  merge(meta)%>%
+  merge(data)%>%
+  filter(gonad=="intact")
+
+p<-ggplot(new_data%>%filter(day=="day1"), aes(x=temp, y=z_bin, color=temp_cor_sig_torpor1, fill=temp_cor_sig_torpor1))+
+  geom_smooth(method=moving_avg, method.args=list(window=3), se=TRUE, linewidth=1)+
+  scale_color_manual(values=cell_type_scale)+
+  geom_hline(yintercept=0,linetype="dashed",linewidth=0.5)+
+  coord_cartesian(ylim=c(-1,3))+
+  scale_fill_manual(values=cell_type_scale)+
+  labs(x="T-Core (Deg. C)", y=expression(bold("Z-scored " * Delta * F)), title="Day 1 data + groups")+
+  ms+theme(legend.position = "none",
+           axis.title.y=element_text(margin=margin(t=0,b=0,l=0,r=3,"pt")),
+           axis.title.x=element_text(margin=margin(t=3)),
+           plot.title=element_text(size=12,margin=margin(b=3)))
+p
+save_plot("z-scored df by temperature and cell type as lines day 1 data and groups", w=2.5,h=2)
+p+new_data%>%filter(day=="day2")+labs(title="Day 2 data, Day 1 groups")
+save_plot("z-scored df by temperature and cell type as lines day 1 data day 2 groups", w=2.5,h=2)
+p+new_data%>%filter(day=="day2")+aes(color=temp_cor_sig_torpor2, fill=temp_cor_sig_torpor2)+labs(title="Day 2 data + groups")
+save_plot("z-scored df by temperature and cell type as lines day 2 data + groups", w=2.5,h=2)
+p+new_data%>%filter(day=="day1")+aes(color=temp_cor_sig_torpor2, fill=temp_cor_sig_torpor2)+labs(title="Day 1 data, Day 2 groups")
+save_plot("z-scored df by temperature and cell type as lines day 1 data, day 2 groups", w=2.5,h=2)
+
 #correlation coefficient
 data<-unit_df%>%
   filter(cr_unit_id_id %in% cr_cells, !is.na(temp_cor_torpor))%>%
