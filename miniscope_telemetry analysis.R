@@ -2154,11 +2154,11 @@ for (target in other_targets){
   if (target=="temp_cor_sig_torpor"){data<-data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))}
   p1<-p+data%>%filter(!is.na(!!sym(target)))+aes(color=!!sym(target), fill=!!sym(target))+labs(title=title)+theme(legend.position = "none",plot.title=element_text(size=12,margin=margin(0,0,3,0,"pt")))
   p1
-  save_plot(paste("df_f0 male_interaction as lines colored by",target), w=4, h=4)
+  save_plot(paste("df_f0 male_interaction no bin as lines colored by",target), w=4, h=4)
   p1+(p1$data)%>%filter(gonad=="intact")
-  save_plot(paste("df_f0 male_interaction as lines colored by",target,"intact"), w=2.3, h=2)
+  save_plot(paste("df_f0 male_interaction no bin as lines colored by",target,"intact"), w=2.3, h=2)
   p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(!!sym(target)))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "right")
-  save_plot(paste("df_f0 male_interaction as lines colored by",target,"ovx by pellet"), w=3, h=2)
+  save_plot(paste("df_f0 male_interaction no bin as lines colored by",target,"ovx by pellet"), w=3, h=2)
 }
 
 ##plot an example session
