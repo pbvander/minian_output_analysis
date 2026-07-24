@@ -2371,7 +2371,8 @@ p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig)
 save_plot("male delta Z by cell type and pellet ovx",w=3.2,h=2)
 
 ##Male logistic regression ----
-data<-event_df%>%filter(!is.na(z),event=="male_added",!is.na(male_interaction))
+# data<-event_df%>%filter(!is.na(z),event=="male_added",!is.na(male_interaction))
+data<-sumdf%>%filter(!is.na(male_interaction))
 
 auc_df<-tibble()
 for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(male_interaction_auc_sig)%>%unique(),"all")){
@@ -2381,9 +2382,10 @@ for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(ma
   for (sid in unique(data$session_id)){
     print(sid)
     d<-data%>%filter(session_id==sid,unit_id_id %in% cells)%>%
-      select(unit_id_id, frame, male_interaction, z)%>%
-      pivot_wider(values_from = z, names_from = unit_id_id)%>%
-      select(-frame)
+      select(unit_id_id, telem_ts, male_interaction, z_bin)%>%
+      pivot_wider(values_from = z_bin, names_from = unit_id_id)%>%
+      select(-telem_ts)%>%
+      drop_na()
     if(nrow(d)==0){
       print("No data, skipping")
       next}
@@ -2469,17 +2471,16 @@ p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interactio
   labs(x=element_blank(),y="AUROC")+
   scale_x_discrete(#labels=c("All","Neutral","Act.","Supp."),
                    guide=guide_axis(n.dodge=2))+
-  draw_pvalue(data=lme_df, label="p.adj.signif",inherit.aes=F)+
   theme(legend.position = "none",
         plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
-p+auc_df%>%filter(pellet=="pre-OVX")+labs(title=paste("Cell type",p_to_stars(male_cell_type_lme["male_interaction_auc_sig","p-value"])))
-save_plot("male interaction auc by cell type intact",w=3.8,h=1.8)
+p+auc_df%>%filter(pellet=="pre-OVX")+labs(title=paste("Cell type",p_to_stars(male_cell_type_lme["male_interaction_auc_sig","p-value"])))+draw_pvalue(data=lme_df, label="p.adj.signif",inherit.aes=F)
+save_plot("male interaction auc by cell type intact",w=3.8,h=2.2)
 p+auc_df%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
 save_plot("male interaction auc ovx by cell type and pellet",w=4.5,h=2.5)
-p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pellet,fill=pellet)+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide = guide_axis(n.dodge = 2))
+p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pellet,fill=pellet)+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide = guide_axis(n.dodge = 2))+coord_cartesian(ylim=c(0,1))+labs(title="Treatment ns")
 save_plot("male interaction auc ovx all cells by pellet",w=2.2,h=2)
-last_plot()+coord_cartesian(ylim=c(0.99,1))+labs(title="Treatment ns",y=element_blank())+scale_y_continuous(breaks=seq(0.98,1,0.004))
-save_plot("male interaction auc ovx all cells by pellet zoom y",w=2.2,h=2)
+# last_plot()+coord_cartesian(ylim=c(0.99,1))+labs(title="Treatment ns",y=element_blank())+scale_y_continuous(breaks=seq(0.98,1,0.004))
+# save_plot("male interaction auc ovx all cells by pellet zoom y",w=2.2,h=2)
 
 ####Comparison of tuning across stimuli ----
 # Heat map
