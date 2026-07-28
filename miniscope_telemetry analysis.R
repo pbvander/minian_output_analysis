@@ -1869,6 +1869,8 @@ save_plot("ambient lm correlation significance by pellet",w=4,h=5)
 ambient_lm_anova<-anova(lme(data=lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX"),
                             fixed=ambient_temp_interpolated_mean_cor_ambient_ ~ pellet,
                             random=~1|mouse))
+t_test(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX")%>%mutate(across(where(is.factor), droplevels)),
+       ambient_temp_interpolated_mean_cor_ambient_ ~ pellet)
 
 p<-ggplot(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant"), aes(x=pellet,y=ambient_temp_interpolated_mean_cor_ambient_))+
   geom_violin(aes(fill=pellet))+
@@ -1919,7 +1921,7 @@ p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_i
   geom_violin(aes(fill=ambient_temp_interpolated_cor_sig_ambient),scale="width",width=0.95)+
   point_summary(aes(color=mouse),position=position_jitter(width=0.15,height=0,seed=123),size=2.8,shape=21,stroke=1)+
   # point_indiv(size=1.5,position=position_jitter(width=0.25,height=0,seed=321))+
-  labs(x=element_blank(),y="r")+
+  labs(x=element_blank(),y="r",title=paste0("Cell type ",p_to_stars(ambient_cell_type_lme[["ambient_temp_interpolated_cor_sig_ambient","p-value"]])))+
   scale_x_discrete(guide = guide_axis(n.dodge=2))+
   scale_fill_manual(values=c("white","black",cell_type_scale))+
   scale_y_continuous(breaks=seq(0,1,0.5),labels=seq(0,1,0.5))+
@@ -1927,7 +1929,8 @@ p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_i
   ms+
   coord_cartesian(ylim=c(-0.2,2))+
   theme(legend.position = "none",
-        axis.title.y = element_text(margin = margin(r=3, unit="pt")))
+        axis.title.y = element_text(margin = margin(r=3, unit="pt")),
+        plot.title = element_text(size=12,hjust=0,margin=margin(b=3)))
 p
 save_plot("ambient lm correlation by cell type",w=2.8,h=1.9)
 
