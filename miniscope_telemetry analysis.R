@@ -856,8 +856,6 @@ p
 save_plot("z-scored df by temperature and cell type as lines", w=3,h=3)
 p+(p$data)%>%filter(gonad=="intact")+coord_cartesian(ylim=c(-1,NA))
 save_plot("z-scored df by temperature and cell type as lines intact", w=2.5,h=2)
-p+(p$data)%>%filter(gonad=="intact")+aes(color=NULL, fill=NULL)+geom_smooth(method=moving_avg, method.args=list(window=4), se=TRUE, linewidth=0.85,color="black",fill="grey10")
-save_plot("z-scored df by temperature as lines intact", w=2.3, h=2)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
 save_plot("z-scored df by temperature and cell type as lines ovx", w=4,h=2)
 p+
@@ -868,6 +866,14 @@ p+
   scale_color_manual(values=post_ovx_scale)+
   theme(legend.position = "none")
 save_plot("z-scored df by temperature as line ovx downsample labels",w=4,h=2)
+
+p1<-p+aes(color="black", fill="grey50")+scale_color_manual(values="black")+scale_fill_manual(values="grey50")
+p1
+save_plot("z-scored df by temeprature as lines", w=3,h=3)
+p1+(p1$data)%>%filter(gonad=="intact")
+save_plot("z-scored df by temperature as lines intact", w=2.5,h=2)
+p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
+save_plot("z-scored df by temperature as lines ovx", w=4,h=2)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "temp_cor_sig_torpor"]
@@ -2299,7 +2305,7 @@ pie<-ggplot(data, aes(x="", y=percent, fill=male_interaction_auc_sig))+ms+theme_
         legend.text = element_text(size=12,face="bold"),
         plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))+
   geom_bar(stat="identity", width=1,color="white",position = position_stack(reverse=T)) +
-  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Male social stimulus response")+
+  scale_fill_manual(values=cell_type_scale, labels=tools::toTitleCase,name="Male social partner response")+
   coord_polar("y", start=0)+
   geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=male_interaction_auc_sig,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")+
   scale_color_manual(values=c("black","black","black"))+
