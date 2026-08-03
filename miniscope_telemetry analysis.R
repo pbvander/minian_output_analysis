@@ -43,7 +43,7 @@ session_id_type_to_exclude<-c("MT29_2025_05_23_session1_heat",  "MT34_2025_12_20
 )
 
 #Parameters
-shuffle_iterations<-500
+shuffle_iterations<-1000
 cross_reg<-FALSE
 
 #Misc
