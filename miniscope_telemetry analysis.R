@@ -1488,14 +1488,39 @@ data<-sumdf%>%
   mutate(session_type=factor(session_type,levels=c("heat","cold")),
          time_minutes = session_time_minutes - min(session_time_minutes))
 
-ggplot(data,aes(x=time_minutes,y=ambient_temp_interpolated))+
+p<-ggplot(data,aes(x=time_minutes,y=ambient_temp_interpolated))+
   labs(x="Time (minutes)",y="Ambient temperature\n(Deg. C)")+
   continuous_line()+
   ms+theme(panel.spacing=unit(0.1,"in"))+
   scale_y_continuous(breaks=seq(5,37,4))+
   scale_x_continuous(expand=c(0,0),breaks=seq(0,1000,10))+
   facet_wrap(vars(session_type),scales="free_x",labeller = labeller(.default = tools::toTitleCase),space = "free_x")
+p
 save_plot("ambient temperature schematic",w=4.2,h=2.2)
+
+##T-Core
+data<-sumdf%>%
+  filter(session_type %in% c("cold","heat"), pellet!="pre-OVX")%>%
+  group_by(session_id_type)%>%
+  mutate(session_type=factor(session_type,levels=c("heat","cold")),
+         time_minutes = session_time_minutes - min(session_time_minutes),
+         delta_temp = temp - mean(temp[time_minutes<5]))
+
+p<-ggplot(data,aes(x=time_minutes,y=temp))+
+  labs(x="Time (minutes)",y="T-Core (Deg. C)")+
+  geom_smooth(aes(fill=pellet, color=pellet),method=moving_avg, method.args=list(window=5), se=TRUE, linewidth=1)+
+  ms+
+  theme(panel.spacing=unit(0.1,"in"),
+        legend.position = "none")+
+  scale_y_continuous(breaks=seq(5,40,1))+
+  scale_x_continuous(expand=c(0,0),breaks=seq(0,1000,10))+
+  scale_color_manual(values=post_ovx_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
+  facet_wrap(vars(session_type),scales="free_x",labeller = labeller(.default = tools::toTitleCase),space = "free_x")
+p
+save_plot("T-Core across heating and cooling by pellet", w=4,h=4)
+p+aes(y=delta_temp)+scale_y_continuous(breaks=seq(-5,5,1))+labs(y=expression(bold(Delta * "T-Core (Deg. C)")))
+save_plot("T-Core change across heating and cooling by pellet", w=4,h=4)
 
 ##Observations by pellet group
 #Set up data
@@ -1570,7 +1595,7 @@ data<-sumdf%>%
   group_by(unit_id_id)%>%
   mutate(scaled_z_bin = scales::rescale(z_bin))%>%
   ungroup()%>%
-  merge(unit_df%>%select(unit_id_id,session_id, all_of(c(target_cols, target_cols_binary))))%>%
+  merge(unit_df%>%select(unit_id_id,session_id, all_of(c(target_cols, target_cols_binary)),temp_cor_sig_ambient))%>%
   mutate(ambient_temp_interpolated_bin1=cut(ambient_temp_interpolated,breaks=c(c(3.9,6.1),seq(8,34,2),c(36.1,38.1)), labels = seq(5,37,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(ambient_temp_interpolated_cor_ambient))%>%pull(unit_id_id)%>%unique()))
 
@@ -1630,6 +1655,21 @@ p+(p$data)%>%filter(gonad=="intact")
 save_plot("z-scored df by t-amb and cell type as lines intact", w=1.8,h=1.6)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+scale_x_continuous(breaks=c(5,21,37))
 save_plot("z-scored df by t-amb and cell type as lines ovx", w=3.2,h=2)
+
+#by T-Core
+p2<-p+
+  (p$data)%>%filter(gonad=="ovx")%>%mutate(temp_cor_sig_ambient=factor(temp_cor_sig_ambient, levels=c("neutral","negative","positive"), labels=c("Neutral","Negative","Positive")))+
+  geom_smooth(method=moving_avg, method.args=list(window=0.5), se=TRUE, linewidth=1)+
+  scale_x_continuous(breaks=seq(34,39,2))+
+  aes(color=pellet, fill=pellet,x=temp)+
+  facet_wrap(vars(temp_cor_sig_ambient))+
+  scale_color_manual(values=post_ovx_scale)+
+  scale_fill_manual(values=post_ovx_scale)+
+  theme(legend.position = "none")+
+  labs(x="T-Core (Deg. C)")
+p2$layers[[1]]<-NULL
+p2
+save_plot("z-scored df by t-core and cell type as lines during ambient ovx", w=3.2,h=2)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "ambient_temp_interpolated_cor_sig_ambient"]
@@ -1758,6 +1798,8 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
 ##Cell type frequencies
 data<-transform_data_piegraph(unit_df, animal_var="pellet",cell_var="ambient_temp_interpolated_cor_sig_ambient")%>%
   mutate(ambient_temp_interpolated_cor_sig_ambient = factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
+data2<-transform_data_piegraph(unit_df, animal_var="pellet",cell_var="temp_cor_sig_ambient")%>%
+  mutate(temp_cor_sig_ambient = factor(temp_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral","Negative","Positive")))
 data_amb_stronger_only<-unit_df%>%
   mutate(ambient_temp_interpolated_cor_sig_ambient = ifelse(ambient_temp_interpolated_cor_sig_ambient == "neutral",
                                                             ambient_temp_interpolated_cor_sig_ambient,
@@ -1771,6 +1813,16 @@ chisq<-data%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
   pivot_wider(names_from = ambient_temp_interpolated_cor_sig_ambient, values_from = n)%>%
+  ungroup()%>%
+  select(-pellet)%>%
+  mutate(across(everything(), ~replace_na(.x,0)))%>%
+  as.matrix()%>%
+  chisq.test()
+
+chisq2<-data2%>%
+  filter(pellet!="pre-OVX")%>%
+  select(-percent)%>%
+  pivot_wider(names_from = temp_cor_sig_ambient, values_from = n)%>%
   ungroup()%>%
   select(-pellet)%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
@@ -1799,6 +1851,10 @@ pie+data_amb_stronger_only%>%filter(pellet=="pre-OVX")+theme(strip.text = elemen
 save_plot("ambient tempertaure correlation types intact t-amb stronger only",w=1.5,h=1.5)
 pie+data%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title=paste0("Treatment ", p_to_stars(chisq$p.value)))
 save_plot("ambient temperature correlation types by pellet ovx",w=3,h=1.8)
+pie2<-last_plot()
+pie2$layers[[2]]<-geom_text(aes(label = paste0(round(percent,digits=0),"%"),color=temp_cor_sig_ambient,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, fontface="bold")
+pie2+data2%>%filter(pellet!="pre-OVX")+aes(fill=temp_cor_sig_ambient)
+save_plot("temperature correlation types during ambient by pellet ovx",w=3,h=1.8)
 
 ##correlation coefficient
 t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_coef=mean(ambient_temp_interpolated_cor_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_coef ~ pellet)
@@ -1807,6 +1863,8 @@ for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambi
   print(cell_type)
   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_cor_ambient ~ pellet, random=~1|mouse))
   print(anov)
+  anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_cor_ambient ~ pellet, random=~1|mouse))
+  print(anov2)
 }
 
 p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_cor_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
@@ -1827,6 +1885,8 @@ p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(labels=c("Neg.","Pos."))
 save_plot("ambient temeprature coefficient by cell type intact",w=1.7,h=1.4)
 p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),labeller = as_labeller(tools::toTitleCase))+scale_fill_manual(values=post_ovx_scale)+labs(title="Treatment ns (both cell types)")+scale_x_discrete(guide=guide_axis(n.dodge=2))
 save_plot("ambient temperature coefficient by cell type and pellet ovx",w=3.2,h=2)
+last_plot()+aes(y=abs(temp_cor_ambient))
+save_plot("temperature coefficient by cell type and pellet ovx during ambient",w=3.2,h=2)
 
 ##slope
 t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_slope=mean(ambient_temp_interpolated_slope_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_slope ~ pellet)
@@ -1835,6 +1895,9 @@ for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambi
   print(cell_type)
   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_slope_ambient ~ pellet, random=~1|mouse))
   print(anov)
+  
+  anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_slope_ambient ~ pellet, random=~1|mouse))
+  print(anov2)
 }
 
 p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_slope_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
@@ -1853,6 +1916,9 @@ p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(labels=c("Neg.","Pos."))
 save_plot("ambient temeprature slope by cell type intact",w=1.7,h=1.4)
 p+(p$data)%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet, levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+aes(x=pellet,fill=pellet)+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",labeller = as_labeller(tools::toTitleCase))+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(guide=guide_axis(n.dodge=2))+labs(title="Treatment ns (both cell types)")
 save_plot("ambient temperature slope by cell type and pellet ovx",w=3.2,h=2)
+last_plot()+aes(y=abs(temp_slope_ambient))
+save_plot("temperature slope by cell type and pellet ovx during ambient",w=3.2,h=2)
+
 
 ##ambient LM results ----
 #LM significance by pellet
