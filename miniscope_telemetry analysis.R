@@ -792,6 +792,12 @@ data<-sumdf%>%
   merge(unit_df%>%select(unit_id_id, session_id, all_of(c(target_cols, target_cols_binary))))%>%
   mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
          unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
+data_ds<-sumdf%>%
+  filter(!is.na(z_bin), session_type=="torpor")%>%
+  equalize_data_temporal()%>%
+  merge(unit_df%>%select(unit_id_id, session_id, all_of(c(target_cols, target_cols_binary))))%>%
+  mutate(temp_bin1=cut(temp,breaks=seq(0,50,2), labels = seq(0,48,2)),
+         unit_id_id=factor(unit_id_id, levels=unit_df%>%arrange(desc(pellet),desc(temp_cor_torpor))%>%pull(unit_id_id)%>%unique()))
 data_ds_labels<-sumdf%>%
   filter(!is.na(z_bin), session_type=="torpor")%>%
   merge(unit_df_torpor_ovx_ds_sum%>%select(unit_id_id, session_id, any_of(c(target_cols, target_cols_binary))))%>%
@@ -858,6 +864,10 @@ p+(p$data)%>%filter(gonad=="intact")+coord_cartesian(ylim=c(-1,NA))
 save_plot("z-scored df by temperature and cell type as lines intact", w=2.5,h=2)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
 save_plot("z-scored df by temperature and cell type as lines ovx", w=4,h=2)
+last_plot()+
+  data_ds%>%filter(gonad=="ovx")%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive")))+
+  scale_x_continuous(breaks=seq(24,40,4))
+save_plot("z-scored df by temperature as line ovx downsample data" ,w=4,h=2)
 p+
   data_ds_labels%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive")))+
   aes(color=pellet,fill=pellet)+
@@ -874,6 +884,18 @@ p1+(p1$data)%>%filter(gonad=="intact")
 save_plot("z-scored df by temperature as lines intact", w=2.5,h=2)
 p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
 save_plot("z-scored df by temperature as lines ovx", w=4,h=2)
+
+data_trs<-(p$data)%>%group_by(session_id)%>%mutate(temp=scales::rescale(temp))
+p2<-p
+p2$layers[[1]]<-NULL
+p2+
+  data_trs%>%filter(gonad=="ovx")+
+  labs(x="Re-scaled T-Core")+
+  aes(color=pellet,fill=pellet)+
+  facet_wrap(vars(temp_cor_sig_torpor))+
+  scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+
+  theme(legend.position = "none")+
+  geom_smooth(method=moving_avg, method.args=list(window=0.2), se=TRUE, linewidth=1)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "temp_cor_sig_torpor"]
