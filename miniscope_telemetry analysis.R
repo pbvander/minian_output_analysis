@@ -457,7 +457,7 @@ unit_df<-merge(unit_df,male_unit_df,all.x=T)
 #torpor and post-ovx data only
 unit_df_torpor_ovx_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
-for (i in 1:shuffle_iterations){
+for (i in 1:(shuffle_iterations/4)){
   d<-sumdf%>%
     filter(!is.na(z_bin),session_type=="torpor",gonad=="ovx")%>%
     equalize_data_temporal(verbose=F)%>%
@@ -547,7 +547,7 @@ lm_df_torpor_ovx_ds<-tibble()
 lm_predict_df_torpor_ovx_ds<-tibble()
 lm_coef_df_torpor_ovx_ds<-tibble()
 pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
-for (i in 1:shuffle_iterations){
+for (i in 1:(shuffle_iterations/4)){
   #Run analysis
   lm_ls<-sumdf%>%filter(!is.na(z_bin),gonad=="ovx")%>%
     equalize_data_temporal(verbose=F)%>%
