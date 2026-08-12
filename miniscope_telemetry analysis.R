@@ -484,7 +484,7 @@ sessions<-sumdf%>%group_by(session_id,torpor_status)%>%summarize(n=n_distinct(te
 torpor_arousal_entry_lm_ls<-lm_analysis(sumdf%>%filter((!is.na(z_bin)), session_id %in% sessions, torpor_status %in% c("entry","arousal")), id_col="telem_ts", .session_type = "torpor", response="temp", cv_folds=c("entry","arousal"), partition_type="entry_arousal", partition_col="torpor_status", shuf_iters=shuffle_iterations)
 
 #Cross-training days
-data<-sumdf%>%separate_wider_delim(cr_session_id, delim = "_", names=c(NA,"timepoint",NA), cols_remove = F)%>%
+data<-sumdf%>%separate_wider_delim(cr_session_id, delim = "_", names=c(NA,"t1","t2",NA), cols_remove = F)%>%unite("timepoint",t1,t2)%>%
   mutate(timepoint = tolower(timepoint), unit_id_id=cr_unit_id_id, session_id=cr_session_id)%>%
   group_by(mouse,timepoint)%>%
   mutate(day=paste0("day",dense_rank(start_date))%>%factor())%>%
