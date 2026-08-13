@@ -456,7 +456,7 @@ unit_df<-merge(unit_df,male_unit_df,all.x=T)
 # Downsample to equalize temperature sampling (taking average (quantitative measures) or mode (cell type classification/"sig" columns) of downsampling iterations).
 #torpor and post-ovx data only
 unit_df_torpor_ovx_ds<-tibble()
-pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
+pb <- txtProgressBar(min = 0, max = shuffle_iterations/4, style = 3)
 for (i in 1:(shuffle_iterations/4)){
   d<-sumdf%>%
     filter(!is.na(z_bin),session_type=="torpor",gonad=="ovx")%>%
@@ -546,7 +546,7 @@ for (cell_type in data%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient
 lm_df_torpor_ovx_ds<-tibble()
 lm_predict_df_torpor_ovx_ds<-tibble()
 lm_coef_df_torpor_ovx_ds<-tibble()
-pb <- txtProgressBar(min = 0, max = shuffle_iterations, style = 3)
+pb <- txtProgressBar(min = 0, max = shuffle_iterations/4, style = 3)
 for (i in 1:(shuffle_iterations/4)){
   #Run analysis
   lm_ls<-sumdf%>%filter(!is.na(z_bin),gonad=="ovx")%>%
