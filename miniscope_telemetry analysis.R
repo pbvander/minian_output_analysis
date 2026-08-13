@@ -502,13 +502,13 @@ lm_df<-merge(torpor_lm_ls$lm_df, ambient_lm_ls$lm_df,all=T)%>%
   merge(torpor_w_tempchange1_lm_ls$lm_df,all=T)%>%
   merge(torpor_w_tempchange1_lm_ls$lm_add_x_var_coef_df,all=T)%>%
   merge(torpor_arousal_entry_lm_ls$lm_df, all=T)%>% #combine data
-  merge(cross_day_lm_ls$lm_df, all=T)%>%
-  merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T) #add metadata
+  merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T),all.x=T)%>% #add metadata
+  merge(cross_day_lm_ls$lm_df, all=T)
 unit_df<-merge(torpor_lm_ls$lm_coef_df, ambient_lm_ls$lm_coef_df,all=T)%>%
   merge(torpor_w_tempchange1_lm_ls$lm_coef_df,all=T)%>%
   merge(torpor_arousal_entry_lm_ls$lm_coef_df, all=T)%>% #combine data
-  merge(cross_day_lm_ls$lm_coef_df, all=T)%>%
-  merge(unit_df,all=T) #add coefficients from population model to unit_df
+  merge(unit_df,all=T)%>% #add coefficients from population model to unit_df
+  merge(cross_day_lm_ls$lm_coef_df, all=T)
 
 # Gonad-intact different cell types
 #torpor
