@@ -848,6 +848,7 @@ p_to_stars <- function(p){
                    p<0.001 ~ "***",
                    p<0.01 ~ "**",
                    p<0.05 ~ "*")
+  return(stars)
 }
 
 write_output<-function(data, direc="./output/", name = NA){

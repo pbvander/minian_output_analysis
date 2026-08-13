@@ -977,6 +977,41 @@ temp_tempchange_lm$lm_df
 ggplot(t_df%>%filter(aligned_time%>%between(0,48)), aes(x=temp,y=act))+xy_point2(alpha=0.05)+ms+scale_x_continuous(breaks=seq(0,50,1))+labs(x="Core body temperature (Deg. C)",y="Gross locomotor activity (AU)")
 save_plot("body temperature and activity relationship",w=12,h=8)
 
+# Check distrubution type for correlation coefficient and slope
+p<-ggplot(unit_df%>%filter(!is.na(temp_slope_torpor)), aes(sample = temp_slope_torpor))+
+  stat_qq(colour = "grey50",shape=21,fill="grey80") +
+  stat_qq_line(colour = "red", linewidth = 0.8) +
+  labs(title = "Slope Q-Q", x = "Theoretical", y = "Sample") +
+  ms+
+  theme(plot.title=element_text(size=12,margin=margin(b=4)))
+p
+save_plot("torpor temperature slope Q-Q",w=3,h=3)
+p+aes(sample=temp_cor_torpor)+labs(title="r Q-Q")
+save_plot("torpor temperature r Q-Q",w=3,h=3)
+p+(p$data)%>%filter(temp_cor_sig_torpor!="neutral")+facet_wrap(vars(temp_cor_sig_torpor),scales="free_x")
+save_plot("torpor temperature slope Q-Q by cell type",w=3,h=3)
+last_plot()+aes(sample=temp_cor_torpor)+labs(title="r Q-Q")
+save_plot("torpor temperature r Q-Q by cell type",w=3,h=3)
+
+p<-ggplot(unit_df%>%filter(!is.na(temp_slope_torpor)), aes(x = (temp_slope_torpor)))+
+  geom_density()+
+  ms+
+  labs(x="|Slope|",y="Density")+
+  theme(plot.title=element_text(size=12,margin=margin(b=4)))
+p
+save_plot("torpor temperature slope density distribution",w=3,h=3)
+p+aes(x=temp_cor_torpor)
+save_plot("torpor temperature r density distribution",w=3,h=3)
+p+(p$data)%>%filter(temp_cor_sig_torpor!="neutral")+facet_wrap(vars(temp_cor_sig_torpor),scales="free",axes="all")+aes(x=abs(temp_slope_torpor))
+save_plot("torpor temperature slope density distribution by cell type",w=4,h=3)
+p+(p$data)%>%filter(temp_cor_sig_torpor!="neutral")+facet_wrap(vars(temp_cor_sig_torpor),scales="free",axes="all")+aes(x=abs(temp_cor_torpor))
+save_plot("torpor temperature r density distribution by cell type",w=4,h=3)
+
+goft::gamma_test(unit_df%>%filter(!is.na(temp_slope_torpor),temp_cor_sig_torpor=="negative")%>%pull(temp_slope_torpor)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(temp_slope_torpor),temp_cor_sig_torpor=="positive")%>%pull(temp_slope_torpor)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(temp_slope_torpor),temp_cor_sig_torpor=="negative")%>%pull(temp_cor_torpor)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(temp_slope_torpor),temp_cor_sig_torpor=="positive")%>%pull(temp_cor_torpor)%>%abs())
+
 # Correlation coefficient by gonad/E2 state or pellet
 p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=group_gonad, y=temp_cor_torpor))+
   geom_violin(aes(fill=group_gonad))+
@@ -987,6 +1022,7 @@ p<-ggplot(unit_df%>%filter(!is.na(temp_cor_sig_torpor)), aes(x=group_gonad, y=te
 p
 save_plot("torpor temperature correlation coefficient by cell type and group_gonad", w=12,h=8)
 
+torpor_cor_test<-wilcox_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_coef=mean(temp_cor_torpor))%>%group_by(temp_cor_sig_torpor), mean_coef ~ pellet)
 stats<-tibble()
 stats_ds<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
@@ -1009,8 +1045,8 @@ for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_
   stats<-rbind(anov, stats)
   stats_ds<-rbind(anov_ds, stats_ds)
 }
-stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="bonferroni")%>%add_significance()
-stats_ds<-stats_ds%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="bonferroni")%>%add_significance()
+stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="holm")%>%add_significance()
+stats_ds<-stats_ds%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="holm")%>%add_significance()
 
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_cor_torpor), fill=pellet))+
@@ -1167,39 +1203,29 @@ pie<-ggplot(mouse_data, aes(x="", y=percent, fill=temp_cor_sig_torpor)) +
 pie
 save_plot("torpor temperature correlation types by mouse and pellet",w=8,h=5)
 
-#Slope by gonad/E2 state
-# for (cell_type in unique(unit_df_torpor_ovx_ds_sum$temp_cor_sig_torpor)){
-#   if (cell_type=="neutral"){next}
-#   print(cell_type)
-#   anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
-#   print(anov_ds)
-#   anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
-#   print(anov)
-#   anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
-#   print(anov_torpor_only)
-#   anov_torpor_only_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
-#   print(anov_torpor_only_ds)
-# }
-# (unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_slope=mean(temp_slope_torpor)))%>%group_by(temp_cor_sig_torpor)%>%wilcox_test(mean_slope ~ pellet)%>%adjust_pvalue()
-
+# Slope by gonad/E2 state
+torpor_slope_test<-wilcox_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_coef=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_coef ~ pellet)
+torpor_slope_test_ds<-wilcox_test(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_coef=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_coef ~ pellet)
 stats<-tibble()
 stats_ds<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
   
-  anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  # anov_ds<-anova(lme(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  anov_ds<-lme4::glmer(data=unit_df_torpor_ovx_ds_sum%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), formula=abs(temp_slope_torpor) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
   print(anov_ds)
   anov_ds$var = rownames(anov_ds)
   anov_ds<-anov_ds%>%mutate(data_type="downsampled",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
   
-  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  # anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), fixed=temp_slope_torpor ~ pellet, random=~1|mouse))
+  anov<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type), formula=abs(temp_slope_torpor) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
   print(anov)
   anov$var = rownames(anov)
   anov<-anov%>%mutate(data_type="observed",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
   
-  anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
-  print(anov_torpor_only)
+  # anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
+  # print(anov_torpor_only)
   
   stats<-rbind(anov, stats)
   stats_ds<-rbind(anov_ds, stats_ds)
@@ -1207,12 +1233,12 @@ for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_
 y_ds<-unit_df_torpor_ovx_ds_sum%>%group_by(temp_cor_sig_torpor)%>%summarize(y.position=1.2*max(abs(temp_slope_torpor)))%>%mutate(data_type="downsampled")
 y<-unit_df%>%group_by(temp_cor_sig_torpor)%>%summarize(y.position=1.15*max(abs(temp_slope_torpor)))%>%mutate(data_type="observed")%>%filter(!is.na(y.position))
 
-stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_slope_torpor", group1="OVX+Veh",group2="OVX+E2",xmin=1,xmax=2)%>%
-  adjust_pvalue(method="bonferroni")%>%add_significance()%>%mutate(vjust=ifelse(p.adj.signif=="ns",-0.1,0.25))%>%
+stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`Pr(>Chisq)`, ".y." = "temp_slope_torpor", group1="OVX+Veh",group2="OVX+E2",xmin=1,xmax=2)%>%
+  adjust_pvalue(method="holm")%>%add_significance()%>%mutate(vjust=ifelse(p.adj.signif=="ns",-0.1,0.25))%>%
   merge(y,all.x=T)
 
-stats_ds<-stats_ds%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_slope_torpor", group1="OVX+Veh",group2="OVX+E2",xmin=1,xmax=2)%>%
-  adjust_pvalue(method="bonferroni")%>%add_significance()%>%mutate(vjust=ifelse(p.adj.signif=="ns",-0.1,0.25))%>%
+stats_ds<-stats_ds%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`Pr(>Chisq)`, ".y." = "temp_slope_torpor", group1="OVX+Veh",group2="OVX+E2",xmin=1,xmax=2)%>%
+  adjust_pvalue(method="holm")%>%add_significance()%>%mutate(vjust=ifelse(p.adj.signif=="ns",-0.1,0.25))%>%
   merge(y_ds,all.x=T)
 
 
@@ -1436,7 +1462,7 @@ if (cell_type_lme[["temp_cor_sig_torpor","p-value"]]<0.05){
     lme_df<-lme_df%>%rbind(tibble(".y."="temp_mean_cor_torpor_", "group1"=comp[1], "group2"=comp[2], "F_value"=lme[["temp_cor_sig_torpor","F-value"]], "p"=lme[["temp_cor_sig_torpor","p-value"]]))
   }
 }
-lme_df<-lme_df%>%mutate(p.adj=p*nrow(lme_df))%>%add_significance()%>%
+lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(),
          y.position=seq(1.14,1.14+(0.17*(nrow(lme_df)-1)),0.17)+0.04)
@@ -1611,6 +1637,41 @@ p<-ggplot(data,aes(x=ambient_temp_interpolated,y=temp))+
 p
 save_plot("T-core vs T-amb correlation constrained T-Amb",w=2,h=2)
 
+# Check distrubution type for correlation coefficient and slope
+p<-ggplot(unit_df%>%filter(!is.na(ambient_temp_interpolated_slope_ambient)), aes(sample = ambient_temp_interpolated_slope_ambient))+
+  stat_qq(colour = "grey50",shape=21,fill="grey80") +
+  stat_qq_line(colour = "red", linewidth = 0.8) +
+  labs(title = "Slope Q-Q", x = "Theoretical", y = "Sample") +
+  ms+
+  theme(plot.title=element_text(size=12,margin=margin(b=4)))
+p
+save_plot("ambient temperature slope Q-Q",w=3,h=3)
+p+aes(sample=ambient_temp_interpolated_cor_ambient)+labs(title="r Q-Q")
+save_plot("ambient temperature r Q-Q",w=3,h=3)
+p+(p$data)%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),scales="free_x")
+save_plot("ambient temperature slope Q-Q by cell type",w=3,h=3)
+last_plot()+aes(sample=ambient_temp_interpolated_cor_ambient)+labs(title="r Q-Q")
+save_plot("ambient temperature r Q-Q by cell type",w=3,h=3)
+
+p<-ggplot(unit_df%>%filter(!is.na(ambient_temp_interpolated_slope_ambient)), aes(x = (ambient_temp_interpolated_slope_ambient)))+
+  geom_density()+
+  ms+
+  labs(x="|Slope|",y="Density")+
+  theme(plot.title=element_text(size=12,margin=margin(b=4)))
+p
+save_plot("ambient temperature slope density distribution",w=3,h=3)
+p+aes(x=ambient_temp_interpolated_cor_ambient)+labs(x="|r|")
+save_plot("ambient temperature r density distribution",w=3,h=3)
+p+(p$data)%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),scales="free",axes="all")+aes(x=abs(ambient_temp_interpolated_slope_ambient))
+save_plot("ambient temperature slope density distribution by cell type",w=4,h=3)
+p+(p$data)%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),scales="free",axes="all")+aes(x=abs(ambient_temp_interpolated_cor_ambient))+labs(x="r")
+save_plot("ambient temperature r density distribution by cell type",w=4,h=3)
+
+goft::gamma_test(unit_df%>%filter(!is.na(ambient_temp_interpolated_slope_ambient),ambient_temp_interpolated_cor_sig_ambient=="negative")%>%pull(ambient_temp_interpolated_slope_ambient)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(ambient_temp_interpolated_slope_ambient),ambient_temp_interpolated_cor_sig_ambient=="positive")%>%pull(ambient_temp_interpolated_slope_ambient)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(ambient_temp_interpolated_slope_ambient),ambient_temp_interpolated_cor_sig_ambient=="negative")%>%pull(ambient_temp_interpolated_cor_ambient)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(ambient_temp_interpolated_slope_ambient),ambient_temp_interpolated_cor_sig_ambient=="positive")%>%pull(ambient_temp_interpolated_cor_ambient)%>%abs())
+
 # Graph all cells on one graph summarized per ambient_temp_interpolated_bin1
 data<-sumdf%>%
   filter(!is.na(z_bin), session_type %in% c("heat","cold"))%>%
@@ -1692,6 +1753,14 @@ p2<-p+
 p2$layers[[1]]<-NULL
 p2
 save_plot("z-scored df by t-core and cell type as lines during ambient ovx", w=3.2,h=2)
+
+p1<-p+aes(color="black", fill="grey50")+scale_color_manual(values="black")+scale_fill_manual(values="grey50")
+p1
+save_plot("z-scored df by t-amb as lines", w=3,h=3)
+p1+(p1$data)%>%filter(gonad=="intact")
+save_plot("z-scored df by t-amb as lines intact", w=2.5,h=2)
+p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
+save_plot("z-scored df by t-amb as lines ovx", w=4,h=2)
 
 #as lines, plotted by other stimuli
 other_targets<-target_cols_binary[target_cols_binary != "ambient_temp_interpolated_cor_sig_ambient"]
@@ -1879,15 +1948,28 @@ pie2+data2%>%filter(pellet!="pre-OVX")+aes(fill=temp_cor_sig_ambient)
 save_plot("temperature correlation types during ambient by pellet ovx",w=3,h=1.8)
 
 ##correlation coefficient
-t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_coef=mean(ambient_temp_interpolated_cor_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_coef ~ pellet)
+amb_cor_test<-wilcox_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_coef=mean(ambient_temp_interpolated_cor_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_coef ~ pellet)
+stats<-tibble()
+stats_tcore<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_cor_ambient ~ pellet, random=~1|mouse))
+  # anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_cor_ambient ~ pellet, random=~1|mouse))
+  anov<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(ambient_temp_interpolated_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
   print(anov)
-  anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_cor_ambient ~ pellet, random=~1|mouse))
+  # anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_cor_ambient ~ pellet, random=~1|mouse))
+  anov2<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(temp_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
   print(anov2)
+  
+  anov$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov$var=rownames(anov)
+  stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
+  anov2$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov2$var=rownames(anov2)
+  stats_tcore<-rbind(stats_tcore, anov2%>%filter(var!="(Intercept)"))
 }
+stats<-stats%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
+stats_tcore<-stats_tcore%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
 
 p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_cor_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
   geom_violin()+
@@ -1911,16 +1993,30 @@ last_plot()+aes(y=abs(temp_cor_ambient))
 save_plot("temperature coefficient by cell type and pellet ovx during ambient",w=3.2,h=2)
 
 ##slope
-t_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_slope=mean(ambient_temp_interpolated_slope_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_slope ~ pellet)
+amb_slope_test<-wilcox_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_slope=mean(ambient_temp_interpolated_slope_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_slope ~ pellet)
+
+stats<-tibble()
+stats_tcore<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient))%>%pull(ambient_temp_interpolated_cor_sig_ambient)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
-  anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_slope_ambient ~ pellet, random=~1|mouse))
+  # anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_slope_ambient ~ pellet, random=~1|mouse))
+  anov<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(ambient_temp_interpolated_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
   print(anov)
   
-  anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_slope_ambient ~ pellet, random=~1|mouse))
+  # anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_slope_ambient ~ pellet, random=~1|mouse))
+  anov2<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(temp_slope_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
   print(anov2)
+  
+  anov$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov$var=rownames(anov)
+  stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
+  anov2$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov2$var=rownames(anov2)
+  stats_tcore<-rbind(stats_tcore, anov2%>%filter(var!="(Intercept)"))
 }
+stats<-stats%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
+stats_tcore<-stats_tcore%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
 
 p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_slope_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
   geom_violin()+
@@ -2006,7 +2102,7 @@ if (ambient_cell_type_lme[["ambient_temp_interpolated_cor_sig_ambient","p-value"
     lme_df<-lme_df%>%rbind(tibble(".y."="ambient_temp_interpolated_mean_cor_ambient_", "group1"=comp[1], "group2"=comp[2], "F_value"=lme[["ambient_temp_interpolated_cor_sig_ambient","F-value"]], "p"=lme[["ambient_temp_interpolated_cor_sig_ambient","p-value"]]))
   }
 }
-lme_df<-lme_df%>%mutate(p.adj=p*nrow(lme_df), p.adj=ifelse(p.adj>1,1,p.adj))%>%add_significance()%>%
+lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(),
          y.position=seq(1.23,1.23+(0.23*(nrow(lme_df)-1)),0.23))
@@ -2062,6 +2158,41 @@ ggplot(data, aes(x=minutes, y=male_social_stimulus))+
   scale_x_continuous(expand=c(0,0))+
   ms
 save_plot("male social schematic",w=4.4,h=1.44)
+
+# Check distrubution type for correlation coefficient and slope
+p<-ggplot(unit_df%>%filter(!is.na(male_interaction_fc)), aes(sample = male_interaction_fc))+
+  stat_qq(colour = "grey50",shape=21,fill="grey80") +
+  stat_qq_line(colour = "red", linewidth = 0.8) +
+  labs(title = "delta Z Q-Q", x = "Theoretical", y = "Sample") +
+  ms+
+  theme(plot.title=element_text(size=12,margin=margin(b=4)))
+p
+save_plot("male slope Q-Q",w=3,h=3)
+p+aes(sample=male_interaction_auc)+labs(title="roc Q-Q")
+save_plot("male roc Q-Q",w=3,h=3)
+p+(p$data)%>%filter(male_interaction_auc_sig!="neutral")+facet_wrap(vars(male_interaction_auc_sig),scales="free_x")
+save_plot("male slope Q-Q by cell type",w=3,h=3)
+last_plot()+aes(sample=male_interaction_auc)+labs(title="roc Q-Q")
+save_plot("male roc Q-Q by cell type",w=3,h=3)
+
+p<-ggplot(unit_df%>%filter(!is.na(male_interaction_fc)), aes(x = (male_interaction_fc)))+
+  geom_density()+
+  ms+
+  labs(x="|Slope|",y="Density")+
+  theme(plot.title=element_text(size=12,margin=margin(b=4)))
+p
+save_plot("male slope density distribution",w=3,h=3)
+p+aes(x=male_interaction_auc)+labs(x="|auc|")
+save_plot("male r density distribution",w=3,h=3)
+p+(p$data)%>%filter(male_interaction_auc_sig!="neutral")+facet_wrap(vars(male_interaction_auc_sig),scales="free",axes="all")+aes(x=abs(male_interaction_fc))
+save_plot("male slope density distribution by cell type",w=4,h=3)
+p+(p$data)%>%filter(male_interaction_auc_sig!="neutral")+facet_wrap(vars(male_interaction_auc_sig),scales="free",axes="all")+aes(x=abs(male_interaction_auc))+labs(x="|auc|")
+save_plot("male r density distribution by cell type",w=4,h=3)
+
+goft::gamma_test(unit_df%>%filter(!is.na(male_interaction_fc),male_interaction_auc_sig=="activated")%>%pull(male_interaction_fc)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(male_interaction_fc),male_interaction_auc_sig=="suppressed")%>%pull(male_interaction_fc)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(male_interaction_fc),male_interaction_auc_sig=="activated")%>%pull(male_interaction_auc)%>%abs())
+goft::gamma_test(unit_df%>%filter(!is.na(male_interaction_fc),male_interaction_auc_sig=="suppressed")%>%pull(male_interaction_auc)%>%abs())
 
 ###plot all cells on one graph
 ##1-minute binned data
@@ -2411,11 +2542,17 @@ save_plot("male interaction cell type legend",w=4,h=0.5)
 data<-unit_df%>%filter(male_interaction_auc_sig!="neutral")%>%
   mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig,levels=c("activated","suppressed"),labels=c("Activated","Suppressed")))
 
+stats<-tibble()
 for (cell_type in data%>%pull(male_interaction_auc_sig)%>%unique()){
   print(cell_type)
-  anova<-anova(lme(data=data%>%filter(male_interaction_auc_sig==cell_type, !is.na(male_interaction_auc), pellet !="pre-OVX"), fixed = male_interaction_auc ~ pellet, random=~1|mouse))
-  print(anova)
+  anov<-anova(lme(data=data%>%filter(male_interaction_auc_sig==cell_type, !is.na(male_interaction_auc), pellet !="pre-OVX"), fixed = male_interaction_auc ~ pellet, random=~1|mouse))
+  print(anov)
+  
+  anov$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov$var=rownames(anov)
+  stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
 }
+stats<-stats%>%adjust_pvalue(method="holm",p.col="p-value", output.col = "p.adj")%>%add_significance()
 
 p<-ggplot(data, aes(x=pellet, y=2*abs(male_interaction_auc-0.5),fill=pellet))+
   geom_violin()+
@@ -2440,12 +2577,21 @@ p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig)
 save_plot("male auc by cell type and pellet ovx",w=3.2,h=2)
 
 ##delta-Z
-t_test(data%>%filter(pellet!="pre-OVX")%>%group_by(mouse,pellet,male_interaction_auc_sig)%>%summarize(mean_fc = mean(male_interaction_fc))%>%ungroup()%>%mutate(pellet=droplevels(pellet))%>%group_by(male_interaction_auc_sig), mean_fc ~ pellet)
+wilcox_test(data%>%filter(pellet!="pre-OVX")%>%group_by(mouse,pellet,male_interaction_auc_sig)%>%summarize(mean_fc = mean(male_interaction_fc))%>%ungroup()%>%mutate(pellet=droplevels(pellet))%>%group_by(male_interaction_auc_sig), mean_fc ~ pellet)
+
+stats<-tibble()
 for (cell_type in data%>%pull(male_interaction_auc_sig)%>%unique()){
   print(cell_type)
-  anova<-anova(lme(data=data%>%filter(male_interaction_auc_sig==cell_type, !is.na(male_interaction_auc), pellet !="pre-OVX"), fixed = male_interaction_fc ~ pellet, random=~1|mouse))
-  print(anova)
+  # anov<-anova(lme(data=data%>%filter(male_interaction_auc_sig==cell_type, !is.na(male_interaction_auc), pellet !="pre-OVX"), fixed = male_interaction_fc ~ pellet, random=~1|mouse))
+  anov<-lme4::glmer(data=data%>%filter(male_interaction_auc_sig==cell_type, !is.na(male_interaction_auc), pellet !="pre-OVX"), formula=abs(male_interaction_fc) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
+  print(anov)
+  
+  anov<-anov%>%as.data.frame()
+  anov$male_interaction_auc_sig=cell_type
+  anov$var=rownames(anov)
+  stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
 }
+stats<-stats%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
 
 p<-ggplot(data, aes(x=pellet, y=abs(male_interaction_fc), fill=pellet))+
   geom_violin()+
@@ -2552,7 +2698,7 @@ if (male_cell_type_lme[["male_interaction_auc_sig","p-value"]]<0.05){
     lme_df<-lme_df%>%rbind(tibble(".y."="mean_auc", "group1"=comp[1], "group2"=comp[2], "F_value"=lme[["male_interaction_auc_sig","F-value"]], "p"=lme[["male_interaction_auc_sig","p-value"]]))
   }
 }
-lme_df<-lme_df%>%mutate(p.adj=p*nrow(lme_df), p.adj=ifelse(p.adj>1,1,p.adj))%>%add_significance()%>%
+lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(),
          y.position=seq(1.23,1.23+(0.2*(nrow(lme_df)-1)),0.2))
