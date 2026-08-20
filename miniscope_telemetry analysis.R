@@ -2059,7 +2059,7 @@ save_plot("ambient lm correlation significance by pellet",w=4,h=5)
 ambient_lm_anova<-anova(lme(data=lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX"),
                             fixed=ambient_temp_interpolated_mean_cor_ambient_ ~ pellet,
                             random=~1|mouse))
-t_test(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX")%>%mutate(across(where(is.factor), droplevels)),
+test<-t_test(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX")%>%mutate(across(where(is.factor), droplevels)),
        ambient_temp_interpolated_mean_cor_ambient_ ~ pellet)
 
 p<-ggplot(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant"), aes(x=pellet,y=ambient_temp_interpolated_mean_cor_ambient_))+
@@ -2077,7 +2077,7 @@ p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(breaks=c())
 save_plot("ambient lm correlation coefficient intact",w=1.4,h=2)
 p+(p$data)%>%filter(pellet!="pre-OVX")+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("ambient lm accuracy ovx",w=2.2,h=2)
-p+(p$data)%>%filter(pellet!="pre-OVX")+coord_cartesian(ylim=c(0.95,1))+labs(title="Treatment ns",y=element_blank())+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge = 2))
+p+(p$data)%>%filter(pellet!="pre-OVX")+coord_cartesian(ylim=c(0.95,1))+labs(title=paste0("Treatment ", p_to_stars(test$p)),y=element_blank())+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge = 2))
 save_plot("ambient lm accuracy ovx zoom y",w=2.2,h=2)
 
 #intact cell types
@@ -2533,7 +2533,7 @@ pie+facet_wrap(vars(pellet))
 save_plot("male response cell types by pellet",w=4,h=2)
 pie+(pie$data)%>%filter(pellet=="pre-OVX")
 save_plot("male response cell types intact",w=1.5,h=1.5)
-pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))+labs(title="Treatment p=0.09")
+pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))+labs(title=paste0("Treatment ",p_to_stars(chisq$p.value)))
 save_plot("male response cell types ovx by pellet",w=3,h=1.8)
 (pie+theme(legend.position = "top"))%>%get_legend()%>%as_ggplot()
 save_plot("male interaction cell type legend",w=4,h=0.5)
@@ -2619,6 +2619,7 @@ data<-sumdf%>%filter(!is.na(male_interaction))
 male_removal_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_removal_minutes=max(session_time_minutes))
 data<-data%>%merge(male_removal_minutes,all.x=T)%>%filter(session_time_minutes < male_removal_minutes-1) #remove post-male time from analysis
 
+if ("male_logistic_auc_df.rds" %nin% list.files("./output/")){
 auc_df<-tibble()
 for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(male_interaction_auc_sig)%>%unique(),"all")){
   cells<-unit_df%>%filter(male_interaction_auc_sig==cell_type)%>%pull(unit_id_id)%>%unique()
@@ -2688,24 +2689,28 @@ auc_df<-auc_df%>%
   mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig,levels=c("all (shuffle)","all","neutral","activated","suppressed"),labels=c("All (shuffle)","All","Neutral","Activated","Suppressed")))%>%
   merge(lm_df%>%select(pellet,session_id,mouse),all.x=T)
 
+write_output(auc_df, name="male_logistic_auc_df")
+}else{
+  auc_df<-read_rds("./output/male_logistic_auc_df.rds")
+}
+
 male_cell_type_lme<-anova(lme(data = auc_df%>%filter(male_interaction_auc_sig %in% c("All","Neutral","Activated","Suppressed")),
                               fixed = mean_auc ~ male_interaction_auc_sig,
                               random = ~1|mouse))
-if (male_cell_type_lme[["male_interaction_auc_sig","p-value"]]<0.05){
-  lme_df<-tibble()
-  for (comp in list(c("All","All (shuffle)"), c("All","Neutral"), c("All","Activated"), c("All","Suppressed"))){
-    lme<-anova(lme(data = auc_df%>%filter(!is.na(male_interaction_auc_sig), male_interaction_auc_sig %in% comp), 
-                   fixed = mean_auc ~ male_interaction_auc_sig, 
-                   random=~1|mouse))
-    lme_df<-lme_df%>%rbind(tibble(".y."="mean_auc", "group1"=comp[1], "group2"=comp[2], "F_value"=lme[["male_interaction_auc_sig","F-value"]], "p"=lme[["male_interaction_auc_sig","p-value"]]))
-  }
+lme_df<-tibble()
+for (comp in list(c("All","All (shuffle)"), c("All","Neutral"), c("All","Activated"), c("All","Suppressed"))){
+  lme<-anova(lme(data = auc_df%>%filter(!is.na(male_interaction_auc_sig), male_interaction_auc_sig %in% comp), 
+                 fixed = mean_auc ~ male_interaction_auc_sig, 
+                 random=~1|mouse))
+  lme_df<-lme_df%>%rbind(tibble(".y."="mean_auc", "group1"=comp[1], "group2"=comp[2], "F_value"=lme[["male_interaction_auc_sig","F-value"]], "p"=lme[["male_interaction_auc_sig","p-value"]]))
 }
 lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(),
          y.position=seq(1.23,1.23+(0.2*(nrow(lme_df)-1)),0.2))
+if (male_cell_type_lme[["male_interaction_auc_sig", "p-value"]]>0.05){lme_df<-lme_df%>%filter(group2=="All (shuffle)")}
 
-t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%mutate(pellet=as.character(pellet)), mean_auc~pellet)
+test<-t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%mutate(pellet=as.character(pellet)), mean_auc~pellet)
 
 p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interaction_auc_sig))+ms+
   geom_violin(scale = "width",width=0.9)+ 
@@ -2722,7 +2727,7 @@ p+auc_df%>%filter(pellet=="pre-OVX")+labs(title=paste("Cell type",p_to_stars(mal
 save_plot("male interaction auc by cell type intact",w=3.8,h=2.2)
 p+auc_df%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
 save_plot("male interaction auc ovx by cell type and pellet",w=4.5,h=2.5)
-p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pellet,fill=pellet)+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide = guide_axis(n.dodge = 2))+coord_cartesian(ylim=c(0,1))+labs(title="Treatment ns")
+p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pellet,fill=pellet)+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide = guide_axis(n.dodge = 2))+coord_cartesian(ylim=c(0,1))+labs(title=paste("Treatment",p_to_stars(test$p)))
 save_plot("male interaction auc ovx all cells by pellet",w=2.2,h=2)
 # last_plot()+coord_cartesian(ylim=c(0.99,1))+labs(title="Treatment ns",y=element_blank())+scale_y_continuous(breaks=seq(0.98,1,0.004))
 # save_plot("male interaction auc ovx all cells by pellet zoom y",w=2.2,h=2)
