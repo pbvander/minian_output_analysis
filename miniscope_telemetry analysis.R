@@ -2616,6 +2616,8 @@ save_plot("male delta Z by cell type and pellet ovx",w=3.2,h=2)
 ##Male logistic regression ----
 # data<-event_df%>%filter(!is.na(z),event=="male_added",!is.na(male_interaction))
 data<-sumdf%>%filter(!is.na(male_interaction))
+male_removal_minutes<-data%>%filter(male_interaction==1)%>%group_by(session_id)%>%summarize(male_removal_minutes=max(session_time_minutes))
+data<-data%>%merge(male_removal_minutes,all.x=T)%>%filter(session_time_minutes < male_removal_minutes-1) #remove post-male time from analysis
 
 auc_df<-tibble()
 for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(male_interaction_auc_sig)%>%unique(),"all")){
