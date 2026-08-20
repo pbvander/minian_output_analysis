@@ -2708,7 +2708,7 @@ lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(),
          y.position=seq(1.23,1.23+(0.2*(nrow(lme_df)-1)),0.2))
-if (male_cell_type_lme[["male_interaction_auc_sig", "p-value"]]>0.05){lme_df<-lme_df%>%filter(group2=="All (shuffle)")}
+if (male_cell_type_lme[["male_interaction_auc_sig", "p-value"]]>0.05){lme_df<-lme_df%>%filter(group2=="All (shuffle)")%>%adjust_pvalue(method="holm")}
 
 test<-t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%mutate(pellet=as.character(pellet)), mean_auc~pellet)
 
@@ -2723,7 +2723,7 @@ p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interactio
                    guide=guide_axis(n.dodge=2))+
   theme(legend.position = "none",
         plot.title=element_text(size=12,hjust=0,margin=margin(b=3,unit="pt")))
-p+auc_df%>%filter(pellet=="pre-OVX")+labs(title=paste("Cell type",p_to_stars(male_cell_type_lme["male_interaction_auc_sig","p-value"])))+draw_pvalue(data=lme_df, label="p.adj.signif",inherit.aes=F)
+p+auc_df%>%filter(pellet=="pre-OVX")+labs(title=paste("Cell type",p_to_stars(male_cell_type_lme["male_interaction_auc_sig","p-value"])))+draw_pvalue(data=lme_df, label="p.adj.signif",inherit.aes=F)+coord_cartesian(ylim=c(0,1.4))
 save_plot("male interaction auc by cell type intact",w=3.8,h=2.2)
 p+auc_df%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")
 save_plot("male interaction auc ovx by cell type and pellet",w=4.5,h=2.5)
