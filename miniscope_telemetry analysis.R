@@ -1097,14 +1097,16 @@ data_downsampled<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var 
 data_group_gonad<-transform_data_piegraph(unit_df, animal_var = "group_gonad", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
-chisq<-data%>%
+chi_data<-data%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
   pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
   ungroup()%>%
   select(-pellet)%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
-  as.matrix()%>%
+  as.matrix()
+
+chisq<-chi_data%>%
   chisq.test()
 
 chisq_torpor_only<-data_torpor_only%>%
@@ -1117,15 +1119,39 @@ chisq_torpor_only<-data_torpor_only%>%
   as.matrix()%>%
   chisq.test()
 
-chisq_ds<-data_downsampled%>%
+chi_data_ds<-data_downsampled%>%
   filter(pellet!="pre-OVX")%>%
   select(-percent)%>%
   pivot_wider(names_from = temp_cor_sig_torpor, values_from = n)%>%
   ungroup()%>%
   select(-pellet)%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
-  as.matrix()%>%
+  as.matrix()
+
+chisq_ds<-chi_data_ds%>%
   chisq.test()
+
+chi_stats<-tibble()
+for (class in c("positive","negative")){
+  for (dataset in c("observed","downsampled")){
+    other_class<-ifelse(class=="positive", "negative","positive")
+    # print(paste(dataset,class,other_class))
+    if(dataset=="observed"){chi_d<-chi_data} 
+    if(dataset=="downsampled"){chi_d<-chi_data_ds}
+    class_counts<-chi_d[,class]
+    other_counts<-rowSums(chi_d[, c(other_class, "neutral")])
+    
+    class_table  <- cbind(class = class_counts, others = other_counts)
+    test<-chisq.test(class_table)
+    assign(paste("chisq",dataset,class,other_class,sep="_"), test)
+    # print(test)
+    
+    chi_stats<-rbind(chi_stats, tibble("dataset"=dataset, "temp_cor_sig_torpor"=class, "p"=test$p.value))
+  }
+}
+chi_stats<-rbind(chi_stats%>%filter(dataset=="observed")%>%adjust_pvalue(method="holm"),
+                 chi_stats%>%filter(dataset=="downsampled")%>%adjust_pvalue(method="holm"))%>%add_significance()
+
 
 chisq_ds_to<-data_torpor_only_ds%>%
   filter(pellet!="pre-OVX")%>%
@@ -1153,7 +1179,12 @@ pie<-ggplot(data, aes(x="", y=percent, fill=temp_cor_sig_torpor))+ms+theme_pie+
   facet_wrap(vars(pellet))
 pie
 save_plot("torpor temperature correlation types by pellet",w=8,h=5)
-pie+data%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title=paste0("Treatment ", p_to_stars(chisq$p.value)))+theme(strip.text.x = element_text(margin=margin(t=0,b=0)))
+pie2<-pie
+pie2$layers[[2]]<-NULL
+pie2+data%>%filter(pellet!="pre-OVX")%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))%>%merge(chi_stats%>%filter(dataset=="observed"),all=T)%>%mutate(p.adj.signif=ifelse(is.na(p.adj.signif),"",p.adj.signif))+
+  labs(title=paste0("Treatment ", p_to_stars(chisq$p.value)))+
+  theme(strip.text.x = element_text(margin=margin(t=0,b=0)))+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%\n",p.adj.signif),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, lineheight=0.8, fontface="bold")
 save_plot("torpor tempertaure correlation types ovx", w=3,h=2)
 pie+data_group_gonad+facet_wrap(vars(group_gonad))
 save_plot("torpor temperature correlation types by group_gonad",w=3,h=3)
@@ -1163,7 +1194,10 @@ pie+data_torpor_only
 save_plot("torpor temperature correlation types by pellet torpor only",w=8,h=5)
 pie+data_torpor_only_ds
 save_plot("torpor temperature correlation types ovx by pellet downsample torpor only",w=8,h=5)
-pie+data_downsampled%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))+labs(title=paste0("Treatment ", p_to_stars(chisq_ds$p.value)))+theme(strip.text.x = element_text(margin=margin(t=0,b=0)))
+pie2+data_downsampled%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))%>%merge(chi_stats%>%filter(dataset=="downsampled"),all=T)%>%mutate(p.adj.signif=ifelse(is.na(p.adj.signif),"",p.adj.signif))+
+  labs(title=paste0("Treatment ", p_to_stars(chisq_ds$p.value)))+
+  theme(strip.text.x = element_text(margin=margin(t=0,b=0)))+
+  geom_text(aes(label = paste0(round(percent,digits=0),"%\n",p.adj.signif),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, lineheight=0.8, fontface="bold")
 save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3,h=2)
 get_legend(pie+theme(legend.position="top"))%>%as_ggplot()
 save_plot("torpor cell type legend",w=4,h=2)
