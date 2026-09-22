@@ -449,6 +449,7 @@ cr_cells<-A_all%>%distinct(unit_id_id,.keep_all = T)%>%group_by(cr_unit_id_id)%>
 
 ##### Single-cell analysis
 unit_df<-unit_analysis(sumdf%>%filter(!is.na(z_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations)
+unit_df_s<-unit_analysis(sumdf%>%filter(!is.na(z_bin)), roc_session_type = c("torpor","heat","cold","male_interaction"), shuf_iters=shuffle_iterations, .predictor = "S_bin")
 male_unit_df<-roc_analysis(male_df%>%filter(!is.na(z), session_type=="male_interaction"), session_type = "male_interaction", predictor="z", shuf_iters = shuffle_iterations)%>%
   rename(male_interaction_auc_nobin = male_interaction_auc, male_interaction_fc_nobin = male_interaction_fc, male_interaction_auc_sig_nobin = male_interaction_auc_sig)
 unit_df<-merge(unit_df,male_unit_df,all.x=T)
@@ -595,6 +596,7 @@ write_output(lm_predict_df_torpor_ovx_ds_sum)
 write_output(cell_type_lm_df)
 write_output(cell_type_predict_df)
 write_output(unit_df)
+write_output(unit_df_s)
 write_output(unit_df_torpor_ovx_ds_sum)
 write_rds(pca_ls,"./output/pca_ls.rds")
 write_output(pca_time)
@@ -618,6 +620,7 @@ lm_predict_df_torpor_ovx_ds_sum<-read_rds("./output/lm_predict_df_torpor_ovx_ds_
 cell_type_lm_df<-read_rds("./output/cell_type_lm_df.rds")
 cell_type_predict_df<-read_rds("./output/cell_type_predict_df.rds")
 unit_df<-read_rds("./output/unit_df.rds")
+unit_df_s<-read_rds("./output/unit_df_s.rds")
 unit_df_torpor_ovx_ds_sum<-read_rds("./output/unit_df_torpor_ovx_ds_sum.rds")
 pca_ls<-read_rds("./output/pca_ls.rds")
 pca_time<-read_rds("./output/pca_time.rds")
@@ -862,8 +865,12 @@ p
 save_plot("z-scored df by temperature and cell type as lines", w=3,h=3)
 p+(p$data)%>%filter(gonad=="intact")+coord_cartesian(ylim=c(-1,NA))
 save_plot("z-scored df by temperature and cell type as lines intact", w=2.5,h=2)
+p+(p$data)%>%filter(gonad=="intact")+aes(y=S_bin)+labs(y="Estimated spiking rate (AU)")
+save_plot("s by temperature and cell type as lines intact", w=2.5,h=3)
 p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
 save_plot("z-scored df by temperature and cell type as lines ovx", w=4,h=2)
+last_plot()+aes(y=S_bin)+labs(y="Estimated\nspiking rate (AU)")
+save_plot("s by temperature and cell type as lines ovx", w=4.2,h=2)
 last_plot()+
   data_ds%>%filter(gonad=="ovx")%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive")))+
   scale_x_continuous(breaks=seq(24,40,4))
@@ -884,6 +891,8 @@ p1+(p1$data)%>%filter(gonad=="intact")
 save_plot("z-scored df by temperature as lines intact", w=2.5,h=2)
 p1+(p1$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
 save_plot("z-scored df by temperature as lines ovx", w=4,h=2)
+last_plot()+aes(y=S_bin)+labs(y="Estimated spiking rate (AU)")
+save_plot("s by temperature as lines ovx", w=4,h=3)
 
 data_trs<-(p$data)%>%group_by(session_id)%>%mutate(temp=scales::rescale(temp))
 p2<-p
@@ -1096,6 +1105,8 @@ data_downsampled<-transform_data_piegraph(unit_df_torpor_ovx_ds_sum, animal_var 
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 data_group_gonad<-transform_data_piegraph(unit_df, animal_var = "group_gonad", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
+data_s<-transform_data_piegraph(unit_df_s, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
+  mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 
 chi_data<-data%>%
   filter(pellet!="pre-OVX")%>%
@@ -1199,6 +1210,8 @@ pie2+data_downsampled%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2")
   theme(strip.text.x = element_text(margin=margin(t=0,b=0)))+
   geom_text(aes(label = paste0(round(percent,digits=0),"%\n",p.adj.signif),color=temp_cor_sig_torpor,x=1.1),position = position_stack(vjust=0.5,reverse = T), size=5, lineheight=0.8, fontface="bold")
 save_plot("torpor temperature correlation types ovx by pellet downsampled",w=3,h=2)
+pie+data_s%>%mutate(pellet=factor(pellet,levels=c("OVX+Veh","OVX+E2"),labels=c("OVX+Vehicle","OVX+E2")))%>%filter(pellet!="pre-OVX")
+save_plot("torpor temperature correlation types ovx spiking analysis", w=3, h=2)
 get_legend(pie+theme(legend.position="top"))%>%as_ggplot()
 save_plot("torpor cell type legend",w=4,h=2)
 get_legend(pie+
@@ -1242,6 +1255,7 @@ torpor_slope_test<-wilcox_test(unit_df%>%filter(temp_cor_sig_torpor!="neutral", 
 torpor_slope_test_ds<-wilcox_test(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,temp_cor_sig_torpor)%>%summarize(mean_coef=mean(temp_slope_torpor))%>%group_by(temp_cor_sig_torpor), mean_coef ~ pellet)
 stats<-tibble()
 stats_ds<-tibble()
+stats_s<-tibble()
 for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_sig_torpor)%>%unique()){
   if (cell_type=="neutral"){next}
   print(cell_type)
@@ -1261,8 +1275,14 @@ for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_
   # anov_torpor_only<-anova(lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_torpor_TempBelow34==cell_type), fixed=temp_slope_torpor_TempBelow34 ~ pellet, random=~1|mouse))
   # print(anov_torpor_only)
   
+  anov_s<-lme4::glmer(data=unit_df_s%>%filter(gonad=="ovx",temp_cor_sig_torpor==cell_type, temp_slope_torpor!=0), formula=abs(temp_slope_torpor) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
+  print(anov_s)
+  anov_s$var = rownames(anov_s)
+  anov_s<-anov_s%>%mutate(data_type="spike",temp_cor_sig_torpor=cell_type)%>%as_tibble()%>%filter(var=="pellet")
+  
   stats<-rbind(anov, stats)
   stats_ds<-rbind(anov_ds, stats_ds)
+  stats_s<-rbind(anov_s, stats_s)
 }
 y_ds<-unit_df_torpor_ovx_ds_sum%>%group_by(temp_cor_sig_torpor)%>%summarize(y.position=1.2*max(abs(temp_slope_torpor)))%>%mutate(data_type="downsampled")
 y<-unit_df%>%group_by(temp_cor_sig_torpor)%>%summarize(y.position=1.15*max(abs(temp_slope_torpor)))%>%mutate(data_type="observed")%>%filter(!is.na(y.position))
@@ -1310,6 +1330,13 @@ p+(p$data)%>%filter(gonad=="ovx")+
 save_plot("torpor temperature slope by cell type ovx", w=3.2, h=2)
 last_plot()+coord_cartesian(ylim=c(0,0.8))
 save_plot("torpor temperature slope by cell type ovx zoom y",w=3.2,h=2)
+
+p+unit_df_s%>%filter(gonad=="ovx", temp_cor_sig_torpor != "neutral")+
+  scale_fill_manual(values=post_ovx_scale)+
+  # draw_pvalue(data=stats, label="p.adj.signif", inherit.aes=F,vjust=-0.1)+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.25)))+
+  scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
+save_plot("torpor temperature slope by cell type ovx spiking analysis", w=3.4, h=2)
 
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
