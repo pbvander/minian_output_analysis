@@ -135,14 +135,14 @@ unit_analysis <- function(data, roc_session_type, .predictor="z_bin", lag_window
   
   ##Correlation analysis with continuous Y variables
   if (verbose){print("Performing correlation analysis with continuous response variables")}
-  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters, verbose=verbose)
-  cor_df_torpor_only<-correlation_analysis(data%>%filter(temp<34), .session_type="torpor", response=c("temp", "temp_change1"), shuf_iters = shuf_iters, verbose=verbose)%>%
+  cor_df_torpor<-correlation_analysis(data, .session_type="torpor", response=c("temp", "temp_change1"), predictor = .predictor, shuf_iters = shuf_iters, verbose=verbose)
+  cor_df_torpor_only<-correlation_analysis(data%>%filter(temp<34), .session_type="torpor", response=c("temp", "temp_change1"), predictor = .predictor, shuf_iters = shuf_iters, verbose=verbose)%>%
     rename_with(~ paste0(.x, "_TempBelow34"), contains("temp"))
-  cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), shuf_iters = shuf_iters, verbose=verbose)
+  cor_df_ambient<-correlation_analysis(data, .session_type=c("cold","heat"), response=c("ambient_temp_interpolated","temp"), predictor = .predictor, shuf_iters = shuf_iters, verbose=verbose)
   
   ##Lag correlation analysis
   if (verbose){print("Performing lag analysis during torpor")}
-  max_cor_df_torpor<-unit_lag_analysis(telem_data = t_df, miniscope_data = data, lag_session_type = "torpor", response="temp", window=lag_window, shuf_iters = shuf_iters, verbose=verbose)
+  max_cor_df_torpor<-unit_lag_analysis(telem_data = t_df, miniscope_data = data, lag_session_type = "torpor", response="temp", window=lag_window, predictor = .predictor, shuf_iters = shuf_iters, verbose=verbose)
   
   ##Combine data and add metadata
   d<-merge(roc_df,cor_df_torpor,all=T)%>%merge(cor_df_torpor_only,all=T)%>%merge(cor_df_ambient,all=T)%>%merge(max_cor_df_torpor, all=T)
