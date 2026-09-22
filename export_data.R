@@ -6,7 +6,7 @@ source("C:/Users/paulv/Documents/GitHub/minian_output_analysis/functions.R")
 output_dir<-"C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Data/Torpor project cross-experiment analyses/Miniscope/output"
 setwd(output_dir)
 
-## Set new column names for improved interpretability (optional, removed renaming step below to keep original names)----
+## Set new column names for improved interpretability (optional, removed renaming step below to keep original names)
 rename_list<-list(
   master_session_id = "session_id",
   cross_day_master_session_id = "cr_session_id",
@@ -43,9 +43,7 @@ rename_list2<-list(
   male_presence = "male_interaction"
 )
 
-
-## Read, write, organize raw frame-wise data ----
-files<-grep("^2_",list.files("./int"),value = T)
+##Make directories
 if (!"./for dryad" %in% list.dirs()){
   dir.create("./for dryad")
   dir.create("./for dryad/raw framewise data")
@@ -58,6 +56,39 @@ if (!"./for dryad" %in% list.dirs()){
   print("Folders created")
 }else{print("Already exists")}
 
+## Read and write summarized data
+sumdf<-read_rds("sumdf.rds")%>%
+  select(session_id,
+         cr_session_id,
+         unit_id_id,
+         cr_unit_id_id,
+         session_type,
+         telem_ts,
+         pellet,
+         YrA_bin,
+         z_bin,
+         temp,
+         act,
+         fed_status,
+         ambient_temp_interpolated,
+         male_interaction
+  )
+if (!dir.exists("./for dryad/binned data")){dir.create("./for dryad/binned data")}
+write_csv(sumdf, "./for dryad/binned data/sumdf.csv")
+
+A_all<-read_rds("A_all.rds")%>%select(
+  session_id,
+  cr_session_id,
+  unit_id_id,
+  cr_unit_id_id,
+  cr,
+  A
+)
+if (!dir.exists("./for dryad/spatial data")){dir.create("./for dryad/spatial data")}
+write_csv(A_all, "./for dryad/spatial data/A_all.csv")
+
+## Read, write, organize raw frame-wise data
+files<-grep("^2_",list.files("./int"),value = T)
 for (file in files){
   gonad=ifelse(grepl("pre-ovx", file), "pre_ovx","post_ovx")
   print(paste(gonad,file))
@@ -88,40 +119,9 @@ for (file in files){
     destination<-case_when(dataset$session_type[1] == "torpor" ~ "torpor",
                            dataset$session_type[1] %in% c("heat","cold") ~ "heat_cold",
                            dataset$session_type[1] == "male_interaction" ~ "social")
-    mouse<-strsplit((dataset%>%pull(master_cell_id))[1], "_")[[1]][1]
+    mouse<-strsplit((dataset%>%pull(unit_id_id))[1], "_")[[1]][1]
     path<-paste0("./for dryad/raw framewise data/",gonad,"/",destination,"/",mouse,".csv")
     print(path)
     write_csv(dataset, path)
   }
 }
-
-## Write summarized data
-sumdf<-read_rds("sumdf.rds")%>%
-  select(session_id,
-         cr_session_id,
-         unit_id_id,
-         cr_unit_id_id,
-         session_type,
-         telem_ts,
-         pellet,
-         YrA_bin,
-         z_bin,
-         temp,
-         act,
-         fed_status,
-         ambient_temp_interpolated,
-         male_interaction
-  )
-if (!dir.exists("./for dryad/binned data")){dir.create("./for dryad/binned data")}
-write_csv(sumdf, "./for dryad/binned data/sumdf.csv")
-
-A_all<-read_rds("A_all.rds")%>%select(
-  session_id,
-  cr_session_id,
-  unit_id_id,
-  cr_unit_id_id,
-  cr,
-  A
-)
-if (!dir.exists("./for dryad/spatial data")){dir.create("./for dryad/spatial data")}
-write_csv(sumdf, "./for dryad/binned data/A_all.csv")
