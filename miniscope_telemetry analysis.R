@@ -3275,7 +3275,7 @@ for (sid in unique(d$session_id)){
     }
   if ("male_interaction" %in% (sidt_meta%>%filter(session_id==sid)%>%pull(session_type))){
     print("saving male plot")
-    save_plot(paste0("A by male_interaction_auc_sig_nobin ",sid), plot=p+aes(color=male_interaction_auc_sig_nobin)+scale_color_manual(values=c("neutral" = cell_type_scale[1],
+    save_plot(paste0("A by male_interaction_auc_sig_nobin ",sid), plot=p+aes(color=male_interaction_auc_sig)+scale_color_manual(values=c("neutral" = cell_type_scale[1],
                                                                                                                                                "activated" = cell_type_scale[2],
                                                                                                                                                "suppressed" = cell_type_scale[3]))+labs(title="Social"), w=2.1,h=2.3)
     }
