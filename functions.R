@@ -952,7 +952,7 @@ get_torpor_y <- function(data){
 
 plot_cross_registration <- function(){
   data<-transform_data_piegraph(A_all, animal_var="session_id", cell_var="cr")%>%mutate(cr=factor(cr, levels=c(TRUE,FALSE), labels=c("Yes","No")))
-  data_all<-transform_data_piegraph(A_all, animal_var=NULL, cell_var="cr")%>%mutate(cr=factor(cr, levels=c(TRUE,FALSE), labels=c("Yes","No")))
+  data_all<-transform_data_piegraph(A_all%>%group_by(unit_id_id)%>%summarize(cr=first(cr)), animal_var=NULL, cell_var="cr")%>%mutate(cr=factor(cr, levels=c(TRUE,FALSE), labels=c("Yes","No")))
   
   p<-ggplot(data, aes(x="", y=percent, fill=cr))+ms+theme_pie+
     theme(legend.position = "right",
