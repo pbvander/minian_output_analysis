@@ -58,6 +58,37 @@ target_cols_binary<-c("temp_cor_sig_torpor",
 labs<-c("T-Core",
         "T-Amb", "Social")
 
+export_cols_sum<-c("session_id",
+               "cr_session_id",
+               "unit_id_id",
+               "cr_unit_id_id",
+               "session_type",
+               "telem_ts",
+               "pellet",
+               "YrA_bin",
+               "z_bin",
+               "temp",
+               "act",
+               "fed_status",
+               "ambient_temp_interpolated",
+               "male_interaction")
+export_cols_raw<-c("session_id",
+                "cr_session_id",
+                "unit_id_id",
+                "cr_unit_id_id",
+                "session_type",
+                "frame",
+                "time_ms",
+                "miniscope_ts",
+                "pellet",
+                "YrA",
+                "z",
+                "temp",
+                "act",
+                "fed_status",
+                "ambient_temp_interpolated",
+                "male_interaction")
+
 #Global graph settings:
 ms<-list(theme_prism(),
          theme(text=element_text(size=12),
@@ -410,6 +441,8 @@ male_df<-male_df%>%mutate(cr = cr_unit_id_id %in% cr_cells)
 
 setwd(output_dir)
 plot_cross_registration()
+write_csv(A_all%>%group_by(unit_id_id)%>%summarize(cr=first(cr)), "./output/Miniscope_cr_efficiency_sourcedata.csv")
+write_csv(transform_data_piegraph(A_all%>%group_by(unit_id_id)%>%summarize(cr=first(cr)), animal_var=NULL, cell_var="cr")%>%mutate(cr=factor(cr, levels=c(TRUE,FALSE), labels=c("Yes","No"))), "./output/Miniscope_cr_efficiency_pie_sourcedata.csv")
 setwd(exp_direc)
 
 if (cross_reg){
@@ -778,6 +811,8 @@ for (id in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique())
             axis.title.x = element_text(margin=margin(t=6,b=0,l=0,r=0,unit="pt")))+
       facet_wrap(vars(unit_id),scales="free_y",axes="all",ncol=2)
     save_plot("z-scored df by body temperature example cells", plot=p, w=2.36,h=3.9)
+    
+    write_csv(p$data%>%select(z_bin, temp, unit_id, unit_id_id, session_id, temp_cor_sig_torpor), "./output/Miniscope_z-tcore_sourcedata.csv")
   }
 }
 
@@ -849,6 +884,11 @@ p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c
 save_plot("df_f0 by temperature all ovx cells",w=2.3,h=4)
 p+data_ds_labels%>%filter(gonad=="ovx")+labels_ovx_ds+pellet_label_ovx_ds+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by temperature all ovx cells downsample labels and sort",w=2.3,h=4)
+
+write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, temp, temp_bin1, unit_id_id, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient, male_interaction_auc_sig, temp_cor_torpor,pellet), "./output/Miniscope_intact_heatmap_sourcedata.csv")
+write_csv(data%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, temp, temp_bin1, unit_id_id, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient, male_interaction_auc_sig, temp_cor_torpor,pellet), "./output/Miniscope_ovx_observed_heatmap_sourcedata.csv")
+write_csv(data_ds%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, temp, temp_bin1, unit_id_id, temp_cor_sig_torpor, temp_cor_torpor, pellet), "./output/Miniscope_ovx_ds_heatmap_sourcedata.csv")
+write_csv(data_ds_labels%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, temp, temp_bin1, unit_id_id, temp_cor_sig_torpor, temp_cor_torpor, pellet), "./output/Miniscope_ovx_dsLabels_heatmap_sourcedata.csv")
 
 #as lines
 p<-ggplot(data%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive"))),
@@ -968,6 +1008,8 @@ p1<-ggplot(data, aes(x=session_time_minutes, y=unit_id))+ms+ls+ridge_set+set+sca
 p2<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y_continuous(breaks=c(24,38),expand = c(0.25,0.25))
 p3<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T), aes(x="",y=unit_id))+ms+set+rect_label_set+labs(y=element_blank())
 save_plot("example session selected cells and timepoints fewer cells",plot=p1+p3+p2+plot_layout(heights=c(5,1),widths=c(20,1),ncol=2),w=4,h=3.5)
+
+write_csv(data%>%select(YrA, session_id, unit_id_id, session_time_minutes, temp, unit_id, temp_cor_sig_torpor),"./output/Miniscope_raw_trace_sourcedata.csv")
 
 # Temp-temp_change1 correlation during torpor
 p<-ggplot(sumdf%>%filter(session_type=="torpor")%>%ungroup()%>%distinct(mouse,telem_ts,.keep_all = T), aes(x=temp_change1, y=temp))+
@@ -1093,6 +1135,10 @@ p+(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral"))+
   scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature correlation coefficient by cell type and pellet downsampled", w=3.2,h=2)
 
+write_csv(unit_df%>%filter(temp_cor_sig_torpor!="neutral")%>%select(unit_id_id, pellet, temp_cor_sig_torpor, temp_cor_torpor, temp_slope_torpor, mouse), "./output/Miniscope_r_slope_sourcedata.csv")
+write_csv(unit_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor!="neutral")%>%select(unit_id_id, pellet, temp_cor_sig_torpor, temp_cor_torpor, temp_slope_torpor, mouse), "./output/Miniscope_r_slope_ds_sourcedata.csv")
+
+
 # Correlation type frequencies
 #Grouped by pellet
 data<-transform_data_piegraph(unit_df, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
@@ -1107,6 +1153,10 @@ data_group_gonad<-transform_data_piegraph(unit_df, animal_var = "group_gonad", c
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
 data_s<-transform_data_piegraph(unit_df_s, animal_var = "pellet", cell_var = "temp_cor_sig_torpor")%>%
   mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor,levels=c("neutral","negative","positive")))
+
+write_csv(data, "./output/Miniscope_observed_piechart_sourcedata.csv")
+write_csv(data_downsampled, "./output/Miniscope_ds_piechart_sourcedata.csv")
+write_csv(data_s%>%filter(pellet!="pre-OVX"), "./output/Miniscope_spikeanalysis_piechart_sourcedata.csv")
 
 chi_data<-data%>%
   filter(pellet!="pre-OVX")%>%
@@ -1507,6 +1557,10 @@ p+lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant")+
   coord_cartesian(ylim=c(0,1.28))
 save_plot("lm correlation coefficient by pellet downsample", w=2.2,h=2)
 
+write_csv(lm_df%>%filter(temp_cor_sig_torpor_=="significant", pellet!="pre-OVX")%>%select(session_id, temp_mean_cor_torpor_, pellet, mouse), "./output/Miniscope_ovx_lm_sourcedata.csv")
+write_csv(lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant", pellet!="pre-OVX")%>%select(session_id, temp_mean_cor_torpor_, pellet, mouse), "./output/Miniscope_ovx_lm_ds_sourcedata.csv")
+
+
 data<-cell_type_lm_df%>%
   merge(lm_df%>%select(session_id,mouse),all.x=T)%>%
   rbind(lm_df%>%filter(gonad=="intact")%>%select(session_id,temp_mean_cor_torpor_,temp_mean_cor_shuf_torpor_,temp_cor_sig_torpor_,mouse)%>%mutate(temp_cor_sig_torpor="All"))%>%
@@ -1516,6 +1570,7 @@ data<-cell_type_lm_df%>%
 cell_type_lme<-anova(lme(data = data%>%filter(!is.na(temp_mean_cor_torpor_), temp_cor_sig_torpor %in% c("All","Neutral","Positive", "Negative")), 
                          fixed = temp_mean_cor_torpor_ ~ temp_cor_sig_torpor, 
                          random=~1|mouse))
+stat_save(cell_type_lme%>%rownames_to_column(), "Miniscope_t-core_lm_celltype_lme.csv")
 if (cell_type_lme[["temp_cor_sig_torpor","p-value"]]<0.05){
   lme_df<-tibble()
   for (comp in list(c("All","All (shuffle)"), c("All","Neutral"), c("All","Negative"), c("All","Positive"))){
@@ -1527,6 +1582,7 @@ lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(),
          y.position=seq(1.14,1.14+(0.17*(nrow(lme_df)-1)),0.17)+0.04)
+stat_save(lme_df, "Miniscope_t-core_lm_celltype_pairwise_lme.csv")
 
 p<-ggplot(data, aes(x=temp_cor_sig_torpor,y=temp_mean_cor_torpor_))+
   geom_violin(aes(fill=temp_cor_sig_torpor),scale="width",width=0.95)+
@@ -1544,6 +1600,8 @@ p<-ggplot(data, aes(x=temp_cor_sig_torpor,y=temp_mean_cor_torpor_))+
   scale_x_discrete(labels=c("All (shuffle)","All","Neutral","Negative","Positive"), guide=guide_axis(n.dodge = 2))
 p
 save_plot("lm correlation by cell type",w=3,h=2.3)
+
+write_csv(data%>%select(-temp_cor_sig_torpor_, -temp_mean_cor_shuf_torpor_), "./output/Miniscope_cellType_lm_sourcedata.csv")
 
 ##LM predictions
 for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique()){
@@ -1570,6 +1628,8 @@ for (sess in sumdf%>%filter(session_type=="torpor")%>%pull(session_id)%>%unique(
   save_plot(paste("predicted temp",sess,"torpor downsampled"),w=6,h=6)
   p+data_cell_type+facet_wrap(vars(temp_cor_sig_torpor),axes="all",nrow=1)+labs(title=element_blank())
   save_plot(paste("predicted temp",sess,"torpor cell types"),w=4.7,h=1.8)
+  
+  if (sess=="MT29_2025_05_22_session1"){write_csv(data%>%rename("observed"=true, "telem_ts"=id, "cv_fold"=fold), "./output/Miniscope_predicted_temp_sourcedata.csv")}
 }
 
 ##LM weight
@@ -1606,6 +1666,7 @@ p<-ggplot(data,aes(x=time_minutes,y=ambient_temp_interpolated))+
   facet_wrap(vars(session_type),scales="free_x",labeller = labeller(.default = tools::toTitleCase),space = "free_x")
 p
 save_plot("ambient temperature schematic",w=4.2,h=2.2)
+write_csv(data%>%select(session_id, time_minutes, session_type, ambient_temp_interpolated), "./output/Miniscope_t-amb_rep_data.csv")
 
 ##T-Core
 data<-sumdf%>%
@@ -1781,6 +1842,11 @@ save_plot("df_f0 by ambient temperature all intact cells",w=2.3,h=4.1)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by ambient temperature all ovx cells",w=2.3,h=4.4)
 
+write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, ambient_temp_interpolated, ambient_temp_interpolated_bin1, unit_id_id, ambient_temp_interpolated_cor_sig_ambient, temp_cor_sig_torpor, male_interaction_auc_sig, ambient_temp_interpolated_cor_ambient, pellet),
+          "./output/Miniscope_intact_heatmap_tamb.csv")
+write_csv(data%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, ambient_temp_interpolated, ambient_temp_interpolated_bin1, unit_id_id, ambient_temp_interpolated_cor_sig_ambient, temp_cor_sig_torpor, male_interaction_auc_sig, ambient_temp_interpolated_cor_ambient, pellet),
+          "./output/Miniscope_ovx_heatmap_tamb.csv")
+
 #as lines
 p<-ggplot(data%>%mutate(ambient_temp_interpolated_cor_sig_ambient=factor(ambient_temp_interpolated_cor_sig_ambient, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive"))),
           aes(x=ambient_temp_interpolated, y=z_bin, color=ambient_temp_interpolated_cor_sig_ambient, fill=ambient_temp_interpolated_cor_sig_ambient))+
@@ -1896,6 +1962,8 @@ p3<-ggplot(data, aes(x=session_time_minutes, y=temp))+ms+ls+temp_set+set+scale_y
 p4<-ggplot(data%>%ungroup()%>%distinct(unit_id,.keep_all = T),aes(x="",y=unit_id))+ms+set+rect_label_set
 save_plot("example session subset data ambient fewer cells",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(5,1,1),widths=c(20,1),ncol=2),w=4.4,h=3.5)
 
+write_csv(data%>%select(YrA, session_id, unit_id_id, session_time_minutes, temp, ambient_temp_interpolated, unit_id, ambient_temp_interpolated_cor_sig_ambient), "./output/Miniscope_raw_trace_t-amb_src.csv")
+
 ## By temeprature
 for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
   print(id)
@@ -1931,7 +1999,7 @@ for (id in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)
       facet_wrap(vars(unit_id),scales="free_y",axes="all",ncol=2)
     p1
     save_plot("z-scored df by ambient temperature example cells", w=2.36, h=3.9)
-    
+    write_csv((p1$data)%>%select(z_bin, ambient_temp_interpolated, unit_id, unit_id_id, session_id, ambient_temp_interpolated_cor_sig_ambient), "./output/Miniscope_z_t-amb_example_cells.csv")
   }
   
   ## Temperature bins
@@ -2098,6 +2166,9 @@ save_plot("ambient temperature slope by cell type and pellet ovx",w=3.2,h=2)
 last_plot()+aes(y=abs(temp_slope_ambient))
 save_plot("temperature slope by cell type and pellet ovx during ambient",w=3.2,h=2)
 
+write_csv(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")%>%
+            select(unit_id_id, pellet, ambient_temp_interpolated_cor_sig_ambient, ambient_temp_interpolated_cor_ambient, ambient_temp_interpolated_slope_ambient, mouse), 
+          "./output/Miniscope_r_slope_tamb_sourcedata.csv")
 
 ##ambient LM results ----
 #LM significance by pellet
@@ -2156,6 +2227,7 @@ data<-ambient_cell_type_lm_df%>%
 ambient_cell_type_lme<-anova(lme(data = data%>%filter(!is.na(ambient_temp_interpolated_mean_cor_ambient_), ambient_temp_interpolated_cor_sig_ambient %in% c("All","Neutral","Positive")), 
                          fixed = ambient_temp_interpolated_mean_cor_ambient_ ~ ambient_temp_interpolated_cor_sig_ambient, 
                          random=~1|mouse)) 
+stat_save(ambient_cell_type_lme%>%rownames_to_column(), "Miniscope_tamb_celltype_lme.csv")
 if (ambient_cell_type_lme[["ambient_temp_interpolated_cor_sig_ambient","p-value"]]<0.05){
   lme_df<-tibble()
   for (comp in list(c("All","All (shuffle)"), c("All","Neutral"), c("All","Negative"), c("All","Positive"))){
@@ -2167,6 +2239,7 @@ lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
   mutate(xmin=factor(group1,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(), 
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Negative","Positive"))%>%as.numeric(),
          y.position=seq(1.23,1.23+(0.23*(nrow(lme_df)-1)),0.23))
+stat_save(lme_df, "Miniscope_tamb_celltype_posthoc")
 
 p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_interpolated_mean_cor_ambient_))+
   geom_violin(aes(fill=ambient_temp_interpolated_cor_sig_ambient),scale="width",width=0.95)+
@@ -2184,6 +2257,8 @@ p<-ggplot(data, aes(x=ambient_temp_interpolated_cor_sig_ambient,y=ambient_temp_i
         plot.title = element_text(size=12,hjust=0,margin=margin(b=3)))
 p
 save_plot("ambient lm correlation by cell type",w=2.8,h=1.9)
+
+write_csv(data%>%select(-ambient_temp_interpolated_mean_cor_shuf_ambient_, -ambient_temp_interpolated_cor_sig_ambient_), "./output/Miniscope_tamb_celltype_lm_srcdata.csv")
 
 ##LM predictions (ambient)
 for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_id)%>%unique()){
@@ -2207,6 +2282,8 @@ for (sess in sumdf%>%filter(session_type %in% c("cold","heat"))%>%pull(session_i
   save_plot(paste("predicted temp",sess,"ambient"),w=1.7,h=1.8)
   p+data_cell_type+facet_wrap(vars(ambient_temp_interpolated_cor_sig_ambient),axes="all",nrow=1)+labs(title=element_blank())
   save_plot(paste("predicted temp",sess,"ambient cell types"),w=4.7,h=1.8)
+  
+  if (sess == "MT31_2025_11_23_session1"){write_csv(data%>%rename(observed=true, telem_ts=id, cv_fold=fold), "./output/Miniscope_tamb_predict_sourcedata.csv")}
 }
 
 ### dF/F0 - male social stimulus relationship ----
@@ -2314,6 +2391,9 @@ p+labels_intact+plot_layout(widths = c(15,1))
 save_plot("df_f0 by male interactin time bin all intact cells",w=1.9,h=3.8)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by male interaction time bin all ovx cells",w=1.8,h=4.5)
+
+write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, male_interaction, telem_ts, time_bin, session_time_minutes, unit_id_id, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient),
+          "./output/Miniscope_social_heatmap_intact_src.csv")
 
 #as lines
 data<-data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed")))
@@ -2494,6 +2574,8 @@ p3<-p3+data+scale_y_continuous(limits=c(34.9,38.1),breaks=c(35,38))+scale_x_cont
 p4<-p4+data%>%ungroup()%>%distinct(unit_id,.keep_all = T)
 save_plot("example session subset data male_interaction fewer cells",plot=p1+p4+p2+plot_spacer()+p3+plot_layout(heights=c(5,1,1),widths=c(20,1),ncol=2),w=4,h=3.3)
 
+write_csv(data%>%select(YrA, session_id, unit_id_id, session_time_minutes, temp, male_interaction, unit_id, male_interaction_auc_sig), "./output/Miniscope_social_raw_traces_src.csv")
+
 ##plot values by male_interaction for each session
 for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>%unique()){
   print(id)
@@ -2527,6 +2609,7 @@ for (id in sumdf%>%filter(session_type=="male_interaction")%>%pull(session_id)%>
                                  scale_y_continuous(breaks=seq(-2,3,0.5)),
                                  scale_y_continuous(breaks=seq(-1.2,3,0.6))))
     save_plot("z by male interaction example cells", w=2.6,h=3.7)
+    write_csv((last_plot()$data)%>%select(z_bin, telem_ts, male_interaction, unit_id, unit_id_id, session_id, male_interaction_auc_sig), "./output/Miniscope_z_social_src.csv")
   }
 }
 
@@ -2598,6 +2681,8 @@ pie+(pie$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet))+labs(title=p
 save_plot("male response cell types ovx by pellet",w=3,h=1.8)
 (pie+theme(legend.position = "top"))%>%get_legend()%>%as_ggplot()
 save_plot("male interaction cell type legend",w=4,h=0.5)
+
+write_csv(data, "./output/Miniscope_social_pie_src.csv")
 
 ##AUROC
 data<-unit_df%>%filter(male_interaction_auc_sig!="neutral")%>%
@@ -2674,6 +2759,9 @@ save_plot("male delta Z by cell type intact",w=2,h=1.8)
 p+(p$data)%>%filter(pellet!="pre-OVX")+facet_wrap(vars(male_interaction_auc_sig),axes="all",scales="free_y")+labs(title="Treatment ns (both cell types)")+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"), guide=guide_axis(n.dodge = 2))
 save_plot("male delta Z by cell type and pellet ovx",w=3.2,h=2)
 
+write_csv(data%>%select(unit_id_id, session_id, male_interaction_auc_sig, male_interaction_fc, male_interaction_auc, pellet, mouse)%>%mutate(male_interaction_rocscore=2*abs(male_interaction_auc-0.5)),
+          "./output/Miniscope_social_deltaz_auroc_src.csv")
+
 ##Male logistic regression ----
 # data<-event_df%>%filter(!is.na(z),event=="male_added",!is.na(male_interaction))
 data<-sumdf%>%filter(!is.na(male_interaction))
@@ -2722,6 +2810,7 @@ for (cell_type in c(unit_df%>%filter(!is.na(male_interaction_auc_sig))%>%pull(ma
                 axis.title.x=element_text(margin=margin(t=3)),
                 axis.title.y=element_text(margin=margin(r=3)))
         save_plot(paste(sid,cell_type,"male interaction roc"),plot=p,w=1.6,h=1.8)
+        write_csv(p$data, "./output/Miniscope_social_roc_rep_src.csv")
       }
     }
     
@@ -2758,6 +2847,8 @@ write_output(auc_df, name="male_logistic_auc_df")
 male_cell_type_lme<-anova(lme(data = auc_df%>%filter(male_interaction_auc_sig %in% c("All","Neutral","Activated","Suppressed")),
                               fixed = mean_auc ~ male_interaction_auc_sig,
                               random = ~1|mouse))
+write_csv(male_cell_type_lme%>%rownames_to_column(), "./output/Miniscope_social_celltype_lme.csv")
+
 lme_df<-tibble()
 for (comp in list(c("All","All (shuffle)"), c("All","Neutral"), c("All","Activated"), c("All","Suppressed"))){
   lme<-anova(lme(data = auc_df%>%filter(!is.na(male_interaction_auc_sig), male_interaction_auc_sig %in% comp), 
@@ -2770,6 +2861,7 @@ lme_df<-lme_df%>%adjust_pvalue(method="holm")%>%add_significance()%>%
          xmax=factor(group2,levels=c("All (shuffle)", "All","Neutral","Activated","Suppressed"))%>%as.numeric(),
          y.position=seq(1.23,1.23+(0.2*(nrow(lme_df)-1)),0.2))
 if (male_cell_type_lme[["male_interaction_auc_sig", "p-value"]]>0.05){lme_df<-lme_df%>%filter(group2=="All (shuffle)")%>%adjust_pvalue(method="holm")}
+stat_save(lme_df, "Miniscope_social_all-allshuffle_lme")
 
 test<-t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%mutate(pellet=as.character(pellet)), mean_auc~pellet)
 
@@ -2792,6 +2884,9 @@ p+auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig =="All")+aes(x=pell
 save_plot("male interaction auc ovx all cells by pellet",w=2.2,h=2)
 # last_plot()+coord_cartesian(ylim=c(0.99,1))+labs(title="Treatment ns",y=element_blank())+scale_y_continuous(breaks=seq(0.98,1,0.004))
 # save_plot("male interaction auc ovx all cells by pellet zoom y",w=2.2,h=2)
+
+write_csv(auc_df%>%filter(pellet=="pre-OVX"), "./output/Miniscope_social_auroc_intact_src.csv")
+write_csv(auc_df%>%filter(pellet!="pre-OVX", male_interaction_auc_sig=="All"), "./output/Miniscope_social_auroc_ovx_src.csv")
 
 ####Comparison of tuning across stimuli ----
 # Heat map
@@ -2847,6 +2942,7 @@ for (target in target_cols){
   
   t=t+1
 }
+write_csv(heatmap_df_intact%>%select(unit_id_id, var, val), "./output/Miniscope_heatmap_allvars_src.csv")
 
 #scatter plots
 combos<-combinations(length(target_cols),2,target_cols)
@@ -2997,6 +3093,9 @@ for (i in 1:length(perms_binary[,1])){
   p
   p+data%>%filter(pellet=="pre-OVX")%>%count(across(all_of(perms_binary[i,])))
   save_plot(paste("ribbon plot intact",perms_binary[i,2],perms_binary[i,1]), w=5,h=3)
+  if(perms_binary[i,2]=="temp_cor_sig_torpor" & perms_binary[i,1]=="ambient_temp_interpolated_cor_sig_ambient"){write_csv(last_plot()$data, "./output/Miniscope_tcore_tamb_ribbon_src.csv")}
+  if(perms_binary[i,2]=="male_interaction_auc_sig" & perms_binary[i,1]=="temp_cor_sig_torpor"){write_csv(last_plot()$data, "./output/Miniscope_social_tcore_ribbon_src.csv")}
+  if(perms_binary[i,2]=="male_interaction_auc_sig" & perms_binary[i,1]=="ambient_temp_interpolated_cor_sig_ambient"){write_csv(last_plot()$data, "./output/Miniscope_social_tamb_ribbon_src.csv")}
   p+data%>%filter(pellet!="pre-OVX")%>%count(across(all_of(perms_binary[i,])),pellet)+facet_wrap(vars(pellet),scales="free_y")
   save_plot(paste("ribbon plot ovx",perms_binary[i,2],perms_binary[i,1]), w=7,h=2.4)
   
@@ -3063,6 +3162,7 @@ data<-lm_df%>%group_by(cr_session_id)%>%
   distinct(cr_session_id, type, .keep_all = T)
   
 cross_day_lm_ttest<-t_test(data%>%filter(pellet=="pre-OVX")%>%ungroup()%>%arrange(cr_session_id), cor ~ type, paired=T)%>%add_significance()%>%add_xy_position()
+stat_save(cross_day_lm_ttest, "Miniscope_cross_day_ttest")
 cross_day_lm_anova_ovx <- anova_test(data%>%filter(pellet!="pre-OVX")%>%ungroup(), cor ~ type * pellet)
 
 p<-ggplot(data, aes(x=type,y=cor))+
@@ -3078,6 +3178,7 @@ p<-ggplot(data, aes(x=type,y=cor))+
 p
 save_plot("cross day training results all", w=2.4,h=2)
 p+data%>%filter(pellet=="pre-OVX")+draw_pvalue(data=cross_day_lm_ttest, label="p.signif", bracket.nudge.y=0.15)
+write_csv(data%>%filter(pellet=="pre-OVX"), "./output/Miniscope_cross_day_sourcedata.csv")
 save_plot("cross day training results intact", w=2.4,h=2)
 p+data%>%filter(pellet!="pre-OVX")+facet_wrap(vars(pellet),axes="all")+theme(plot.title=element_text(size=12,hjust=0, margin=margin(t=0,b=3,l=0,r=0)))+
   labs(title=paste0("Model type ", ((cross_day_lm_anova_ovx%>%pull(p))[1])%>%p_to_stars(),
@@ -3157,6 +3258,7 @@ for (sid in unique(pca_time$session_id)){
         ms+set
       p
       save_plot(paste("PCA by temp",sidt),w=2.2,h=2.48)
+      if (sidt=="MT29_2025_05_22_session1_torpor"){write_csv(data%>%select(telem_ts, session_id, temp, PC1, PC2), "./output/Miniscope_PCA_sourcedata.csv")}
       
       p<-ggplot(data, aes(x=temp,y=PC1))+
         xy_point2()+
@@ -3194,6 +3296,8 @@ for (sid in unique(pca_time$session_id)){
         ms+set
       p
       save_plot(paste("PC1 - ambient temp correlation",sid, "ambient"),w=6,h=5)
+      
+      if(sidt == "MT31_2025_11_23_session1_cold"){write_csv(data%>%select(telem_ts, session_id, ambient_temp_interpolated, PC1, PC2), "./output/Miniscope_PCA_tamb_sourcedata.csv")}
     }
     if(grepl("male_interaction",sidt)){
       data<-d%>%filter(session_id_type==sidt, !is.na(male_interaction))
@@ -3283,7 +3387,9 @@ for (sid in unique(d$session_id)){
     as_ggplot(get_legend(p+theme(legend.position = "right")))
     save_plot("A by temp_cor_sig_torpor legend",w=2,h=2)
   }
-}
+} 
+write_csv(d%>%filter(session_id=="MT35_2026_02_10_session1")%>%select(unit_id_id, session_id, session_type, width, height, A, mouse, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient, male_interaction_auc_sig),
+          "./output/Miniscope_example_fov_sourcedata.csv")
 
 #test for spatial localization of cell types
 pie_data<-tibble()
@@ -3299,6 +3405,13 @@ for (col in target_cols_binary){
   pie_data2<-rbind(pie_data2, 
                    transform_data_piegraph(test2%>%merge(unit_df%>%select(session_id,pellet)%>%distinct(),all.x=T), animal_var="pellet",cell_var="sig_cell_type_count")%>%mutate(var=col))
 }
+write_csv(temp_cor_sig_torpor_test, "./output/Miniscope_t-core_spatial_test.csv")
+write_csv(ambient_temp_interpolated_cor_sig_ambient_test, "./output/Miniscope_t-amb_spatial_test.csv")
+write_csv(male_interaction_auc_sig_test, "./output/Miniscope_social_spatial_test.csv")
+write_csv(rbind(temp_cor_sig_torpor_test%>%rename(cell_type=temp_cor_sig_torpor)%>%mutate(var="temp_cor_sig_torpor"),
+                ambient_temp_interpolated_cor_sig_ambient_test%>%rename(cell_type=ambient_temp_interpolated_cor_sig_ambient)%>%mutate(var="ambient_temp_interpolated_cor_sig_ambient"),
+                male_interaction_auc_sig_test%>%rename(cell_type=male_interaction_auc_sig)%>%mutate(var="male_interaction_auc_sig")),
+          "./output/Miniscope_spatial_tests.csv")
 
 ##plot piegraph of frequencies
 pie<-ggplot(pie_data%>%mutate(var=factor(var,levels=target_cols_binary, labels=c("T-Core","T-Amb","Social"))), aes(x="", y=percent, fill=sig))+ms+theme_pie+
@@ -3326,6 +3439,8 @@ pie2<-pie+
 pie2+facet_grid(vars(var),vars(pellet))
 pie2+(pie2$data)%>%filter(pellet=="pre-OVX")+facet_wrap(vars(var))
 save_plot("spatial analysis by number of cell types sig intact", w=4,h=3)
+
+write_csv((pie2$data)%>%filter(pellet=="pre-OVX"), "./output/Miniscope_spatial_sourcedata.csv")
 
 ####Plot events ----
 #example
@@ -3453,6 +3568,7 @@ p+flow_data_pellet+facet_wrap(vars(pellet))
 save_plot("torpor stability by day by pellet", w=12,h=3)
 p+flow_data_pellet%>%filter(pellet=="pre-OVX")
 save_plot("torpor stability by day by pellet intact", w=4,h=3)
+write_csv(flow_data_pellet%>%filter(pellet=="pre-OVX"), "./output/Miniscope_torpor_stability_counts.csv")
 
 
 p<-ggplot(flow_data, aes(axis1 = temp_cor_sig_torpor1, axis2 = temp_cor_sig_torpor2, y = n)) +
@@ -3507,6 +3623,8 @@ p+new_data%>%filter(day=="day2")+aes(color=temp_cor_sig_torpor2, fill=temp_cor_s
 save_plot("z-scored df by temperature and cell type as lines day 2 data + groups", w=2.5,h=2)
 p+new_data%>%filter(day=="day1")+aes(color=temp_cor_sig_torpor2, fill=temp_cor_sig_torpor2)+labs(title="Day 1 data, Day 2 groups")
 save_plot("z-scored df by temperature and cell type as lines day 1 data, day 2 groups", w=2.5,h=2)
+
+write_csv(new_data%>%select(temp_cor_sig_torpor1,temp_cor_sig_torpor2,temp,z_bin, unit_id_id, session_id), "./output/Miniscope_stability_tuning_sourcedata.csv")
 
 #correlation coefficient
 data<-unit_df%>%
@@ -3575,6 +3693,8 @@ save_plot("unstable cell day 1",w=3,h=2.5)
   plot_layout(heights=c(1.8,1),widths=c(20,1),ncol=2)
 save_plot("unstable cell day 2",w=3,h=2.5)
 
+write_csv(data%>%select(YrA, session_id, unit_id_id, session_time_minutes, temp, day, temp_cor_sig_torpor), "./output/Miniscope_unstable_cell_trace_sourcedata.csv")
+
 #plot example data (binned)
 data<-sumdf%>%filter(unit_id_id == "MT33_2025_11_22_session1_1" | unit_id_id == "MT33_2025_11_23_session1_2")%>%
   mutate(day=factor(start_date), day=paste("Day",as.numeric(day)))%>%
@@ -3591,6 +3711,8 @@ p<-ggplot(data, aes(x=temp, y=z_bin))+
         panel.spacing = unit(12,"pt"))
 p+facet_wrap(vars(day),scale="free_y")
 save_plot("unstable cell z scored df by body temperature", w=4,h=2.5)
+
+write_csv(data%>%select(z_bin, temp, unit_id_id, day, session_id, temp_cor_sig_torpor), "./output/Miniscope_unstable_z-tcore_sourcedata.csv")
 
 ####Write final outputs
 write_sessioninfo()
