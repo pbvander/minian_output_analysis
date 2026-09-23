@@ -3286,34 +3286,19 @@ for (sid in unique(d$session_id)){
 }
 
 #test for spatial localization of cell types
-spatial_test_obs<-tibble()
-spatial_test_null<-tibble()
 pie_data<-tibble()
-test_obs2<-tibble()
 pie_data2<-tibble()
+test_results<-tibble()
 for (col in target_cols_binary){
   print(col)
-  test<-spatial_test(d, col,shuf_iters = shuffle_iterations)
-  test_obs<-(test$observed)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))%>%merge(sumdf%>%ungroup()%>%distinct(session_id,.keep_all = T), all.x=T)
-  test_null<-(test$null)%>%mutate(cell_type=.data[[col]],var=col)%>%select(-all_of(col))%>%merge(sumdf%>%ungroup()%>%distinct(session_id, .keep_all = T), all.x=T)
-  spatial_test_obs<-rbind(spatial_test_obs,test_obs)
-  spatial_test_null<-rbind(spatial_test_null, test_null)
-  test_obs2<-rbind(test_obs2,test_obs%>%group_by(session_id)%>%summarize(sig_cell_type_count = sum(p.adj <0.05))%>%mutate(var=col))
+  test<-spatial_test(d%>%filter(.data[[col]]!="neutral"), col,shuf_iters = shuffle_iterations)
+  assign(paste0(col,"_test"),test)
+  test2<-test%>%group_by(session_id)%>%summarize(sig_cell_type_count = sum(p.adj <0.05))%>%mutate(var=col)
   pie_data<-rbind(pie_data,
-                  transform_data_piegraph(test_obs%>%merge(unit_df,all.x=T),animal_var="pellet",cell_var="sig")%>%mutate(var=col))
+                  transform_data_piegraph(test%>%merge(unit_df%>%select(session_id,pellet)%>%distinct(),all.x=T),animal_var="pellet",cell_var="sig")%>%mutate(var=col))
   pie_data2<-rbind(pie_data2, 
-                   transform_data_piegraph(test_obs2%>%merge(unit_df%>%select(session_id,pellet)), animal_var="pellet",cell_var="sig_cell_type_count")%>%mutate(var=col))
+                   transform_data_piegraph(test2%>%merge(unit_df%>%select(session_id,pellet)%>%distinct(),all.x=T), animal_var="pellet",cell_var="sig_cell_type_count")%>%mutate(var=col))
 }
-
-##plot observed vs null
-p<-ggplot(spatial_test_obs%>%filter(session_id=="MT29_2025_05_22_session1",!is.na(obs_dist),var=="temp_cor_sig_torpor"), aes(x=cell_type,y=obs_dist))+
-  geom_violin(inherit.aes = F, data=spatial_test_null%>%filter(session_id=="MT29_2025_05_22_session1",var=="temp_cor_sig_torpor",!is.na(perm_dist)), aes(x=cell_type,y=perm_dist),fill=NA)+
-  point_summary(aes(color=sig),color="black")+
-  coord_cartesian(ylim=c(0,NA))+
-  labs(x=element_blank(), y="Distance (pixels)")+
-  ms
-p
-save_plot("example observed vs null spatial distance",w=5,h=3)
 
 ##plot piegraph of frequencies
 pie<-ggplot(pie_data%>%mutate(var=factor(var,levels=target_cols_binary, labels=c("T-Core","T-Amb","Social"))), aes(x="", y=percent, fill=sig))+ms+theme_pie+

@@ -590,34 +590,42 @@ plot_pca <- function(pca_ls, unit_df, verbose=T){
 }
 
 spatial_test <- function(data, var, shuf_iters=1000){
-  cell_centroids <- data %>%
-    filter(!is.na(.data[[var]])) %>%
-    group_by(across(all_of(c(var,"unit_id_id","session_id")))) %>%
-    summarize(x = sum(width * A) / sum(A), y = sum(height * A) / sum(A))
-  observed<-cell_centroids%>%
-    group_by(across(all_of(c(var,"session_id"))))%>%
-    summarize(obs_dist = mean(nndist(x,y)))
-  
-  null_distribution <- map_dfr(1:shuf_iters, function(i) {
-    cell_centroids %>%
-      ungroup()%>%
-      mutate("{var}":= sample(cell_centroids%>%pull({{var}}), length(cell_centroids%>%pull({{var}})))) %>% # Shuffle labels
-      group_by(across(all_of(c(var,"session_id")))) %>%
-      summarize(perm_dist = mean(nndist(x, y)))
-  })%>%ungroup()
-  null_distribution_sum<-null_distribution%>%group_by(across(all_of(c(var,"session_id"))))%>%summarize(null_dist=list(perm_dist))
-  
-  observed<-observed%>%
-    merge(null_distribution_sum,all=T)%>%
+  results<-tibble()
+  shuf_results_sum<-tibble()
+  d2<-data%>%filter(!is.na(.data[[var]]))
+  for (sid in unique(d2$session_id)){
+    filt_d<-d2%>%filter(session_id==sid)
+    centroids <- filt_d%>%
+      group_by(across(all_of(c(var,"unit_id_id","session_id")))) %>%
+      summarize(x = sum(width * A) / sum(A), y = sum(height * A) / sum(A))%>%
+      ungroup()
+    for (cell_type in unique(centroids[[var]])){
+      filt_centroids<-centroids%>%filter(.data[[var]]==cell_type)
+      obs_dist=as.matrix(filt_centroids[, c("x", "y")])%>%dist()%>%mean()
+      results=rbind(results, tibble("session_id"=sid, "{var}":=cell_type, "obs_dist"=obs_dist))
+    }
+    shuf_results<-tibble()
+    for (i in 1:shuf_iters){
+      shuf_centroids=centroids%>%mutate("{var}":= sample(centroids%>%pull({{var}}), length(centroids%>%pull({{var}}))))
+      for (cell_type in unique(centroids[[var]])){
+        filt_shuf_centroids<-shuf_centroids%>%filter(.data[[var]]==cell_type)
+        dist=as.matrix(filt_shuf_centroids[, c("x", "y")])%>%dist()%>%mean()
+        shuf_results=rbind(shuf_results, tibble("session_id"=sid, "{var}":=cell_type, "shuf_dist"=dist, "shuf_fold"=i))
+      }
+    }
+    shuf_results_sum<-rbind(shuf_results_sum, shuf_results%>%group_by(across(all_of(c(var,"session_id"))))%>%summarize(null_dist=list(shuf_dist)))
+  }
+  out<-results%>%
+    merge(shuf_results_sum,all=T)%>%
+    drop_na()%>%
     rowwise()%>%
     mutate(rank = rank(c(obs_dist,null_dist))[1],
-           p = rank/shuf_iters,
-           p.adj=p*length(unique(observed%>%pull({{var}}))),
-           p.adj=ifelse(p.adj>1, 1, p.adj),
-           sig=ifelse(p.adj<0.05, "p<0.05","ns"))%>%
+           p = rank/shuf_iters)%>%
+    adjust_pvalue(method="holm")%>%
+    mutate(sig=ifelse(p.adj<0.05, "p<0.05","ns"))%>%
     select(-null_dist)%>%
     ungroup()
-  out<-list("observed"=observed, "null"=null_distribution)
+  
   return(out)
 }
 
