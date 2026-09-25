@@ -762,6 +762,8 @@ facet_data<-rbind(timepoints_per_pellet%>%mutate(data="Observed"), timepoints_pe
 p+facet_data+facet_wrap(vars(data),axes="all")
 save_plot("torpor timepoint by temp and pellet facet",w=5,h=2.2)
 
+write_csv(facet_data%>%select(-timepoints_per_mouse, -mice_per_pellet), "./output/Miniscope_timepoints_src.csv")
+
 #Number of timepoints per mouse
 p<-ggplot(timepoints_per_pellet_per_mouse, aes(x=temp_bin1, y=timepoints_per_mouse))+
   geom_col(aes(fill=pellet),position = position_dodge())+
@@ -907,11 +909,15 @@ p+(p$data)%>%filter(gonad=="intact")+coord_cartesian(ylim=c(-1,NA))
 save_plot("z-scored df by temperature and cell type as lines intact", w=2.5,h=2)
 p+(p$data)%>%filter(gonad=="intact")+aes(y=S_bin)+labs(y="Estimated spiking rate (AU)")
 save_plot("s by temperature and cell type as lines intact", w=2.5,h=3)
-p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
+p1<-p+(p$data)%>%filter(gonad=="ovx")+aes(color=pellet,fill=pellet)+facet_wrap(vars(temp_cor_sig_torpor))+scale_fill_manual(values = post_ovx_scale)+scale_color_manual(values=post_ovx_scale)+theme(legend.position = "none")
+p1
 save_plot("z-scored df by temperature and cell type as lines ovx", w=4,h=2)
-last_plot()+aes(y=S_bin)+labs(y="Estimated\nspiking rate (AU)")
+p2<-p1
+p2$layers[[2]]<-NULL
+p2+aes(y=S_bin)+labs(y="Estimated\nspiking rate (AU)")+coord_cartesian(ylim=c(0,NA))
 save_plot("s by temperature and cell type as lines ovx", w=4.2,h=2)
-last_plot()+
+write_csv((p2$data)%>%select(unit_id_id,session_id,S_bin,temp,pellet,mouse), "./output/Miniscope_spiking_tuning_src.csv")
+p1+
   data_ds%>%filter(gonad=="ovx")%>%mutate(temp_cor_sig_torpor=factor(temp_cor_sig_torpor, levels=c("neutral","negative","positive"),labels=c("Neutral", "Negative","Positive")))+
   scale_x_continuous(breaks=seq(24,40,4))
 save_plot("z-scored df by temperature as line ovx downsample data" ,w=4,h=2)
@@ -1098,7 +1104,7 @@ for (cell_type in unit_df%>%filter(!is.na(temp_cor_sig_torpor))%>%pull(temp_cor_
 }
 stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="holm")%>%add_significance()
 stats_ds<-stats_ds%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_cor_torpor", y.position=1.18,xmin=1,xmax=2)%>%adjust_pvalue(method="holm")%>%add_significance()
-
+write_csv(rbind(stats,stats_ds), "./output/Miniscope_r_lmes.csv")
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_cor_torpor), fill=pellet))+
   geom_violin(aes())+
@@ -1169,6 +1175,7 @@ chi_data<-data%>%
 
 chisq<-chi_data%>%
   chisq.test()
+chisq_to_csv(chisq, "Miniscope_chisq_obs")
 
 chisq_torpor_only<-data_torpor_only%>%
   filter(pellet!="pre-OVX")%>%
@@ -1191,6 +1198,7 @@ chi_data_ds<-data_downsampled%>%
 
 chisq_ds<-chi_data_ds%>%
   chisq.test()
+chisq_to_csv(chisq_ds, "Miniscope_chisq_ds")
 
 chi_stats<-tibble()
 for (class in c("positive","negative")){
@@ -1207,11 +1215,12 @@ for (class in c("positive","negative")){
     assign(paste("chisq",dataset,class,other_class,sep="_"), test)
     # print(test)
     
-    chi_stats<-rbind(chi_stats, tibble("dataset"=dataset, "temp_cor_sig_torpor"=class, "p"=test$p.value))
+    chi_stats<-rbind(chi_stats, tibble("dataset"=dataset, "temp_cor_sig_torpor"=class, "p"=test$p.value, "df"=test$parameter, "statistic"=test$statistic,"method"=test$method))
   }
 }
 chi_stats<-rbind(chi_stats%>%filter(dataset=="observed")%>%adjust_pvalue(method="holm"),
                  chi_stats%>%filter(dataset=="downsampled")%>%adjust_pvalue(method="holm"))%>%add_significance()
+write_csv(chi_stats, "./output/Miniscope_pairwise_chi_stats.csv")
 
 
 chisq_ds_to<-data_torpor_only_ds%>%
@@ -1344,7 +1353,7 @@ stats<-stats%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`Pr(>Chisq)`, ".y." = 
 stats_ds<-stats_ds%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`Pr(>Chisq)`, ".y." = "temp_slope_torpor", group1="OVX+Veh",group2="OVX+E2",xmin=1,xmax=2)%>%
   adjust_pvalue(method="holm")%>%add_significance()%>%mutate(vjust=ifelse(p.adj.signif=="ns",-0.1,0.25))%>%
   merge(y_ds,all.x=T)
-
+write_csv(rbind(stats,stats_ds), "./output/Miniscope_slope_glmes.csv")
 
 p1<-ggplot(unit_df%>%filter(temp_cor_sig_torpor!="neutral"), aes(x=pellet, y=abs(temp_slope_torpor),fill=pellet))+
   geom_violin(aes())+
@@ -1387,6 +1396,7 @@ p+unit_df_s%>%filter(gonad=="ovx", temp_cor_sig_torpor != "neutral")+
   scale_y_continuous(expand=expansion(mult = c(0.05, 0.25)))+
   scale_x_discrete(labels=c("OVX+Vehicle","OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("torpor temperature slope by cell type ovx spiking analysis", w=3.4, h=2)
+write_csv(unit_df_s%>%filter(gonad=="ovx",temp_cor_sig_torpor!="neutral")%>%select(temp_slope_torpor,pellet,unit_id_id,mouse,session_id), "./output/Miniscope_spiking_slope_src.csv")
 
 ## Torpor vs non-torpor bins
 # Examine torpor status labeling
@@ -1512,18 +1522,19 @@ pie+data_ovx_ds
 save_plot("lm correlation significance by pellet downsample",w=4,h=5)
 
 ##LM accuracy
-lm_anova<-anova(lme(data=lm_df%>%filter(temp_cor_sig_torpor_=="significant"),
+lm_anova<-anova(lme(data=lm_df%>%filter(!is.na(temp_cor_sig_torpor_), pellet!="pre-OVX"),
                     fixed=temp_mean_cor_torpor_ ~ pellet,
                     random=~1|mouse))
 lm_anova$var <- rownames(lm_anova)
 lm_anova<-lm_anova%>%mutate(data_type="full")%>%as_tibble()%>%filter(var=="pellet")
-lm_anova_ds<-anova(lme(data=lm_df_torpor_ovx_ds_sum%>%filter(temp_cor_sig_torpor_=="significant"),
+lm_anova_ds<-anova(lme(data=lm_df_torpor_ovx_ds_sum%>%filter(!is.na(temp_cor_sig_torpor_), pellet!="pre-OVX"),
                        fixed=temp_mean_cor_torpor_ ~ pellet,
                        random=~1|mouse))
 lm_anova_ds$var <- rownames(lm_anova_ds)
 lm_anova_ds<-lm_anova_ds%>%mutate(data_type="downsampled")%>%as_tibble()%>%filter(var=="pellet")
 
 stats<-rbind(lm_anova, lm_anova_ds)%>%mutate(group1="OVX+Veh",group2="OVX+E2", p=`p-value`, ".y." = "temp_mean_cor_torpor_", y.position=1.18, xmin=1, xmax=2)%>%add_significance()
+stat_save(stats, "Miniscope_lm_accuracy_stats")
 
 p<-ggplot(lm_df%>%filter(temp_cor_sig_torpor_=="significant"), aes(x=pellet,y=temp_mean_cor_torpor_))+
   geom_violin(aes(fill=pellet))+
@@ -1842,9 +1853,9 @@ save_plot("df_f0 by ambient temperature all intact cells",w=2.3,h=4.1)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by ambient temperature all ovx cells",w=2.3,h=4.4)
 
-write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, ambient_temp_interpolated, ambient_temp_interpolated_bin1, unit_id_id, ambient_temp_interpolated_cor_sig_ambient, temp_cor_sig_torpor, male_interaction_auc_sig, ambient_temp_interpolated_cor_ambient, pellet),
+write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, ambient_temp_interpolated, ambient_temp_interpolated_bin1, temp, unit_id_id, ambient_temp_interpolated_cor_sig_ambient, temp_cor_sig_torpor, male_interaction_auc_sig, ambient_temp_interpolated_cor_ambient, pellet),
           "./output/Miniscope_intact_heatmap_tamb.csv")
-write_csv(data%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, ambient_temp_interpolated, ambient_temp_interpolated_bin1, unit_id_id, ambient_temp_interpolated_cor_sig_ambient, temp_cor_sig_torpor, male_interaction_auc_sig, ambient_temp_interpolated_cor_ambient, pellet),
+write_csv(data%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, ambient_temp_interpolated, ambient_temp_interpolated_bin1, temp, unit_id_id, ambient_temp_interpolated_cor_sig_ambient, temp_cor_sig_ambient, temp_cor_sig_torpor, male_interaction_auc_sig, ambient_temp_interpolated_cor_ambient, pellet),
           "./output/Miniscope_ovx_heatmap_tamb.csv")
 
 #as lines
@@ -2038,6 +2049,7 @@ chisq<-data%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
   as.matrix()%>%
   chisq.test()
+chisq_to_csv(chisq, "Miniscope_tamb_chisq")
 
 chisq2<-data2%>%
   filter(pellet!="pre-OVX")%>%
@@ -2048,6 +2060,7 @@ chisq2<-data2%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
   as.matrix()%>%
   chisq.test()
+chisq_to_csv(chisq2, "Miniscope_tcore-during-ambient_chisq")
 
 pie<-ggplot(data, aes(x="", y=percent, fill=ambient_temp_interpolated_cor_sig_ambient))+ms+theme_pie+
   theme(legend.position = "none",
@@ -2076,6 +2089,9 @@ pie2$layers[[2]]<-geom_text(aes(label = paste0(round(percent,digits=0),"%"),colo
 pie2+data2%>%filter(pellet!="pre-OVX")+aes(fill=temp_cor_sig_ambient)
 save_plot("temperature correlation types during ambient by pellet ovx",w=3,h=1.8)
 
+write_csv(data, "./output/Miniscope_tamb_pie_src.csv")
+write_csv(data2%>%filter(pellet!="pre-OVX"), "./output/Miniscope_tcore-during-ambient_src.csv")
+
 ##correlation coefficient
 amb_cor_test<-wilcox_test(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral", gonad=="ovx")%>%group_by(mouse,pellet,ambient_temp_interpolated_cor_sig_ambient)%>%summarize(mean_coef=mean(ambient_temp_interpolated_cor_ambient))%>%group_by(ambient_temp_interpolated_cor_sig_ambient), mean_coef ~ pellet)
 stats<-tibble()
@@ -2084,21 +2100,24 @@ for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambi
   if (cell_type=="neutral"){next}
   print(cell_type)
   # anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_cor_ambient ~ pellet, random=~1|mouse))
-  anov<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(ambient_temp_interpolated_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
+  anov<-lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=abs(ambient_temp_interpolated_cor_ambient) ~ pellet, random= ~1|mouse)%>%anova()%>%as.data.frame()
   print(anov)
   # anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_cor_ambient ~ pellet, random=~1|mouse))
-  anov2<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(temp_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
+  anov2<-lme(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_ambient==cell_type), fixed=abs(temp_cor_ambient) ~ pellet, random= ~1|mouse)%>%anova()%>%as.data.frame()
   print(anov2)
   
   anov$ambient_temp_interpolated_cor_sig_ambient=cell_type
   anov$var=rownames(anov)
   stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
-  anov2$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov2$temp_cor_sig_ambient=cell_type
   anov2$var=rownames(anov2)
   stats_tcore<-rbind(stats_tcore, anov2%>%filter(var!="(Intercept)"))
 }
-stats<-stats%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
-stats_tcore<-stats_tcore%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
+stats<-stats%>%adjust_pvalue(method="holm",p.col="p-value", output.col = "p.adj")%>%add_significance()
+stats_tcore<-stats_tcore%>%adjust_pvalue(method="holm",p.col="p-value", output.col = "p.adj")%>%add_significance()
+
+write_csv(stats, "./output/Miniscope_tamb_r_lme.csv")
+write_csv(stats_tcore, "./output/Miniscope_tcore-during-ambient_r_lme.csv")
 
 p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_cor_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
   geom_violin()+
@@ -2130,22 +2149,25 @@ for (cell_type in unit_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambi
   if (cell_type=="neutral"){next}
   print(cell_type)
   # anov<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=ambient_temp_interpolated_slope_ambient ~ pellet, random=~1|mouse))
-  anov<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(ambient_temp_interpolated_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
+  anov<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(ambient_temp_interpolated_cor_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()%>%as.data.frame()
   print(anov)
   
   # anov2<-anova(lme(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), fixed=temp_slope_ambient ~ pellet, random=~1|mouse))
-  anov2<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",ambient_temp_interpolated_cor_sig_ambient==cell_type), formula=abs(temp_slope_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()
+  anov2<-lme4::glmer(data=unit_df%>%filter(gonad=="ovx",temp_cor_sig_ambient==cell_type), formula=abs(temp_slope_ambient) ~ pellet + (1|mouse), family = Gamma(link="log"))%>%Anova()%>%as.data.frame()
   print(anov2)
   
   anov$ambient_temp_interpolated_cor_sig_ambient=cell_type
   anov$var=rownames(anov)
   stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
-  anov2$ambient_temp_interpolated_cor_sig_ambient=cell_type
+  anov2$temp_cor_sig_ambient=cell_type
   anov2$var=rownames(anov2)
   stats_tcore<-rbind(stats_tcore, anov2%>%filter(var!="(Intercept)"))
 }
 stats<-stats%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
 stats_tcore<-stats_tcore%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
+
+write_csv(stats, "./output/Miniscope_tamb_slope_glme.csv")
+write_csv(stats_tcore, "./output/Miniscope_tcore-during-ambient_slope_glme.csv")
 
 p<-ggplot(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral"), aes(x=ambient_temp_interpolated_cor_sig_ambient, y=abs(ambient_temp_interpolated_slope_ambient),fill=ambient_temp_interpolated_cor_sig_ambient))+
   geom_violin()+
@@ -2169,6 +2191,9 @@ save_plot("temperature slope by cell type and pellet ovx during ambient",w=3.2,h
 write_csv(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")%>%
             select(unit_id_id, pellet, ambient_temp_interpolated_cor_sig_ambient, ambient_temp_interpolated_cor_ambient, ambient_temp_interpolated_slope_ambient, mouse), 
           "./output/Miniscope_r_slope_tamb_sourcedata.csv")
+write_csv(unit_df%>%filter(ambient_temp_interpolated_cor_sig_ambient!="neutral")%>%
+            select(unit_id_id, pellet, temp_cor_sig_ambient, temp_cor_ambient, temp_slope_ambient, mouse), 
+          "./output/Miniscope_r_slope_tcore-during-ambient_sourcedata.csv")
 
 ##ambient LM results ----
 #LM significance by pellet
@@ -2188,11 +2213,12 @@ pie
 save_plot("ambient lm correlation significance by pellet",w=4,h=5)
 
 ##LM accuracy
-ambient_lm_anova<-anova(lme(data=lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX"),
+ambient_lm_anova<-anova(lme(data=lm_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient_), pellet!="pre-OVX"),
                             fixed=ambient_temp_interpolated_mean_cor_ambient_ ~ pellet,
                             random=~1|mouse))
-test<-t_test(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant", pellet!="pre-OVX")%>%mutate(across(where(is.factor), droplevels)),
+test<-t_test(lm_df%>%filter(!is.na(ambient_temp_interpolated_cor_sig_ambient_), pellet!="pre-OVX")%>%mutate(across(where(is.factor), droplevels)),
        ambient_temp_interpolated_mean_cor_ambient_ ~ pellet)
+stat_save(test, "Miniscope_tamb_lm_ttest")
 
 p<-ggplot(lm_df%>%filter(ambient_temp_interpolated_cor_sig_ambient_=="significant"), aes(x=pellet,y=ambient_temp_interpolated_mean_cor_ambient_))+
   geom_violin(aes(fill=pellet))+
@@ -2209,6 +2235,7 @@ p+(p$data)%>%filter(pellet=="pre-OVX")+scale_x_discrete(breaks=c())
 save_plot("ambient lm correlation coefficient intact",w=1.4,h=2)
 p+(p$data)%>%filter(pellet!="pre-OVX")+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge=2))
 save_plot("ambient lm accuracy ovx",w=2.2,h=2)
+write_csv((last_plot()$data)%>%select(pellet,mouse,session_id,ambient_temp_interpolated_mean_cor_ambient_), "./output/Miniscope_tamb_lm_src.csv")
 p+(p$data)%>%filter(pellet!="pre-OVX")+coord_cartesian(ylim=c(0.95,1))+labs(title=paste0("Treatment ", p_to_stars(test$p)),y=element_blank())+scale_fill_manual(values=post_ovx_scale)+scale_x_discrete(labels=c("OVX+Vehicle", "OVX+E2"),guide=guide_axis(n.dodge = 2))
 save_plot("ambient lm accuracy ovx zoom y",w=2.2,h=2)
 
@@ -2392,8 +2419,10 @@ save_plot("df_f0 by male interactin time bin all intact cells",w=1.9,h=3.8)
 p+data%>%filter(gonad=="ovx")+labels_ovx+pellet_label_ovx+plot_layout(widths = c(20,1,1))
 save_plot("df_f0 by male interaction time bin all ovx cells",w=1.8,h=4.5)
 
-write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, male_interaction, telem_ts, time_bin, session_time_minutes, unit_id_id, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient),
+write_csv(data%>%filter(gonad=="intact")%>%select(YrA_bin, z_bin, male_interaction, telem_ts, time_bin, session_time_minutes, male_entry_minutes, unit_id_id, male_interaction_auc_sig, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient),
           "./output/Miniscope_social_heatmap_intact_src.csv")
+write_csv(data%>%filter(gonad=="ovx")%>%select(YrA_bin, z_bin, male_interaction, telem_ts, time_bin, session_time_minutes, male_entry_minutes, unit_id_id, male_interaction_auc_sig, temp_cor_sig_torpor, ambient_temp_interpolated_cor_sig_ambient, pellet),
+          "./output/Miniscope_social_heatmap_ovx_src.csv")
 
 #as lines
 data<-data%>%mutate(male_interaction_auc_sig=factor(male_interaction_auc_sig, levels=c("neutral","activated","suppressed"),labels=c("Neutral", "Activated","Suppressed")))
@@ -2660,6 +2689,7 @@ chisq<-data%>%
   mutate(across(everything(), ~replace_na(.x,0)))%>%
   as.matrix()%>%
   chisq.test()
+chisq_to_csv(chisq, "Miniscope_social_chisq")
 
 pie<-ggplot(data, aes(x="", y=percent, fill=male_interaction_auc_sig))+ms+theme_pie+
   theme(legend.position = "none",
@@ -2699,6 +2729,7 @@ for (cell_type in data%>%pull(male_interaction_auc_sig)%>%unique()){
   stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
 }
 stats<-stats%>%adjust_pvalue(method="holm",p.col="p-value", output.col = "p.adj")%>%add_significance()
+write_csv(stats, "./output/Miniscope_social_rocscore_lme.csv")
 
 p<-ggplot(data, aes(x=pellet, y=2*abs(male_interaction_auc-0.5),fill=pellet))+
   geom_violin()+
@@ -2738,6 +2769,7 @@ for (cell_type in data%>%pull(male_interaction_auc_sig)%>%unique()){
   stats<-rbind(stats, anov%>%filter(var!="(Intercept)"))
 }
 stats<-stats%>%adjust_pvalue(method="holm",p.col="Pr(>Chisq)", output.col = "p.adj")%>%add_significance()
+write_csv(stats, "./output/Miniscope_social_deltaz_glme.csv")
 
 p<-ggplot(data, aes(x=pellet, y=abs(male_interaction_fc), fill=pellet))+
   geom_violin()+
@@ -2864,6 +2896,7 @@ if (male_cell_type_lme[["male_interaction_auc_sig", "p-value"]]>0.05){lme_df<-lm
 stat_save(lme_df, "Miniscope_social_all-allshuffle_lme")
 
 test<-t_test(auc_df%>%filter(pellet!="pre-OVX",male_interaction_auc_sig=="All")%>%mutate(pellet=as.character(pellet)), mean_auc~pellet)
+stat_save(test, "Miniscope_social_auroc_ttest")
 
 p<-ggplot(auc_df, aes(x=male_interaction_auc_sig,y=mean_auc,fill=male_interaction_auc_sig))+ms+
   geom_violin(scale = "width",width=0.9)+ 
@@ -3716,4 +3749,29 @@ write_csv(data%>%select(z_bin, temp, unit_id_id, day, session_id, temp_cor_sig_t
 
 ####Write final outputs
 write_sessioninfo()
+
+####Source data/stats for paper ----
+files<-grep("Miniscope_", list.files("./output/"),value = T)
+write.csv(files,"./output/Miniscope_source-stats-figure-mappings.csv",row.names = F,col.names = F) #manually assign mappings here then run below
+
+#output
+library(openxlsx)
+
+wb<-loadWorkbook("C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Writing/Papers/Vander et al 2026/source data and stats.xlsx")
+mappings<-read_csv("./output/Miniscope_source-stats-figure-mappings.csv")%>%filter(!is.na(figure)) #should have columns "name" (csv file) and "figure" (figure mapping to paper)
+
+for (row in 1:nrow(mappings)){
+  sheet_name=mappings[[row, "figure"]]
+  if(nchar(sheet_name)>31){
+    sheet_name=gsub("stats (shuffle comparison)","stats", sheet_name)
+  }
+  
+  d<-read_csv(paste0("./output/",mappings[[row,"name"]]),show_col_types = F)
+  addWorksheet(wb, sheet_name)
+  writeData(wb, sheet_name, d)
+}
+
+saveWorkbook(wb, "C:/Users/paulv/Box/correalab/Member Folders/Paul Vander/Writing/Papers/Vander et al 2026/source data and stats.xlsx", overwrite = T)
+
+
 
